@@ -2,13 +2,16 @@
 
 ## Product Purpose
 
-HyperCardSharp is a cross-platform HyperCard stack player and HyperTalk interpreter for retro computing enthusiasts and digital preservationists who want to open and interact with classic Mac HyperCard stacks (`.stk` files) on modern Windows, macOS, and Linux systems without requiring full Mac emulation.
+HyperCardSharp is a cross-platform, native HyperCard stack player and HyperTalk interpreter for retro computing enthusiasts and digital preservationists. It opens classic Mac HyperCard stacks directly on modern Windows, macOS, and Linux systems — no Mac emulation. It handles stacks delivered as raw files, StuffIt (.sit) archives, or Mac disk images (.img), with support for B&W and color display modes, embedded QuickTime MOV playback, and HyperTalk script execution.
 
 ## Technical Stack
 
-- **Language:** C# 12 / .NET 8
-- **UI Framework:** AvaloniaUI (cross-platform, MVVM)
-- **Media Playback:** LibVLCSharp (QuickTime MOV, audio)
+- **Language:** C# 12 / .NET 8 (LTS)
+- **UI Framework:** AvaloniaUI 11.x (cross-platform, MVVM with CommunityToolkit.Mvvm)
+- **Rendering:** SkiaSharp via ICustomDrawOperation for pixel-level bitmap rendering
+- **Media Playback:** LibVLCSharp + LibVLCSharp.Avalonia (QuickTime MOV, audio)
+- **Binary Parsing:** Span<byte> + BinaryPrimitives (big-endian, zero-allocation)
+- **Container Formats:** All native C# — no external tool dependencies
 - **Target Platforms:** Windows 11, macOS, Linux
 - **Distribution:** Self-contained .NET publish (no runtime install required)
 
@@ -16,14 +19,34 @@ HyperCardSharp is a cross-platform HyperCard stack player and HyperTalk interpre
 
 ```
 HyperCardSharp/
-├── Core/
-│   ├── StackParser/        # Binary stack format reader (resource fork layout)
-│   ├── HyperTalk/          # Lexer, parser, and interpreter for HyperTalk scripting
-│   └── Resources/          # PICT, snd, icon, and other resource type parsers
-├── Rendering/              # AvaloniaUI card, field, and button rendering
-├── Media/                  # LibVLCSharp wrapper for QuickTime/audio playback
-└── Xcmd/                   # XCMD/XFCN stub layer — logs unsupported calls, does not crash
+├── src/
+│   ├── HyperCardSharp.Core/          # Binary parsing, stack model, containers
+│   │   ├── Binary/                   # BigEndianReader, MagicDetector, BlockHeader
+│   │   ├── Stack/                    # STAK/MAST/LIST/PAGE/CARD/BKGD/BMAP block parsers
+│   │   ├── Parts/                    # Button, field, part content models
+│   │   ├── Bitmap/                   # WOBA decoder, BitmapImage
+│   │   ├── Containers/               # StuffIt, DiskCopy, HFS, MacBinary, AppleSingle, ResourceFork
+│   │   └── Resources/                # PICT, snd, icon, AddColor decoders
+│   ├── HyperCardSharp.HyperTalk/    # Lexer, parser (AST), interpreter, XCMD stubs
+│   ├── HyperCardSharp.Rendering/    # SkiaSharp card/part/bitmap/color rendering
+│   └── HyperCardSharp.App/          # AvaloniaUI application (views, viewmodels, services)
+├── tests/                            # Unit tests for Core, HyperTalk, Rendering
+└── docs/                             # PLAN.md, stack-format.md, hypertalk-coverage.md
 ```
+
+## Supported Input Formats
+
+- **Raw HyperCard stacks** — STAK magic at offset 0x04, big-endian block structure
+- **StuffIt archives (.sit)** — SIT! magic, native C# LZW decompression
+- **Mac disk images (.img)** — DiskCopy 4.2 format, native C# HFS filesystem parser
+- **MacBinary / AppleSingle / AppleDouble** — wrapper formats preserving resource forks
+- **Auto-detection** — MagicDetector identifies format from first bytes, chains extraction
+
+## Display Modes
+
+- **Black & White** — authentic 1-bit rendering at 512×342 (classic Mac 128K/Plus/SE)
+- **Color** — full color for HC 2.x stacks with AddColor XCMD data (HCcd/HCbg resources)
+- Mode switching via UI toggle — same data, different rendering presentation
 
 ## Known Stack Format Research Areas
 
@@ -37,9 +60,15 @@ The HyperCard binary format is partially reverse-engineered. These areas need fu
 - Foreign language script system encodings
 
 Primary references:
-- [HyperCardPreview by Pierre Lorenzi](https://github.com/PierreLorenzi/HyperCardPreview)
-- [ViperCard](https://github.com/vipercard/vipercard)
-- [OpenXION](http://www.openxion.org/)
+- [HyperCardPreview by Pierre Lorenzi](https://github.com/PierreLorenzi/HyperCardPreview) — deepest binary format work, WOBA decoder (Swift)
+- [hypercard4net](https://github.com/giawa/hypercard4net) — partial C# HyperCard parser
+- [ViperCard](https://github.com/vipercard/vipercard) — browser-based HyperCard reimplementation
+- [OpenXION](http://www.openxion.org/) — open source HyperTalk interpreter (Java)
+- [Definitive Guide to HC Stack File Format](https://www.kreativekorp.com/swdownload/wildfire/HC%20FILE%20FORMAT%202010.TXT)
+- [AddColor Resource Format](https://hypercard.org/addcolor_resource_format/)
+- [thecloudexpanse/sit](https://github.com/thecloudexpanse/sit) — StuffIt LZW reference (C)
+- [libfshfs](https://github.com/libyal/libfshfs) — HFS filesystem documentation
+- [HFSExplorer](https://github.com/unsound/hfsexplorer) — HFS parser reference (Java)
 
 ## Engineering Principles
 
@@ -77,9 +106,11 @@ Primary references:
 ## User Experience Requirements
 
 - Stacks open with a single file picker action — no configuration required to view a basic stack.
+- Accepts raw stacks, .sit archives, and .img disk images transparently via auto-detection.
 - Unsupported features (XCMDs, missing codecs, unknown resource types) degrade gracefully with a visible log entry, never a crash.
 - HyperTalk script errors surface as readable messages, not raw exceptions.
 - The player presents cards at authentic HyperCard resolution (512×342 base), with optional scaling.
+- B&W and Color display modes are toggled via the View menu.
 
 ## Implementation Expectations
 
