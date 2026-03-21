@@ -36,6 +36,9 @@ bld/
 # macOS
 .DS_Store
 
+# Sample stacks (local testing only)
+samples/
+
 # Test results
 TestResults/
 *.trx
