@@ -1,14 +1,27 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:HyperCardSharp.App.Controls"
         x:Class="HyperCardSharp.App.Views.MainWindow"
-        Title="HyperCardSharp"
-        Width="512" Height="374"
-        CanResize="True">
-    <Panel Background="White">
-        <TextBlock Text="HyperCardSharp"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   FontSize="24"
-                   Foreground="Black"/>
-    </Panel>
+        Title="{Binding Title}"
+        Width="660" Height="460"
+        MinWidth="400" MinHeight="300"
+        CanResize="True"
+        Background="#333333">
+
+    <DockPanel>
+        <!-- Status bar at bottom -->
+        <Border DockPanel.Dock="Bottom" Background="#222222" Padding="8,4">
+            <TextBlock Text="{Binding StatusText}"
+                       Foreground="#CCCCCC"
+                       FontSize="12"
+                       FontFamily="Consolas, Courier New, monospace"/>
+        </Border>
+
+        <!-- Card display area — content auto-scales to fit -->
+        <controls:SkiaBitmapControl x:Name="CardDisplay"
+                                     Source="{Binding CurrentBitmap}"
+                                     Margin="4"
+                                     HorizontalAlignment="Stretch"
+                                     VerticalAlignment="Stretch"/>
+    </DockPanel>
 </Window>

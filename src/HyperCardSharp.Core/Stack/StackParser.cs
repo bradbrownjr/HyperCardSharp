@@ -1,4 +1,5 @@
 using HyperCardSharp.Core.Binary;
+using HyperCardSharp.Core.Bitmap;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -63,6 +64,13 @@ public class StackParser
         var blocks = EnumerateBlocks(fileData);
         StackBlock? stackBlock = null;
         MasterBlock? masterBlock = null;
+        ListBlock? listBlock = null;
+        FontTableBlock? fontTable = null;
+        StyleTableBlock? styleTable = null;
+        var cards = new List<CardBlock>();
+        var backgrounds = new List<BackgroundBlock>();
+        var pageHeaders = new List<BlockHeader>();
+        var bitmaps = new Dictionary<int, BitmapBlock>();
 
         foreach (var header in blocks)
         {
@@ -83,16 +91,83 @@ public class StackParser
                     var nonZeroOffsets = masterBlock.Offsets.Count(o => o != 0);
                     _logger.LogInformation("MAST: {Count} non-zero offset entries", nonZeroOffsets);
                     break;
+
+                case "LIST":
+                    listBlock = ListBlock.Parse(blockData, header);
+                    _logger.LogInformation("LIST: {PageCount} pages, {CardCount} total cards, cardRefSize={RefSize}",
+                        listBlock.PageCount, listBlock.TotalCardCount, listBlock.CardReferenceSize);
+                    break;
+
+                case "PAGE":
+                    // Defer PAGE parsing until we have the LIST block's cardReferenceSize
+                    pageHeaders.Add(header);
+                    break;
+
+                case "CARD":
+                    var card = CardBlock.Parse(blockData, header);
+                    cards.Add(card);
+                    _logger.LogDebug("CARD {Id}: bg={BgId}, parts={Parts}, bitmap={Bitmap}",
+                        header.Id, card.BackgroundId, card.Parts.Count, card.BitmapId);
+                    break;
+
+                case "BKGD":
+                    var bg = BackgroundBlock.Parse(blockData, header);
+                    backgrounds.Add(bg);
+                    _logger.LogInformation("BKGD {Id}: {Cards} cards, {Parts} parts",
+                        header.Id, bg.CardCount, bg.Parts.Count);
+                    break;
+
+                case "FTBL":
+                    fontTable = FontTableBlock.Parse(blockData, header);
+                    _logger.LogInformation("FTBL: {Count} fonts", fontTable.FontCount);
+                    break;
+
+                case "STBL":
+                    styleTable = StyleTableBlock.Parse(blockData, header);
+                    _logger.LogInformation("STBL: {Count} styles", styleTable.StyleCount);
+                    break;
+
+                case "BMAP":
+                    var bmap = BitmapBlock.Parse(blockData, header);
+                    bitmaps[header.Id] = bmap;
+                    _logger.LogDebug("BMAP {Id}: card={CardRect}, mask={MaskRect}, image={ImageRect}",
+                        header.Id, bmap.CardRect, bmap.MaskRect, bmap.ImageRect);
+                    break;
             }
         }
 
         if (stackBlock == null)
             throw new InvalidDataException("No STAK block found in file");
 
+        // Now parse PAGE blocks with the LIST's cardReferenceSize
+        var pages = new List<PageBlock>();
+        if (listBlock != null)
+        {
+            // Build a lookup from page block ID to expected card count
+            var pageCardCounts = listBlock.PageReferences.ToDictionary(
+                pr => pr.PageBlockId, pr => (int)pr.CardCount);
+
+            foreach (var pageHeader in pageHeaders)
+            {
+                var pageData = data.Slice((int)pageHeader.FileOffset, pageHeader.Size);
+                var expectedCards = pageCardCounts.GetValueOrDefault(pageHeader.Id, 0);
+                var page = PageBlock.Parse(pageData, pageHeader, listBlock.CardReferenceSize, expectedCards);
+                pages.Add(page);
+                _logger.LogInformation("PAGE {Id}: {Count} card references", pageHeader.Id, page.CardReferences.Count);
+            }
+        }
+
         return new StackFile
         {
             StackHeader = stackBlock,
             MasterIndex = masterBlock,
+            ListIndex = listBlock,
+            FontTable = fontTable,
+            StyleTable = styleTable,
+            Cards = cards,
+            Backgrounds = backgrounds,
+            Pages = pages,
+            Bitmaps = bitmaps,
             Blocks = blocks,
             RawData = fileData
         };

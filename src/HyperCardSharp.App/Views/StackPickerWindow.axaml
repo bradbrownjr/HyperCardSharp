@@ -1,0 +1,62 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="HyperCardSharp.App.Views.StackPickerWindow"
+        Title="Select a Stack"
+        Width="540" Height="420"
+        MinWidth="400" MinHeight="300"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#CCCCCC"
+        FontFamily="Geneva, Helvetica, Arial, sans-serif"
+        FontSize="12">
+
+    <!-- System 7 style: light gray background, inset list, bold-outlined default button -->
+    <Border BorderBrush="#888888" BorderThickness="2" Margin="0"
+            Background="#CCCCCC" CornerRadius="0">
+        <DockPanel Margin="14">
+
+            <!-- Title label (System 7 style: bold, top-left) -->
+            <TextBlock DockPanel.Dock="Top"
+                       Text="Select a stack to open:"
+                       FontWeight="Bold" FontSize="13"
+                       Foreground="#000000"
+                       Margin="2,0,0,10"/>
+
+            <!-- Button row at bottom -->
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                        HorizontalAlignment="Right" Margin="0,12,0,0" Spacing="10">
+                <Button x:Name="CancelButton" Content="Cancel"
+                        Width="90" Height="26"
+                        Click="OnCancelClick" IsCancel="True"
+                        Background="#DDDDDD" Foreground="#000000"
+                        BorderBrush="#000000" BorderThickness="1"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        FontSize="12" Padding="0"/>
+                <!-- Default button: bold border like System 7 -->
+                <Border BorderBrush="#000000" BorderThickness="3" CornerRadius="4"
+                        Padding="0">
+                    <Button x:Name="OkButton" Content="Open"
+                            Width="90" Height="24"
+                            Click="OnOkClick" IsDefault="True"
+                            Background="#DDDDDD" Foreground="#000000"
+                            BorderBrush="#000000" BorderThickness="1"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            FontWeight="Bold" FontSize="12" Padding="0"/>
+                </Border>
+            </StackPanel>
+
+            <!-- Inset-bordered scrolling list (System 7 style) -->
+            <Border BorderBrush="#666666" BorderThickness="1" Margin="0,0,0,0"
+                    Background="#FFFFFF">
+                <ListBox x:Name="StackList"
+                         Background="#FFFFFF"
+                         Foreground="#000000"
+                         SelectionMode="Single"
+                         FontFamily="Geneva, Monaco, Courier New, monospace"
+                         FontSize="12"/>
+            </Border>
+        </DockPanel>
+    </Border>
+</Window>

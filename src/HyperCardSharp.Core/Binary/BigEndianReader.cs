@@ -104,4 +104,12 @@ public ref struct BigEndianReader
     {
         return BinaryPrimitives.ReadInt16BigEndian(data.Slice(offset, 2));
     }
+
+    /// <summary>
+    /// Read a big-endian UInt16 at a specific offset without advancing position.
+    /// </summary>
+    public static ushort ReadUInt16At(ReadOnlySpan<byte> data, int offset)
+    {
+        return BinaryPrimitives.ReadUInt16BigEndian(data.Slice(offset, 2));
+    }
 }

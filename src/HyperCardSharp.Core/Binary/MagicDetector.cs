@@ -68,4 +68,34 @@ public static class MagicDetector
 
         return FileFormat.Unknown;
     }
+
+    /// <summary>
+    /// Returns a short format tag string from the first bytes of a file.
+    /// Possible values: "STAK", "SIT!", "DCPY", "MBIN", "APLS", "APLD", "HFS!", "UNKN"
+    /// </summary>
+    public static string DetectFormat(ReadOnlySpan<byte> data)
+    {
+        return Detect(data) switch
+        {
+            FileFormat.HyperCardStack => "STAK",
+            FileFormat.StuffItArchive => "SIT!",
+            FileFormat.DiskCopy42     => "DCPY",
+            FileFormat.MacBinary      => "MBIN",
+            FileFormat.AppleSingle    => "APLS",
+            FileFormat.AppleDouble    => "APLD",
+            _                         => DetectHfs(data)
+        };
+    }
+
+    private static string DetectHfs(ReadOnlySpan<byte> data)
+    {
+        // HFS MDB signature 0xD2D7 at block 2 (offset 1024)
+        if (data.Length >= 1026)
+        {
+            ushort sig = System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(data.Slice(1024, 2));
+            if (sig == 0xD2D7)
+                return "HFS!";
+        }
+        return "UNKN";
+    }
 }
