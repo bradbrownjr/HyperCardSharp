@@ -30,7 +30,7 @@ public partial class StackViewModel : ObservableObject
     private string _title = "HyperCard#";
 
     [ObservableProperty]
-    private string _statusText = "Ctrl+O open | Ctrl+M switch stack | Ctrl+1/2/3/4 zoom";
+    private string _statusText = "";
 
     [ObservableProperty]
     private SKBitmap? _currentBitmap;

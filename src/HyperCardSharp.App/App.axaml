@@ -38,13 +38,19 @@
         <!-- ── System 7.5 ListBox selection highlight ───────────────────
              Solid black selection bar with white text — authentic System 7.
         -->
+        <Style Selector="ListBox.sys7 ListBoxItem">
+            <Setter Property="Foreground"   Value="#000000"/>
+            <Setter Property="FontFamily"   Value="avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial, sans-serif"/>
+            <Setter Property="FontSize"     Value="12"/>
+            <Setter Property="Padding"      Value="6,3"/>
+        </Style>
         <Style Selector="ListBox.sys7 ListBoxItem:selected /template/ ContentPresenter">
-            <Setter Property="Background"   Value="#000080"/>
+            <Setter Property="Background"   Value="#000000"/>
         </Style>
         <Style Selector="ListBox.sys7 ListBoxItem:selected">
             <Setter Property="Foreground"   Value="#FFFFFF"/>
         </Style>
-        <Style Selector="ListBox.sys7 ListBoxItem:pointerover /template/ ContentPresenter">
+        <Style Selector="ListBox.sys7 ListBoxItem:not(:selected):pointerover /template/ ContentPresenter">
             <Setter Property="Background"   Value="#C8C8C8"/>
         </Style>
     </Application.Styles>

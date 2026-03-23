@@ -69,7 +69,7 @@
                              Background="#FFFFFF"
                              Foreground="#000000"
                              SelectionMode="Single"
-                             FontFamily="Geneva, Monaco, Courier New, monospace"
+                             FontFamily="avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial, sans-serif"
                              FontSize="12"/>
                 </Border>
                 </Border>

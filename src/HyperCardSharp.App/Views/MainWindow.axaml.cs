@@ -286,4 +286,7 @@ public partial class MainWindow : Window
 
     private void OnMenuHelp(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => _ = ShowHelpAsync();
+
+    private void OnMenuAbout(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => _ = ShowHelpAsync();
 }

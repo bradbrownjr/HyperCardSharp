@@ -55,9 +55,9 @@ public class SkiaBitmapControl : Control
     private static readonly string[] DiskBody =
     [
         "BBBBBBBBBBBBBBBBBBBBBBBBBBBBTTTT",  // row  0  top border, chamfer cutout (4T)
-        "BWWWWWWBWWWWWWWWWWWWWWWBWWWWBTBT",  // row  1  shutter + diagonal + fold tip
-        "BWWWWWWBWWWWWWWWWBBBWWWBWWWWWBWB",  // row  2  hub top + diagonal + fold body
-        "BWWWWWWBWWWWWWWWBWWWBWWBWWWWWWBB",  // row  3  hub sides + diagonal meets border
+        "BWWWWWWBWWWWWWWWWWWWWWWBWWWWBTTT",  // row  1  chamfer step: col28=B border, 29-31=T
+        "BWWWWWWBWWWWWWWWWBBBWWWBWWWWWBTT",  // row  2  chamfer step: col29=B border, 30-31=T
+        "BWWWWWWBWWWWWWWWBWWWBWWBWWWWWWBT",  // row  3  chamfer step: col30=B border, 31=T
         "BWWWWWWBWWWWWWWWBWWWBWWBWWWWWWWB",  // row  4  hub
         "BWWWWWWBWWWWWWWWBWWWBWWBWWWWWWWB",  // row  5  hub
         "BWWWWWWBWWWWWWWWBWWWBWWBWWWWWWWB",  // row  6  hub
@@ -223,10 +223,10 @@ public class SkiaBitmapControl : Control
             for (int x = 0; x < w; x++)
                 pixels[y * w + x] = ((x + y) % 2 == 0) ? 0xFFFFFFFF : 0xFF000000;
 
-        // Scale floppy proportionally to the window zoom level.
-        // Baseline: scale=3 at the standard 640×400 (1× zoom) card size, doubling with each zoom step.
-        // Formula: 3 * min(w,h) / 400 — produces scale 3/4/6/12 at 1×/1.5×/2×/4× zoom.
-        int scale = Math.Max(3, 3 * Math.Min(w, h) / 400);
+        // Scale floppy proportionally to the window size.
+        // Formula: min(w,h)/160 → scale 2/3/4/8 at 1×/1.5×/2×/4× zoom.
+        // Produces ~64px disk at 1×, ~96px at 1.5×, ~128px at 2× — authentic Mac startup proportions.
+        int scale = Math.Max(2, Math.Min(w, h) / 160);
         int renderW = DiskW * scale;
         int renderH = DiskH * scale;
         int ox = (w - renderW) / 2;
