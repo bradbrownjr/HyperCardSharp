@@ -8,20 +8,266 @@
         CanResize="True"
         Background="#333333">
 
-    <DockPanel>
-        <!-- Status bar at bottom -->
-        <Border DockPanel.Dock="Bottom" Background="#222222" Padding="8,4">
-            <TextBlock Text="{Binding StatusText}"
-                       Foreground="#CCCCCC"
-                       FontSize="12"
-                       FontFamily="Consolas, Courier New, monospace"/>
-        </Border>
+    <Window.Resources>
+        <FontFamily x:Key="Chicago">avares://HyperCardSharp.App/Assets/Fonts/ChicagoFLF.ttf#ChicagoFLF</FontFamily>
+    </Window.Resources>
 
-        <!-- Card display area — content auto-scales to fit -->
-        <controls:SkiaBitmapControl x:Name="CardDisplay"
-                                     Source="{Binding CurrentBitmap}"
-                                     Margin="4"
-                                     HorizontalAlignment="Stretch"
-                                     VerticalAlignment="Stretch"/>
-    </DockPanel>
+    <Panel>
+        <!-- Main content layer -->
+        <DockPanel>
+            <Border DockPanel.Dock="Bottom" Background="#222222" Padding="8,4">
+                <TextBlock Text="{Binding StatusText}"
+                           Foreground="#CCCCCC"
+                           FontSize="12"
+                           FontFamily="Consolas, Courier New, monospace"/>
+            </Border>
+            <controls:SkiaBitmapControl x:Name="CardDisplay"
+                                         Source="{Binding CurrentBitmap}"
+                                         Margin="4"
+                                         HorizontalAlignment="Stretch"
+                                         VerticalAlignment="Stretch"/>
+        </DockPanel>
+
+        <!-- ══ System 7 Finder-style Stack Picker overlay ══ -->
+        <Border x:Name="PickerOverlay"
+                IsVisible="False"
+                Background="#80000000"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch">
+
+            <!-- Outer window frame: 1px black border -->
+            <Border Background="#000000"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Width="620"
+                    MinHeight="340" MaxHeight="520"
+                    Padding="1">
+
+                <Border Background="#CCCCCC" Padding="0">
+
+                    <!-- Styles scoped to the picker — override Fluent on buttons -->
+                    <Border.Styles>
+                        <!-- System 7 button: no hover effect, invert on press -->
+                        <Style Selector="Button.mac7">
+                            <Setter Property="Background" Value="#DDDDDD"/>
+                            <Setter Property="Foreground" Value="#000000"/>
+                            <Setter Property="BorderBrush" Value="#000000"/>
+                            <Setter Property="BorderThickness" Value="1"/>
+                            <Setter Property="CornerRadius" Value="0"/>
+                        </Style>
+                        <Style Selector="Button.mac7:pointerover /template/ ContentPresenter">
+                            <Setter Property="Background" Value="#DDDDDD"/>
+                            <Setter Property="TextElement.Foreground" Value="#000000"/>
+                        </Style>
+                        <Style Selector="Button.mac7:pressed /template/ ContentPresenter">
+                            <Setter Property="Background" Value="#000000"/>
+                            <Setter Property="TextElement.Foreground" Value="#FFFFFF"/>
+                        </Style>
+                        <!-- Close box: tiny square, no Fluent effects -->
+                        <Style Selector="Button.mac7close">
+                            <Setter Property="Background" Value="#FFFFFF"/>
+                            <Setter Property="BorderBrush" Value="#000000"/>
+                            <Setter Property="BorderThickness" Value="1"/>
+                            <Setter Property="CornerRadius" Value="0"/>
+                            <Setter Property="Padding" Value="0"/>
+                        </Style>
+                        <Style Selector="Button.mac7close:pointerover /template/ ContentPresenter">
+                            <Setter Property="Background" Value="#FFFFFF"/>
+                        </Style>
+                        <Style Selector="Button.mac7close:pressed /template/ ContentPresenter">
+                            <Setter Property="Background" Value="#000000"/>
+                        </Style>
+                    </Border.Styles>
+
+                    <DockPanel>
+
+                        <!-- ── TITLE BAR ── -->
+                        <!-- System 7: white bg with black stripes, title in cleared center -->
+                        <Border DockPanel.Dock="Top" Height="20" Background="#FFFFFF"
+                                BorderBrush="#000000" BorderThickness="0,0,0,1">
+                            <Panel>
+                                <!-- 6 horizontal stripe lines on white background -->
+                                <Canvas>
+                                    <Rectangle Canvas.Left="22" Canvas.Top="3"  Width="574" Height="1" Fill="#000000"/>
+                                    <Rectangle Canvas.Left="22" Canvas.Top="6"  Width="574" Height="1" Fill="#000000"/>
+                                    <Rectangle Canvas.Left="22" Canvas.Top="9"  Width="574" Height="1" Fill="#000000"/>
+                                    <Rectangle Canvas.Left="22" Canvas.Top="12" Width="574" Height="1" Fill="#000000"/>
+                                    <Rectangle Canvas.Left="22" Canvas.Top="15" Width="574" Height="1" Fill="#000000"/>
+                                    <Rectangle Canvas.Left="22" Canvas.Top="18" Width="574" Height="1" Fill="#000000"/>
+                                </Canvas>
+
+                                <!-- Close box -->
+                                <Button Classes="mac7close"
+                                        Width="13" Height="11"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Center"
+                                        Margin="5,0,0,0"
+                                        Click="OnPickerCancel"
+                                        Cursor="Hand"/>
+
+                                <!-- Title text centered with white bg to mask stripes -->
+                                <Border Background="#FFFFFF"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Padding="6,0">
+                                    <TextBlock x:Name="PickerTitleText"
+                                               Text="Select a Stack"
+                                               FontSize="12"
+                                               Foreground="#000000"
+                                               FontFamily="{StaticResource Chicago}"
+                                               HorizontalAlignment="Center"/>
+                                </Border>
+                            </Panel>
+                        </Border>
+
+                        <!-- ── INFO BAR ── -->
+                        <Border DockPanel.Dock="Top" Background="#FFFFFF"
+                                BorderBrush="#000000" BorderThickness="0,0,0,1"
+                                Padding="8,2">
+                            <TextBlock x:Name="PickerInfoText"
+                                       Text="0 stacks"
+                                       FontSize="10"
+                                       Foreground="#000000"
+                                       FontFamily="Geneva, Helvetica, Arial, sans-serif"/>
+                        </Border>
+
+                        <!-- ── COLUMN HEADERS ── -->
+                        <Border DockPanel.Dock="Top" Background="#FFFFFF"
+                                BorderBrush="#000000" BorderThickness="0,0,0,1"
+                                Padding="0">
+                            <Grid ColumnDefinitions="*,52,58,74" Height="16">
+                                <TextBlock Grid.Column="0" Text="Name"
+                                           FontWeight="Bold" FontSize="10"
+                                           Foreground="#000000"
+                                           FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                           VerticalAlignment="Center"
+                                           Margin="6,0,0,0"/>
+                                <Border Grid.Column="1" BorderBrush="#000000" BorderThickness="1,0,0,0">
+                                    <TextBlock Text="Cards"
+                                               FontWeight="Bold" FontSize="10"
+                                               Foreground="#000000"
+                                               FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,4,0"/>
+                                </Border>
+                                <Border Grid.Column="2" BorderBrush="#000000" BorderThickness="1,0,0,0">
+                                    <TextBlock Text="Size"
+                                               FontWeight="Bold" FontSize="10"
+                                               Foreground="#000000"
+                                               FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,4,0"/>
+                                </Border>
+                                <Border Grid.Column="3" BorderBrush="#000000" BorderThickness="1,0,0,0">
+                                    <TextBlock Text="Resolution"
+                                               FontWeight="Bold" FontSize="10"
+                                               Foreground="#000000"
+                                               FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,4,0"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <!-- ── BUTTON ROW (bottom) ── -->
+                        <Border DockPanel.Dock="Bottom" Background="#CCCCCC"
+                                BorderBrush="#000000" BorderThickness="0,1,0,0"
+                                Padding="8,10">
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Right" Spacing="12">
+                                <Button Classes="mac7"
+                                        x:Name="PickerCancelButton" Content="Cancel"
+                                        Width="90" Height="24"
+                                        Click="OnPickerCancel"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        FontFamily="{StaticResource Chicago}"
+                                        FontSize="12" Padding="0"/>
+                                <!-- Default button: thick outer border (System 7) -->
+                                <Border BorderBrush="#000000" BorderThickness="3" CornerRadius="3"
+                                        Padding="0">
+                                    <Button Classes="mac7"
+                                            x:Name="PickerOkButton" Content="Open"
+                                            Width="86" Height="20"
+                                            Click="OnPickerOk"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"
+                                            FontFamily="{StaticResource Chicago}"
+                                            FontWeight="Bold" FontSize="12" Padding="0"/>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- ── LIST CONTENT ── -->
+                        <ListBox x:Name="PickerList"
+                                 Background="#FFFFFF"
+                                 Foreground="#000000"
+                                 SelectionMode="Single"
+                                 FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                 FontSize="11"
+                                 DoubleTapped="OnPickerDoubleTap"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 BorderThickness="0"
+                                 Padding="0">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnDefinitions="*,52,58,74">
+                                        <TextBlock Grid.Column="0"
+                                                   Text="{Binding Name}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Margin="4,0,4,0"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding Cards}"
+                                                   HorizontalAlignment="Right"
+                                                   Margin="0,0,4,0"/>
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding Size}"
+                                                   HorizontalAlignment="Right"
+                                                   Margin="0,0,4,0"/>
+                                        <TextBlock Grid.Column="3"
+                                                   Text="{Binding Resolution}"
+                                                   HorizontalAlignment="Right"
+                                                   Margin="0,0,4,0"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                            <ListBox.Styles>
+                                <!-- System 7: selected = black bg, white text -->
+                                <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="#000000"/>
+                                    <Setter Property="TextElement.Foreground" Value="#FFFFFF"/>
+                                </Style>
+                                <Style Selector="ListBoxItem:selected:focus /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="#000000"/>
+                                    <Setter Property="TextElement.Foreground" Value="#FFFFFF"/>
+                                </Style>
+                                <!-- No hover highlight on non-selected items -->
+                                <Style Selector="ListBoxItem:not(:selected):pointerover /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="TextElement.Foreground" Value="#000000"/>
+                                </Style>
+                                <!-- Selected + hover: stay inverted -->
+                                <Style Selector="ListBoxItem:selected:pointerover /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="#000000"/>
+                                    <Setter Property="TextElement.Foreground" Value="#FFFFFF"/>
+                                </Style>
+                                <Style Selector="ListBoxItem">
+                                    <Setter Property="Padding" Value="0,1"/>
+                                    <Setter Property="MinHeight" Value="16"/>
+                                </Style>
+                                <!-- Gray scrollbar track (classic Mac) -->
+                                <Style Selector="ScrollViewer /template/ ScrollBar">
+                                    <Setter Property="Background" Value="#CCCCCC"/>
+                                </Style>
+                            </ListBox.Styles>
+                        </ListBox>
+
+                    </DockPanel>
+                </Border>
+            </Border>
+        </Border>
+    </Panel>
 </Window>

@@ -98,43 +98,8 @@ public class RawStackScanner : IContainerExtractor
 
     private static string BuildStackName(byte[] stackData, int totalLength)
     {
-        var span = stackData.AsSpan();
-        int stkBlockSize = BinaryPrimitives.ReadInt32BigEndian(span.Slice(0, 4));
-
-        // Try to extract the stack name from the STAK block's script.
-        // The script is null-terminated and often starts with "-- stackName" or
-        // contains "on openStack" referencing the stack.
-        // More reliably: the STAK block's name field sits after parts/contents,
-        // but it's at a variable offset. We'll try reading it from the script area.
-        string stackName = TryExtractStackName(stackData, stkBlockSize);
-
-        // Count CARD blocks
-        int cardCount = 0;
-        int pos = 0;
-        while (pos + 8 <= stackData.Length)
-        {
-            int sz = BinaryPrimitives.ReadInt32BigEndian(span.Slice(pos, 4));
-            if (sz < 16 || pos + sz > stackData.Length) break;
-            if (stackData[pos + 4] == 'C' && stackData[pos + 5] == 'A' &&
-                stackData[pos + 6] == 'R' && stackData[pos + 7] == 'D')
-                cardCount++;
-            pos += sz;
-        }
-
-        // Read card dimensions from STAK block
-        string dims = "";
-        if (stkBlockSize >= 0x1BC && stackData.Length >= 0x1BC)
-        {
-            short h = BinaryPrimitives.ReadInt16BigEndian(span.Slice(0x1B8, 2));
-            short w = BinaryPrimitives.ReadInt16BigEndian(span.Slice(0x1BA, 2));
-            if (w > 0 && h > 0)
-                dims = $", {w}x{h}";
-        }
-
-        string label = $"{cardCount} cards{dims}, {totalLength / 1024}K";
-        return stackName != null
-            ? $"{stackName} ({label})"
-            : $"Stack ({label})";
+        int stkBlockSize = BinaryPrimitives.ReadInt32BigEndian(stackData.AsSpan().Slice(0, 4));
+        return TryExtractStackName(stackData, stkBlockSize) ?? "Untitled";
     }
 
     /// <summary>

@@ -116,28 +116,35 @@ public partial class StackViewModel : ObservableObject
             return;
         }
 
-        var parser = new StackParser();
-        _stack = parser.Parse(fileData);
-        _renderer?.ClearCache();
-        _renderer = new CardRenderer(_stack);
-
-        // Get card order from PAGE blocks
-        _cardOrder = _stack.GetCardOrder().ToList();
-        if (_cardOrder.Count == 0)
+        try
         {
-            // Fallback: use block order
-            _cardOrder = _stack.Cards.Select(c => c.Header.Id).ToList();
+            var parser = new StackParser();
+            _stack = parser.Parse(fileData);
+            _renderer?.ClearCache();
+            _renderer = new CardRenderer(_stack);
+
+            // Get card order from PAGE blocks
+            _cardOrder = _stack.GetCardOrder().ToList();
+            if (_cardOrder.Count == 0)
+            {
+                // Fallback: use block order
+                _cardOrder = _stack.Cards.Select(c => c.Header.Id).ToList();
+            }
+
+            CurrentFileName = fileName;
+            CurrentStackName = stackName;
+
+            TotalCards = _cardOrder.Count;
+            Title = stackName != null
+                ? $"HyperCard# — {fileName} — {stackName}"
+                : $"HyperCard# — {fileName}";
+            CurrentCardIndex = 0;
+            RenderCurrentCard();
         }
-
-        CurrentFileName = fileName;
-        CurrentStackName = stackName;
-
-        TotalCards = _cardOrder.Count;
-        Title = stackName != null
-            ? $"HyperCard# — {fileName} — {stackName}"
-            : $"HyperCard# — {fileName}";
-        CurrentCardIndex = 0;
-        RenderCurrentCard();
+        catch (Exception ex)
+        {
+            StatusText = $"Error loading stack \"{stackName ?? fileName}\": {ex.Message}";
+        }
     }
 
     [RelayCommand]

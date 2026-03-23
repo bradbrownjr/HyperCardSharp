@@ -25,7 +25,19 @@ public class CardRenderer
         int width = _stack.StackHeader.CardWidth;
         int height = _stack.StackHeader.CardHeight;
 
+        // Guard against stacks with zero or negative dimensions
+        if (width <= 0) width = 512;
+        if (height <= 0) height = 342;
+
         var surface = SKSurface.Create(new SKImageInfo(width, height, SKColorType.Bgra8888));
+        if (surface == null)
+        {
+            // Fallback: return a blank bitmap
+            var fallback = new SKBitmap(width, height, SKColorType.Bgra8888, SKAlphaType.Premul);
+            using var c = new SKCanvas(fallback);
+            c.Clear(SKColors.White);
+            return fallback;
+        }
         var canvas = surface.Canvas;
         canvas.Clear(SKColors.White);
 
