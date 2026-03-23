@@ -202,7 +202,10 @@ public partial class MainWindow : Window
                 return;
             }
 
-            // Store for Ctrl+L re-pick
+            // Sort alphabetically before storing and presenting
+            stacks.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name));
+
+            // Store for Ctrl+M re-pick
             _currentOpenFileName = file.Name;
             _currentStacks = stacks;
 

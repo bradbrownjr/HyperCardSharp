@@ -197,7 +197,7 @@ Use this map to locate code without re-exploring the codebase.
 
 All modal dialogs in this project must follow these conventions to stay visually consistent.
 
-- **Background:** `#CCCCCC` (light gray)
+- **Background:** `#C0C0C0` (System 7.5 authentic gray)
 - **Outer border:** `BorderBrush="#888888" BorderThickness="2" CornerRadius="0"`
 - **Font:** `FontFamily="Geneva, Helvetica, Arial, sans-serif" FontSize="12"`
 - **Text color:** `#000000`

@@ -1,62 +1,82 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:HyperCardSharp.App.Controls"
         x:Class="HyperCardSharp.App.Views.StackPickerWindow"
         Title="Select a Stack"
         Width="540" Height="420"
         MinWidth="400" MinHeight="300"
         CanResize="False"
+        SystemDecorations="None"
         WindowStartupLocation="CenterOwner"
-        Background="#CCCCCC"
+        Background="#C0C0C0"
         FontFamily="Geneva, Helvetica, Arial, sans-serif"
         FontSize="12">
 
-    <!-- System 7 style: light gray background, inset list, bold-outlined default button -->
-    <Border BorderBrush="#888888" BorderThickness="2" Margin="0"
-            Background="#CCCCCC" CornerRadius="0">
-        <DockPanel Margin="14">
+    <!-- 1px black outer border — System 7 window outline -->
+    <Border BorderBrush="#000000" BorderThickness="1" Background="#C0C0C0">
+        <DockPanel>
 
-            <!-- Title label (System 7 style: bold, top-left) -->
-            <TextBlock DockPanel.Dock="Top"
-                       Text="Select a stack to open:"
-                       FontWeight="Bold" FontSize="13"
-                       Foreground="#000000"
-                       Margin="2,0,0,10"/>
+            <!-- System 7.5 striped title bar -->
+            <controls:System7TitleBar DockPanel.Dock="Top"
+                                      Title="Select a Stack"
+                                      CloseRequested="OnTitleBarClose"/>
 
-            <!-- Button row at bottom -->
-            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
-                        HorizontalAlignment="Right" Margin="0,12,0,0" Spacing="10">
-                <Button x:Name="CancelButton" Content="Cancel"
-                        Width="90" Height="26"
-                        Click="OnCancelClick" IsCancel="True"
-                        Background="#DDDDDD" Foreground="#000000"
-                        BorderBrush="#000000" BorderThickness="1"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        FontSize="12" Padding="0"/>
-                <!-- Default button: bold border like System 7 -->
-                <Border BorderBrush="#000000" BorderThickness="3" CornerRadius="4"
-                        Padding="0">
-                    <Button x:Name="OkButton" Content="Open"
-                            Width="90" Height="24"
-                            Click="OnOkClick" IsDefault="True"
-                            Background="#DDDDDD" Foreground="#000000"
-                            BorderBrush="#000000" BorderThickness="1"
+            <!-- Hairline rule under title bar -->
+            <Border DockPanel.Dock="Top" Height="1" Background="#000000"/>
+
+            <!-- Content area -->
+            <DockPanel Margin="14">
+
+                <!-- Prompt label -->
+                <TextBlock DockPanel.Dock="Top"
+                           Text="Select a stack to open:"
+                           FontWeight="Bold" FontSize="13"
+                           Foreground="#000000"
+                           Margin="0,8,0,10"/>
+
+                <!-- Button row -->
+                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                            HorizontalAlignment="Right" Margin="0,12,0,0" Spacing="10">
+                    <Button x:Name="CancelButton" Content="Cancel"
+                            Classes="sys7"
+                            Width="90" Height="26"
+                            Click="OnCancelClick" IsCancel="True"
                             HorizontalContentAlignment="Center"
                             VerticalContentAlignment="Center"
-                            FontWeight="Bold" FontSize="12" Padding="0"/>
-                </Border>
-            </StackPanel>
+                            FontSize="12"/>
+                    <!-- Default button: 3px outer border = System 7 default-button indicator -->
+                    <Border BorderBrush="#000000" BorderThickness="3" CornerRadius="4" Padding="0">
+                        <Button x:Name="OkButton" Content="Open"
+                                Classes="sys7"
+                                Width="84" Height="20"
+                                Click="OnOkClick" IsDefault="True"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                FontWeight="Bold" CornerRadius="3"
+                                FontSize="12"/>
+                    </Border>
+                </StackPanel>
 
-            <!-- Inset-bordered scrolling list (System 7 style) -->
-            <Border BorderBrush="#666666" BorderThickness="1" Margin="0,0,0,0"
-                    Background="#FFFFFF">
-                <ListBox x:Name="StackList"
-                         Background="#FFFFFF"
-                         Foreground="#000000"
-                         SelectionMode="Single"
-                         FontFamily="Geneva, Monaco, Courier New, monospace"
-                         FontSize="12"/>
-            </Border>
+                <!-- 3D inset bevel border around the list box.
+                     Four nested Borders simulate the System 7.5 sunken-well look:
+                     outer dark/light bevel + inner black/white bevel. -->
+                <Border BorderBrush="#808080" BorderThickness="1,1,0,0">
+                <Border BorderBrush="#DFDFDF" BorderThickness="0,0,1,1">
+                <Border BorderBrush="#000000" BorderThickness="1,1,0,0">
+                <Border BorderBrush="#FFFFFF" BorderThickness="0,0,1,1" Background="#FFFFFF">
+                    <ListBox x:Name="StackList"
+                             Classes="sys7"
+                             Background="#FFFFFF"
+                             Foreground="#000000"
+                             SelectionMode="Single"
+                             FontFamily="Geneva, Monaco, Courier New, monospace"
+                             FontSize="12"/>
+                </Border>
+                </Border>
+                </Border>
+                </Border>
+
+            </DockPanel>
         </DockPanel>
     </Border>
 </Window>

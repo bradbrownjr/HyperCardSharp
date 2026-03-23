@@ -1,3 +1,4 @@
+using System;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 
@@ -10,8 +11,7 @@ public partial class HelpWindow : Window
         InitializeComponent();
     }
 
-    private void OnOkClick(object? sender, RoutedEventArgs e)
-    {
-        Close();
-    }
+    private void OnTitleBarClose(object? sender, EventArgs e) => Close();
+
+    private void OnOkClick(object? sender, RoutedEventArgs e) => Close();
 }

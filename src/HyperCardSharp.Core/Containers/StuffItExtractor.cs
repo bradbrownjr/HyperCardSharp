@@ -39,8 +39,20 @@ public class StuffItExtractor : IContainerExtractor
 
     public byte[]? Extract(byte[] data)
     {
+        var all = ExtractAll(data);
+        return all.Count > 0 ? all[0].Data : null;
+    }
+
+    /// <summary>
+    /// Extracts all STAK files found in the archive.
+    /// Returns a list of (name, decompressed data) pairs.
+    /// </summary>
+    public List<(string Name, byte[] Data)> ExtractAll(byte[] data)
+    {
+        var results = new List<(string Name, byte[] Data)>();
+
         if (!CanHandle(data))
-            return null;
+            return results;
 
         try
         {
@@ -48,11 +60,7 @@ public class StuffItExtractor : IContainerExtractor
 
             ushort numFiles = BinaryPrimitives.ReadUInt16BigEndian(span.Slice(4, 2));
             if (numFiles == 0)
-                return null;
-
-            // Validate "rLau" secondary magic
-            // (offset 0x0A = 10)
-            // Not strictly required — some archivers may vary. We proceed regardless.
+                return results;
 
             int pos = ArchiveHeaderSize;
 
@@ -66,66 +74,61 @@ public class StuffItExtractor : IContainerExtractor
                 byte rsrcMethod = entry[0];
                 byte dataMethod = entry[1];
 
-                // Pascal string at offset 2 (64 bytes total)
                 int nameLen = entry[2];
                 if (nameLen > 63) nameLen = 63;
+                string fileName = nameLen > 0
+                    ? Encoding.GetEncoding("macintosh").GetString(entry.Slice(3, nameLen))
+                    : $"stack_{fileIdx}";
 
-                // File type at offset 0x42
                 string fileType = Encoding.ASCII.GetString(entry.Slice(0x42, 4));
 
-                // Sizes
-                int rsrcLen = (int)BinaryPrimitives.ReadUInt32BigEndian(entry.Slice(0x54, 4));
-                int dataLen = (int)BinaryPrimitives.ReadUInt32BigEndian(entry.Slice(0x58, 4));
+                int rsrcLen     = (int)BinaryPrimitives.ReadUInt32BigEndian(entry.Slice(0x54, 4));
+                int dataLen     = (int)BinaryPrimitives.ReadUInt32BigEndian(entry.Slice(0x58, 4));
                 int rsrcCompLen = (int)BinaryPrimitives.ReadUInt32BigEndian(entry.Slice(0x5C, 4));
                 int dataCompLen = (int)BinaryPrimitives.ReadUInt32BigEndian(entry.Slice(0x60, 4));
 
                 pos += EntryHeaderSize;
 
-                // Bounds check compressed data
                 if (pos + rsrcCompLen + dataCompLen > span.Length)
                     break;
 
-                // Resource fork data
                 var rsrcCompData = span.Slice(pos, rsrcCompLen).ToArray();
                 pos += rsrcCompLen;
 
-                // Data fork data
                 var dataCompData = span.Slice(pos, dataCompLen).ToArray();
                 pos += dataCompLen;
 
-                // We want STAK files
-                if (fileType == "STAK")
+                if (fileType != "STAK")
+                    continue;
+
+                // Try data fork first, then resource fork.
+                byte[]? extracted = null;
+                if (dataLen > 0)
                 {
-                    // Try data fork first
-                    if (dataLen > 0)
-                    {
-                        var extracted = Decompress(dataMethod, dataCompData, dataLen);
-                        if (extracted != null && IsStack(extracted))
-                            return extracted;
-                    }
-
-                    // Try resource fork
-                    if (rsrcLen > 0)
-                    {
-                        var extracted = Decompress(rsrcMethod, rsrcCompData, rsrcLen);
-                        if (extracted != null && IsStack(extracted))
-                            return extracted;
-                    }
-
-                    // Return data fork even if not confirmed STAK magic (maybe it works)
-                    if (dataLen > 0)
-                    {
-                        return Decompress(dataMethod, dataCompData, dataLen);
-                    }
+                    var candidate = Decompress(dataMethod, dataCompData, dataLen);
+                    if (candidate != null && IsStack(candidate))
+                        extracted = candidate;
                 }
-            }
+                if (extracted == null && rsrcLen > 0)
+                {
+                    var candidate = Decompress(rsrcMethod, rsrcCompData, rsrcLen);
+                    if (candidate != null && IsStack(candidate))
+                        extracted = candidate;
+                }
+                // Accept data fork even without confirmed magic
+                if (extracted == null && dataLen > 0)
+                    extracted = Decompress(dataMethod, dataCompData, dataLen);
 
-            return null;
+                if (extracted != null)
+                    results.Add((fileName, extracted));
+            }
         }
         catch
         {
-            return null;
+            // Partial results are still valid
         }
+
+        return results;
     }
 
     private static bool IsStack(byte[] data)
