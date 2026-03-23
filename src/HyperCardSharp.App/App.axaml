@@ -3,5 +3,49 @@
              x:Class="HyperCardSharp.App.App">
     <Application.Styles>
         <FluentTheme />
+
+        <!-- ── System 7.5 button style ──────────────────────────────────
+             Apply Classes="sys7" to any Button inside a System 7 dialog.
+             Suppresses Fluent hover glow; uses flat gray with subtle darken
+             on hover and black/white inversion on press (authentic Mac feel).
+        -->
+        <Style Selector="Button.sys7">
+            <Setter Property="Background"   Value="#DDDDDD"/>
+            <Setter Property="Foreground"   Value="#000000"/>
+            <Setter Property="BorderBrush"  Value="#000000"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding"      Value="0"/>
+        </Style>
+        <Style Selector="Button.sys7 /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background"   Value="#DDDDDD"/>
+            <Setter Property="CornerRadius" Value="4"/>
+        </Style>
+        <Style Selector="Button.sys7:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background"   Value="#C8C8C8"/>
+        </Style>
+        <Style Selector="Button.sys7:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background"   Value="#000000"/>
+        </Style>
+        <Style Selector="Button.sys7:pressed">
+            <Setter Property="Foreground"   Value="#FFFFFF"/>
+        </Style>
+        <!-- Remove Fluent focus ring -->
+        <Style Selector="Button.sys7:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background"   Value="#DDDDDD"/>
+        </Style>
+
+        <!-- ── System 7.5 ListBox selection highlight ───────────────────
+             Solid black selection bar with white text — authentic System 7.
+        -->
+        <Style Selector="ListBox.sys7 ListBoxItem:selected /template/ ContentPresenter">
+            <Setter Property="Background"   Value="#000080"/>
+        </Style>
+        <Style Selector="ListBox.sys7 ListBoxItem:selected">
+            <Setter Property="Foreground"   Value="#FFFFFF"/>
+        </Style>
+        <Style Selector="ListBox.sys7 ListBoxItem:pointerover /template/ ContentPresenter">
+            <Setter Property="Background"   Value="#C8C8C8"/>
+        </Style>
     </Application.Styles>
 </Application>

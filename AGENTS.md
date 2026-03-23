@@ -126,3 +126,91 @@ Primary references:
 - Unsupported features degrade gracefully without crashing.
 - Tests or validation steps cover the changed behavior where possible.
 - Related documentation and format research notes are updated.
+- Changes are committed and pushed (see Commit Policy below).
+
+## Regression Check Policy
+
+- Always review the net diff before finalising any change. If more lines were deleted than added, explicitly verify that no behaviour was unintentionally removed.
+- Run the full build (`dotnet build`) and existing tests (`dotnet test`) after every change that touches more than one file or removes any non-trivial block of code.
+- Large deletions require a written justification: state what was removed and why it is safe to drop before committing.
+
+## Commit Policy
+
+- Commit and push after every major change or bugfix — do not batch unrelated work into a single commit.
+- Each commit message must describe *what* changed and *why* in the imperative mood (e.g. "Add Ctrl+H help dialog with System 7 styling").
+- Always include the Co-authored-by trailer:
+  `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`
+- Never commit broken builds or failing tests.
+
+## Quick File Reference
+
+Use this map to locate code without re-exploring the codebase.
+
+### App layer (`src/HyperCardSharp.App/`)
+
+| Concern | File |
+|---------|------|
+| Main window XAML | `Views/MainWindow.axaml` |
+| Keyboard shortcuts (`OnKeyDown`) | `Views/MainWindow.axaml.cs` |
+| File open / stack switching | `Views/MainWindow.axaml.cs` — `OpenFileAsync`, `SwitchStackAsync`, `PickAndLoadStack` |
+| Zoom (presets + step) | `Views/MainWindow.axaml.cs` — `ResizeToScale`, `ZoomIn`, `ZoomOut`; `ZoomLevels` array |
+| Help dialog | `Views/HelpWindow.axaml` + `Views/HelpWindow.axaml.cs` |
+| Stack picker dialog (multi-stack) | `Views/StackPickerWindow.axaml` + `.axaml.cs` |
+| Card display / pixel-art placeholder | `Controls/SkiaBitmapControl.cs` |
+| MVVM model (navigation, HyperTalk callbacks) | `ViewModels/StackViewModel.cs` |
+
+### Core layer (`src/HyperCardSharp.Core/`)
+
+| Concern | File |
+|---------|------|
+| Format auto-detection | `Binary/MagicDetector.cs` |
+| Big-endian binary reads | `Binary/BigEndianReader.cs` |
+| Block header (16-byte) | `Binary/BlockHeader.cs` |
+| Top-level stack model | `Stack/StackFile.cs` |
+| Block dispatcher | `Stack/StackParser.cs` |
+| Container unwrap chain | `Containers/ContainerPipeline.cs` |
+| WOBA bitmap decompression | `Bitmap/WobaDecoder.cs` |
+
+### Rendering (`src/HyperCardSharp.Rendering/`)
+
+| Concern | File |
+|---------|------|
+| Card compositor | `CardRenderer.cs` |
+| 1-bit → SKBitmap | `BitmapRenderer.cs` |
+
+### HyperTalk (`src/HyperCardSharp.HyperTalk/`)
+
+| Concern | File |
+|---------|------|
+| Lexer | `Lexer/HyperTalkLexer.cs` |
+| Parser (AST) | `Parser/HyperTalkParser.cs` |
+| AST nodes | `Ast/AstNodes.cs` |
+| Interpreter | `Interpreter/HyperTalkInterpreter.cs` |
+| Message dispatch hierarchy | `MessagePassing/MessageDispatcher.cs` |
+
+### Tests & samples
+
+- Unit tests: `tests/` (Core, HyperTalk, Rendering sub-folders + `QuickTest/`)
+- Sample stacks (raw, .sit, .img): **`samples/`** — use these for manual validation
+
+## System 7 Dialog Styling Conventions
+
+All modal dialogs in this project must follow these conventions to stay visually consistent.
+
+- **Background:** `#C0C0C0` (System 7.5 authentic gray)
+- **Outer border:** `BorderBrush="#888888" BorderThickness="2" CornerRadius="0"`
+- **Font:** `FontFamily="Geneva, Helvetica, Arial, sans-serif" FontSize="12"`
+- **Text color:** `#000000`
+- **List box background:** `#FFFFFF` with `BorderBrush="#666666" BorderThickness="1"`
+- **Default button:** wrapped in `<Border BorderBrush="#000000" BorderThickness="3" CornerRadius="4">`, inner button uses `Background="#DDDDDD" BorderBrush="#000000" BorderThickness="1" FontWeight="Bold"`
+- **Cancel / secondary button:** `Background="#DDDDDD" BorderBrush="#000000" BorderThickness="1"` (no outer wrapper)
+- **Section headers inside dialogs:** `FontWeight="Bold" FontSize="13"`
+- **`WindowStartupLocation="CenterOwner"`** on all dialogs
+
+Reference implementations: `StackPickerWindow.axaml`, `HelpWindow.axaml`.
+
+## Known Pre-existing Build Warnings
+
+Do not treat these as regressions — they existed before any recent changes:
+
+- `RawStackScanner.cs(109)` — `CS8600`: Converting null literal to non-nullable type

@@ -109,14 +109,6 @@ public partial class MainWindow : Window
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        // ── Help overlay ──
-        if (HelpOverlay.IsVisible)
-        {
-            HelpOverlay.IsVisible = false;
-            e.Handled = true;
-            return;
-        }
-
         // ── Picker overlay: let arrow keys through for list navigation ──
         if (PickerOverlay.IsVisible)
         {
@@ -165,7 +157,7 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 break;
             case Key.H when HasMod(e):
-                ShowHelp();
+                _ = ShowHelpAsync();
                 e.Handled = true;
                 break;
             // Zoom presets
@@ -199,34 +191,17 @@ public partial class MainWindow : Window
         }
     }
 
-    // ── Help overlay ────────────────────────────────────────────────────
+    // ── Help ────────────────────────────────────────────────────────────
 
-    private void ShowHelp()
+    private async Task ShowHelpAsync()
     {
-        // Build help text with platform-correct modifier key
-        HelpContent.Text =
-            $"  {Mod}+O          Open file\n" +
-            $"  {Mod}+M          Switch stack\n" +
-            $"  {Mod}+H          This help\n" +
-            $"\n" +
-            $"  {Mod}+1          Zoom 1\u00D7\n" +
-            $"  {Mod}+2          Zoom 1.5\u00D7\n" +
-            $"  {Mod}+3          Zoom 2\u00D7\n" +
-            $"  {Mod}+4          Zoom 4\u00D7\n" +
-            $"  {Mod}++          Zoom in\n" +
-            $"  {Mod}+\u2212          Zoom out\n" +
-            $"\n" +
-            $"  \u2190 \u2192            Previous / next card\n" +
-            $"  Home / End     First / last card\n" +
-            $"  Space          Next card\n" +
-            $"\n" +
-            $"  Escape         Close dialog";
-        HelpOverlay.IsVisible = true;
+        var help = new HelpWindow();
+        await help.ShowDialog(this);
     }
 
-    private void OnHelpClose(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnHelpClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        HelpOverlay.IsVisible = false;
+        _ = ShowHelpAsync();
     }
 
     // ── Zoom ────────────────────────────────────────────────────────────
@@ -351,6 +326,9 @@ public partial class MainWindow : Window
                 _viewModel.StatusText = $"Could not open \"{file.Name}\": {detail}";
                 return;
             }
+
+            // Sort alphabetically before storing and presenting
+            stacks.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name));
 
             _currentOpenFileName = file.Name;
             _currentStacks = stacks;

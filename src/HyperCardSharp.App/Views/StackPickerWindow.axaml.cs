@@ -30,6 +30,12 @@ public partial class StackPickerWindow : Window
     /// </summary>
     public int SelectedIndex => _selectedIndex;
 
+    private void OnTitleBarClose(object? sender, EventArgs e)
+    {
+        _selectedIndex = -1;
+        Close(-1);
+    }
+
     private void OnOkClick(object? sender, RoutedEventArgs e)
     {
         _selectedIndex = StackList.SelectedIndex;

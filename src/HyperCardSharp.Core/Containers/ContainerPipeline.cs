@@ -87,6 +87,25 @@ public static class ContainerPipeline
 
             log?.Invoke($"Detected {extractor.GetType().Name} — extracting…");
 
+            // StuffIt: enumerate all STAK entries before falling back to single-extract
+            if (extractor is StuffItExtractor sit)
+            {
+                var sitStacks = sit.ExtractAll(data);
+                if (sitStacks.Count == 0)
+                {
+                    log?.Invoke("StuffItExtractor found no STAK entries.");
+                    return [];
+                }
+                log?.Invoke($"StuffItExtractor found {sitStacks.Count} stack(s).");
+                var sitResults = new List<(string Name, byte[] Data)>();
+                foreach (var (name, stackData) in sitStacks)
+                {
+                    var unwrapped = Unwrap(stackData, log, depth + 1) ?? stackData;
+                    sitResults.Add((name, unwrapped));
+                }
+                return sitResults;
+            }
+
             // Before RawStackScanner, try HFS+ enumeration for multi-stack support
             if (extractor is RawStackScanner)
             {
