@@ -14,8 +14,8 @@ public partial class MainWindow : Window
 {
     private readonly StackViewModel _viewModel = new();
 
-    // System 7 title bar (19px) + 1px rule + menu bar (~24px) + 2px outer border
-    private const double ChromeHeight = 47;
+    // Menu bar height (~28px) + 2px outer border
+    private const double ChromeHeight = 30;
 
     private static readonly double[] ZoomLevels = { 1.0, 1.5, 2.0, 4.0 };
     private int _currentScaleIndex = 0;
@@ -30,6 +30,17 @@ public partial class MainWindow : Window
         DataContext = _viewModel;
         KeyDown += OnKeyDown;
         _viewModel.ShowAnswerDialog  += OnShowAnswerDialog;
+
+        // Make the menu bar border draggable (it is the top chrome)
+        var menuBarBorder = this.FindControl<Avalonia.Controls.Border>("MenuBarBorder");
+        if (menuBarBorder != null)
+        {
+            menuBarBorder.PointerPressed += (_, e) =>
+            {
+                if (e.GetCurrentPoint(menuBarBorder).Properties.IsLeftButtonPressed)
+                    BeginMoveDrag(e);
+            };
+        }
     }
 
     protected override void OnOpened(EventArgs e)
@@ -165,6 +176,17 @@ public partial class MainWindow : Window
     private void OnTitleBarClose(object? sender, EventArgs e)
     {
         Close();
+    }
+
+    // Close from keyboard (Alt+F4 may not work without OS chrome)
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Key == Key.F4 && e.KeyModifiers.HasFlag(KeyModifiers.Alt))
+        {
+            Close();
+            e.Handled = true;
+        }
     }
 
     private async System.Threading.Tasks.Task OpenFileAsync()
