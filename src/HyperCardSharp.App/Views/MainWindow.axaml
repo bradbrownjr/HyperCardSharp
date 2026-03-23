@@ -10,11 +10,35 @@
 
     <DockPanel>
         <!-- Status bar at bottom -->
-        <Border DockPanel.Dock="Bottom" Background="#222222" Padding="8,4">
-            <TextBlock Text="{Binding StatusText}"
-                       Foreground="#CCCCCC"
-                       FontSize="12"
-                       FontFamily="Consolas, Courier New, monospace"/>
+        <Border DockPanel.Dock="Bottom" Background="#222222" Padding="0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="{Binding StatusText}"
+                           Foreground="#CCCCCC"
+                           FontSize="12"
+                           FontFamily="Consolas, Courier New, monospace"
+                           Padding="8,4"
+                           VerticalAlignment="Center"/>
+                <!-- System 7-style help button, bottom-right -->
+                <Button x:Name="HelpButton"
+                        Grid.Column="1"
+                        Content="?"
+                        Width="22" Height="22"
+                        Margin="4,3,4,3"
+                        Click="OnHelpClick"
+                        Background="#CCCCCC" Foreground="#000000"
+                        BorderBrush="#000000" BorderThickness="1"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                        FontWeight="Bold" FontSize="12" Padding="0"
+                        VerticalAlignment="Center"
+                        ToolTip.Tip="Keyboard Shortcuts (Ctrl+H)"/>
+            </Grid>
         </Border>
 
         <!-- Card display area — content auto-scales to fit -->

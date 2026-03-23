@@ -18,6 +18,9 @@ public partial class MainWindow : Window
     private const double WindowChromeHeight = 32;
     private const double CardPadding = 8; // Margin*2 from XAML
 
+    private static readonly double[] ZoomLevels = { 1.0, 1.5, 2.0, 4.0 };
+    private int _currentScaleIndex = 0;
+
     // Retained for Ctrl+L "switch stack" within the same file
     private string? _currentOpenFileName;
     private List<(string Name, byte[] Data)>? _currentStacks;
@@ -75,21 +78,41 @@ public partial class MainWindow : Window
                 _ = SwitchStackAsync();
                 e.Handled = true;
                 break;
+            // Show help dialog
+            case Key.H when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                _ = ShowHelpAsync();
+                e.Handled = true;
+                break;
             // Zoom presets
             case Key.D1 when e.KeyModifiers.HasFlag(KeyModifiers.Control):
-                ResizeToScale(1.0);
+                _currentScaleIndex = 0;
+                ResizeToScale(ZoomLevels[0]);
                 e.Handled = true;
                 break;
             case Key.D2 when e.KeyModifiers.HasFlag(KeyModifiers.Control):
-                ResizeToScale(1.5);
+                _currentScaleIndex = 1;
+                ResizeToScale(ZoomLevels[1]);
                 e.Handled = true;
                 break;
             case Key.D3 when e.KeyModifiers.HasFlag(KeyModifiers.Control):
-                ResizeToScale(2.0);
+                _currentScaleIndex = 2;
+                ResizeToScale(ZoomLevels[2]);
                 e.Handled = true;
                 break;
             case Key.D4 when e.KeyModifiers.HasFlag(KeyModifiers.Control):
-                ResizeToScale(4.0);
+                _currentScaleIndex = 3;
+                ResizeToScale(ZoomLevels[3]);
+                e.Handled = true;
+                break;
+            // Zoom in/out step (Ctrl+= and Ctrl+-)
+            case Key.OemPlus when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+            case Key.Add when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                ZoomIn();
+                e.Handled = true;
+                break;
+            case Key.OemMinus when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+            case Key.Subtract when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                ZoomOut();
                 e.Handled = true;
                 break;
         }
@@ -114,6 +137,35 @@ public partial class MainWindow : Window
 
         Width = targetW;
         Height = targetH;
+    }
+
+    private void ZoomIn()
+    {
+        if (_currentScaleIndex < ZoomLevels.Length - 1)
+        {
+            _currentScaleIndex++;
+            ResizeToScale(ZoomLevels[_currentScaleIndex]);
+        }
+    }
+
+    private void ZoomOut()
+    {
+        if (_currentScaleIndex > 0)
+        {
+            _currentScaleIndex--;
+            ResizeToScale(ZoomLevels[_currentScaleIndex]);
+        }
+    }
+
+    private async System.Threading.Tasks.Task ShowHelpAsync()
+    {
+        var help = new HelpWindow();
+        await help.ShowDialog(this);
+    }
+
+    private void OnHelpClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _ = ShowHelpAsync();
     }
 
     private async System.Threading.Tasks.Task OpenFileAsync()
