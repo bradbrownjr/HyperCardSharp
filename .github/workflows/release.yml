@@ -23,7 +23,7 @@ jobs:
           - os: windows-latest
             rid: win-x64
             artifact-name: HyperCardSharp-windows-x64
-          - os: macos-13
+          - os: macos-15
             rid: osx-x64
             artifact-name: HyperCardSharp-macos-intel
           - os: macos-latest
