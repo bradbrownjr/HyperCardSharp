@@ -35,6 +35,16 @@ public partial class StackViewModel : ObservableObject
     [ObservableProperty]
     private SKBitmap? _currentBitmap;
 
+    [ObservableProperty]
+    private RenderMode _renderMode = RenderMode.BlackAndWhite;
+
+    /// <summary>Menu label that shows the next mode to switch to.</summary>
+    public string RenderModeLabel =>
+        RenderMode == RenderMode.BlackAndWhite ? "Switch to Color Mode" : "Switch to Black & White Mode";
+
+    partial void OnRenderModeChanged(RenderMode value)
+        => OnPropertyChanged(nameof(RenderModeLabel));
+
     /// <summary>Raised when a HyperTalk script wants to show an answer dialog.</summary>
     public event Action<string>? ShowAnswerDialog;
 
@@ -207,10 +217,19 @@ public partial class StackViewModel : ObservableObject
         if (card == null) return;
 
         var oldBitmap = CurrentBitmap;
-        CurrentBitmap = _renderer.RenderCard(card);
+        CurrentBitmap = _renderer.RenderCard(card, RenderMode);
         oldBitmap?.Dispose();
 
         UpdateStatusText();
+    }
+
+    [RelayCommand]
+    public void ToggleRenderMode()
+    {
+        RenderMode = RenderMode == RenderMode.BlackAndWhite
+            ? RenderMode.Color
+            : RenderMode.BlackAndWhite;
+        RenderCurrentCard();
     }
 
     // -------------------------------------------------------------------------

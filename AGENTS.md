@@ -1,8 +1,8 @@
-# Agent Guide for HyperCardSharp
+# Agent Guide for HyperCard#
 
 ## Product Purpose
 
-HyperCardSharp is a cross-platform, native HyperCard stack player and HyperTalk interpreter for retro computing enthusiasts and digital preservationists. It opens classic Mac HyperCard stacks directly on modern Windows, macOS, and Linux systems — no Mac emulation. It handles stacks delivered as raw files, StuffIt (.sit) archives, or Mac disk images (.img), with support for B&W and color display modes, embedded QuickTime MOV playback, and HyperTalk script execution.
+HyperCard# is a cross-platform, native HyperCard stack player and HyperTalk interpreter for retro computing enthusiasts and digital preservationists. It opens classic Mac HyperCard stacks directly on modern Windows, macOS, and Linux systems — no Mac emulation. It handles stacks delivered as raw files, StuffIt (.sit) archives, or Mac disk images (.img), with support for B&W and color display modes, embedded QuickTime MOV playback, and HyperTalk script execution.
 
 ## Technical Stack
 

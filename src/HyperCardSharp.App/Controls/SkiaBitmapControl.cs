@@ -223,9 +223,10 @@ public class SkiaBitmapControl : Control
             for (int x = 0; x < w; x++)
                 pixels[y * w + x] = ((x + y) % 2 == 0) ? 0xFFFFFFFF : 0xFF000000;
 
-        // Scale floppy proportionally: 32px icon should be ~6% of shortest side (32/512)
-        // At 512px → scale 1, at 1024px → scale 2, etc.
-        int scale = Math.Max(1, Math.Min(w, h) / 512);
+        // Scale floppy proportionally to the window zoom level.
+        // Baseline: scale=3 at the standard 640×400 (1× zoom) card size, doubling with each zoom step.
+        // Formula: 3 * min(w,h) / 400 — produces scale 3/4/6/12 at 1×/1.5×/2×/4× zoom.
+        int scale = Math.Max(3, 3 * Math.Min(w, h) / 400);
         int renderW = DiskW * scale;
         int renderH = DiskH * scale;
         int ox = (w - renderW) / 2;

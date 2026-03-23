@@ -321,7 +321,7 @@ public class HyperTalkInterpreter
         {
             var val = Evaluate(s.CardExpr, env);
             if (val.TryAsNumber(out double n))
-                GoToCardByIndex((int)n - 1); // HyperTalk is 1-based
+                GoToCardByIndex((int)n); // pass 1-based; callback converts to 0-based index
             else
                 LogMessage($"HyperTalk: go to card '{val.Raw}' — name navigation not implemented");
         }

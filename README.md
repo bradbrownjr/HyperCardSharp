@@ -1,12 +1,12 @@
-# HyperCardSharp
+# HyperCard#
 
 A cross-platform, open source HyperCard stack player and HyperTalk interpreter built with C# and .NET 8.
 
-![HyperCardSharp Screenshot](docs/screenshot.png)
+![HyperCard# Screenshot](docs/screenshot.png)
 
 ## What It Does
 
-HyperCardSharp opens classic Mac HyperCard stacks natively on Windows, macOS, and Linux — no Mac emulation required. It handles stacks delivered as raw files, StuffIt archives (.sit), BinHex (.hqx), or Mac disk images (.img), with support for black-and-white bitmap rendering, interactive card navigation, and HyperTalk script execution.
+HyperCard# opens classic Mac HyperCard stacks natively on Windows, macOS, and Linux — no Mac emulation required. It handles stacks delivered as raw files, StuffIt archives (.sit), BinHex (.hqx), or Mac disk images (.img), with support for black-and-white bitmap rendering, interactive card navigation, and HyperTalk script execution.
 
 ## Current Features
 

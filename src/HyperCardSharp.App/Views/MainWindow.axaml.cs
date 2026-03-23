@@ -1,10 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Platform.Storage;
@@ -13,83 +10,27 @@ using HyperCardSharp.Core.Containers;
 
 namespace HyperCardSharp.App.Views;
 
-/// <summary>
-/// View-model for a single row in the stack picker list.
-/// </summary>
-public class StackListItem
-{
-    public string Name { get; init; } = "";
-    public string Cards { get; init; } = "";
-    public string Size { get; init; } = "";
-    public string Resolution { get; init; } = "";
-    public int Index { get; init; }
-
-    public static StackListItem FromStackData(string name, byte[] data, int index)
-    {
-        int cardCount = 0;
-        short cardW = 0, cardH = 0;
-
-        try
-        {
-            var span = data.AsSpan();
-            int stkBlockSize = BinaryPrimitives.ReadInt32BigEndian(span.Slice(0, 4));
-            if (stkBlockSize >= 0x1BC && data.Length >= 0x1BC)
-            {
-                cardH = BinaryPrimitives.ReadInt16BigEndian(span.Slice(0x1B8, 2));
-                cardW = BinaryPrimitives.ReadInt16BigEndian(span.Slice(0x1BA, 2));
-            }
-            int pos = 0;
-            while (pos + 8 <= data.Length)
-            {
-                int sz = BinaryPrimitives.ReadInt32BigEndian(span.Slice(pos, 4));
-                if (sz < 16 || pos + sz > data.Length) break;
-                if (data[pos + 4] == 'C' && data[pos + 5] == 'A' &&
-                    data[pos + 6] == 'R' && data[pos + 7] == 'D')
-                    cardCount++;
-                pos += sz;
-            }
-        }
-        catch { }
-
-        string sizeStr = data.Length >= 1024 * 1024
-            ? $"{data.Length / (1024.0 * 1024.0):F1} MB"
-            : $"{data.Length / 1024}K";
-        string resStr = cardW > 0 && cardH > 0 ? $"{cardW}\u00D7{cardH}" : "\u2014";
-
-        return new StackListItem
-        {
-            Name = name,
-            Cards = cardCount > 0 ? cardCount.ToString() : "\u2014",
-            Size = sizeStr,
-            Resolution = resStr,
-            Index = index
-        };
-    }
-}
-
 public partial class MainWindow : Window
 {
     private readonly StackViewModel _viewModel = new();
 
     private const double StatusBarHeight = 28;
     private const double WindowChromeHeight = 32;
-    private const double CardPadding = 8;
+    private const double CardPadding = 8; // Margin*2 from XAML
 
+    private static readonly double[] ZoomLevels = { 1.0, 1.5, 2.0, 4.0 };
+    private int _currentScaleIndex = 0;
+
+    // Retained for Ctrl+L "switch stack" within the same file
     private string? _currentOpenFileName;
     private List<(string Name, byte[] Data)>? _currentStacks;
-    private TaskCompletionSource<int>? _pickerTcs;
-
-    /// <summary>Platform-aware modifier key label: ⌘ on macOS, Ctrl on others.</summary>
-    private static readonly string Mod = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "\u2318" : "Ctrl";
-    private static readonly KeyModifiers PlatformMod =
-        RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? KeyModifiers.Meta : KeyModifiers.Control;
 
     public MainWindow()
     {
         InitializeComponent();
         DataContext = _viewModel;
         KeyDown += OnKeyDown;
-        _viewModel.ShowAnswerDialog += OnShowAnswerDialog;
+        _viewModel.ShowAnswerDialog  += OnShowAnswerDialog;
     }
 
     protected override void OnOpened(EventArgs e)
@@ -105,28 +46,8 @@ public partial class MainWindow : Window
         _viewModel.StatusText = $"[answer] {message}";
     }
 
-    private bool HasMod(KeyEventArgs e) => e.KeyModifiers.HasFlag(PlatformMod);
-
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        // ── Picker overlay: let arrow keys through for list navigation ──
-        if (PickerOverlay.IsVisible)
-        {
-            if (e.Key == Key.Escape)
-            {
-                ClosePickerWithResult(-1);
-                e.Handled = true;
-            }
-            else if (e.Key == Key.Enter)
-            {
-                ClosePickerWithResult(PickerList.SelectedIndex);
-                e.Handled = true;
-            }
-            // Don't handle Up/Down/Home/End — let them navigate the ListBox
-            return;
-        }
-
-        // ── Main key handling ──
         switch (e.Key)
         {
             case Key.Right:
@@ -148,131 +69,57 @@ public partial class MainWindow : Window
                 _viewModel.LastCard();
                 e.Handled = true;
                 break;
-            case Key.O when HasMod(e):
+            case Key.O when e.KeyModifiers.HasFlag(KeyModifiers.Control):
                 _ = OpenFileAsync();
                 e.Handled = true;
                 break;
-            case Key.M when HasMod(e):
+            // Switch stack within the current multi-stack file
+            case Key.M when e.KeyModifiers.HasFlag(KeyModifiers.Control):
                 _ = SwitchStackAsync();
                 e.Handled = true;
                 break;
-            case Key.H when HasMod(e):
+            // Show help dialog
+            case Key.H when e.KeyModifiers.HasFlag(KeyModifiers.Control):
                 _ = ShowHelpAsync();
                 e.Handled = true;
                 break;
             // Zoom presets
-            case Key.D1 when HasMod(e):
-                ResizeToScale(1.0);
+            case Key.D1 when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                _currentScaleIndex = 0;
+                ResizeToScale(ZoomLevels[0]);
                 e.Handled = true;
                 break;
-            case Key.D2 when HasMod(e):
-                ResizeToScale(1.5);
+            case Key.D2 when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                _currentScaleIndex = 1;
+                ResizeToScale(ZoomLevels[1]);
                 e.Handled = true;
                 break;
-            case Key.D3 when HasMod(e):
-                ResizeToScale(2.0);
+            case Key.D3 when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                _currentScaleIndex = 2;
+                ResizeToScale(ZoomLevels[2]);
                 e.Handled = true;
                 break;
-            case Key.D4 when HasMod(e):
-                ResizeToScale(4.0);
+            case Key.D4 when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                _currentScaleIndex = 3;
+                ResizeToScale(ZoomLevels[3]);
                 e.Handled = true;
                 break;
-            // Zoom +/-
-            case Key.OemPlus when HasMod(e):
-            case Key.Add when HasMod(e):
-                ZoomStep(+1);
+            // Zoom in/out step (Ctrl+= and Ctrl+-)
+            case Key.OemPlus when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+            case Key.Add when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                ZoomIn();
                 e.Handled = true;
                 break;
-            case Key.OemMinus when HasMod(e):
-            case Key.Subtract when HasMod(e):
-                ZoomStep(-1);
+            case Key.OemMinus when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+            case Key.Subtract when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                ZoomOut();
                 e.Handled = true;
                 break;
         }
     }
-
-    // ── Help ────────────────────────────────────────────────────────────
-
-    private async Task ShowHelpAsync()
-    {
-        var help = new HelpWindow();
-        await help.ShowDialog(this);
-    }
-
-    private void OnHelpClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        _ = ShowHelpAsync();
-    }
-
-    // ── Zoom ────────────────────────────────────────────────────────────
-
-    private double _currentScale = 1.0;
-    private static readonly double[] ZoomLevels = { 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0 };
-
-    private void ZoomStep(int direction)
-    {
-        // Find current position in zoom levels and step
-        int idx = 0;
-        double minDist = double.MaxValue;
-        for (int i = 0; i < ZoomLevels.Length; i++)
-        {
-            double dist = Math.Abs(ZoomLevels[i] - _currentScale);
-            if (dist < minDist) { minDist = dist; idx = i; }
-        }
-        idx = Math.Clamp(idx + direction, 0, ZoomLevels.Length - 1);
-        _currentScale = ZoomLevels[idx];
-        ResizeToScale(_currentScale);
-    }
-
-    // ── Picker overlay ──────────────────────────────────────────────────
-
-    private Task<int> ShowPickerOverlay(List<(string Name, byte[] Data)> stacks)
-    {
-        PickerList.Items.Clear();
-        for (int i = 0; i < stacks.Count; i++)
-        {
-            var item = StackListItem.FromStackData(stacks[i].Name, stacks[i].Data, i);
-            PickerList.Items.Add(item);
-        }
-
-        PickerInfoText.Text = stacks.Count == 1 ? "1 stack" : $"{stacks.Count} stacks";
-        if (_currentOpenFileName != null)
-            PickerTitleText.Text = _currentOpenFileName;
-
-        if (stacks.Count > 0)
-            PickerList.SelectedIndex = 0;
-
-        PickerOverlay.IsVisible = true;
-        PickerList.Focus();
-
-        _pickerTcs = new TaskCompletionSource<int>();
-        return _pickerTcs.Task;
-    }
-
-    private void ClosePickerWithResult(int index)
-    {
-        PickerOverlay.IsVisible = false;
-        _pickerTcs?.TrySetResult(index);
-        _pickerTcs = null;
-    }
-
-    private void OnPickerOk(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-        => ClosePickerWithResult(PickerList.SelectedIndex);
-
-    private void OnPickerCancel(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-        => ClosePickerWithResult(-1);
-
-    private void OnPickerDoubleTap(object? sender, TappedEventArgs e)
-    {
-        if (PickerList.SelectedIndex >= 0)
-            ClosePickerWithResult(PickerList.SelectedIndex);
-    }
-
-    // ── Window resize ───────────────────────────────────────────────────
 
     private void ResizeToScale(double scale)
     {
-        _currentScale = scale;
         double cardW = _viewModel.CardWidth * scale;
         double cardH = _viewModel.CardHeight * scale;
         double targetW = cardW + CardPadding;
@@ -292,9 +139,36 @@ public partial class MainWindow : Window
         Height = targetH;
     }
 
-    // ── File open / stack selection ─────────────────────────────────────
+    private void ZoomIn()
+    {
+        if (_currentScaleIndex < ZoomLevels.Length - 1)
+        {
+            _currentScaleIndex++;
+            ResizeToScale(ZoomLevels[_currentScaleIndex]);
+        }
+    }
 
-    private async Task OpenFileAsync()
+    private void ZoomOut()
+    {
+        if (_currentScaleIndex > 0)
+        {
+            _currentScaleIndex--;
+            ResizeToScale(ZoomLevels[_currentScaleIndex]);
+        }
+    }
+
+    private async System.Threading.Tasks.Task ShowHelpAsync()
+    {
+        var help = new HelpWindow();
+        await help.ShowDialog(this);
+    }
+
+    private void OnHelpClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _ = ShowHelpAsync();
+    }
+
+    private async System.Threading.Tasks.Task OpenFileAsync()
     {
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
@@ -307,7 +181,8 @@ public partial class MainWindow : Window
             }
         });
 
-        if (files.Count == 0) return;
+        if (files.Count == 0)
+            return;
 
         var file = files[0];
         try
@@ -330,8 +205,10 @@ public partial class MainWindow : Window
             // Sort alphabetically before storing and presenting
             stacks.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name));
 
+            // Store for Ctrl+M re-pick
             _currentOpenFileName = file.Name;
             _currentStacks = stacks;
+
             await PickAndLoadStack(file.Name, stacks);
         }
         catch (Exception ex)
@@ -340,29 +217,39 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task SwitchStackAsync()
+    /// <summary>
+    /// Re-show the stack picker for the currently open multi-stack file.
+    /// </summary>
+    private async System.Threading.Tasks.Task SwitchStackAsync()
     {
         if (_currentStacks == null || _currentStacks.Count < 2 || _currentOpenFileName == null)
         {
             _viewModel.StatusText = "No multi-stack file loaded. Ctrl+O to open a file.";
             return;
         }
+
         await PickAndLoadStack(_currentOpenFileName, _currentStacks);
     }
 
-    private async Task PickAndLoadStack(string fileName, List<(string Name, byte[] Data)> stacks)
+    private async System.Threading.Tasks.Task PickAndLoadStack(
+        string fileName, List<(string Name, byte[] Data)> stacks)
     {
         byte[] data;
         string? stackName = null;
 
         if (stacks.Count > 1)
         {
-            int selectedIndex = await ShowPickerOverlay(stacks);
+            var names = stacks.Select(s => s.Name).ToList();
+            var picker = new StackPickerWindow(names);
+            var result = await picker.ShowDialog<int?>(this);
+            int selectedIndex = result ?? -1;
+
             if (selectedIndex < 0 || selectedIndex >= stacks.Count)
             {
                 _viewModel.StatusText = "Stack selection cancelled.";
                 return;
             }
+
             data = stacks[selectedIndex].Data;
             stackName = stacks[selectedIndex].Name;
         }
@@ -373,4 +260,30 @@ public partial class MainWindow : Window
 
         _viewModel.LoadStack(data, fileName, stackName);
     }
+
+    // ── Menu event handlers ────────────────────────────────────────────────────
+
+    private void OnMenuOpen(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => _ = OpenFileAsync();
+
+    private void OnMenuSwitchStack(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => _ = SwitchStackAsync();
+
+    private void OnMenuToggleRenderMode(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => _viewModel.ToggleRenderMode();
+
+    private void OnMenuZoom1(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    { _currentScaleIndex = 0; ResizeToScale(ZoomLevels[0]); }
+
+    private void OnMenuZoom2(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    { _currentScaleIndex = 1; ResizeToScale(ZoomLevels[1]); }
+
+    private void OnMenuZoom3(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    { _currentScaleIndex = 2; ResizeToScale(ZoomLevels[2]); }
+
+    private void OnMenuZoom4(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    { _currentScaleIndex = 3; ResizeToScale(ZoomLevels[3]); }
+
+    private void OnMenuHelp(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => _ = ShowHelpAsync();
 }

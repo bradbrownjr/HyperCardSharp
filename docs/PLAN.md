@@ -1,4 +1,4 @@
-# HyperCardSharp — Full Implementation Plan
+# HyperCard# — Full Implementation Plan
 
 ## Context
 
