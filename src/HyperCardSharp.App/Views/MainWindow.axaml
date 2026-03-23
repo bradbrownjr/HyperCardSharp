@@ -6,85 +6,68 @@
         Width="660" Height="460"
         MinWidth="400" MinHeight="300"
         CanResize="True"
-        Background="#333333">
+        SystemDecorations="None"
+        Background="#C0C0C0">
 
-    <DockPanel>
-        <!-- Mac System 7 menu bar: white background, Chicago font, 1px black bottom border -->
-        <Border DockPanel.Dock="Top"
-                Background="#FFFFFF"
-                BorderBrush="#000000"
-                BorderThickness="0,0,0,1">
-            <Menu Background="Transparent"
-                  FontFamily="avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial, sans-serif"
-                  FontSize="13"
-                  Padding="4,0">
-                <!-- Apple menu symbol -->
-                <MenuItem Header="&#xF8FF;" FontSize="14">
-                    <MenuItem Header="About HyperCard#…"
-                              Click="OnMenuAbout"/>
-                </MenuItem>
-                <MenuItem Header="_File">
-                    <MenuItem Header="_Open…"
-                              InputGesture="Ctrl+O"
-                              Click="OnMenuOpen"/>
-                    <MenuItem Header="_Switch Stack…"
-                              InputGesture="Ctrl+M"
-                              Click="OnMenuSwitchStack"/>
-                </MenuItem>
-                <MenuItem Header="_View">
-                    <MenuItem Header="{Binding RenderModeLabel}"
-                              Click="OnMenuToggleRenderMode"/>
-                    <Separator/>
-                    <MenuItem Header="Zoom _1×"  InputGesture="Ctrl+1"  Click="OnMenuZoom1"/>
-                    <MenuItem Header="Zoom _2×"  InputGesture="Ctrl+2"  Click="OnMenuZoom2"/>
-                    <MenuItem Header="Zoom _3×"  InputGesture="Ctrl+3"  Click="OnMenuZoom3"/>
-                    <MenuItem Header="Zoom _4×"  InputGesture="Ctrl+4"  Click="OnMenuZoom4"/>
-                </MenuItem>
-                <MenuItem Header="_Help">
-                    <MenuItem Header="Keyboard Shortcuts…"
-                              InputGesture="Ctrl+H"
-                              Click="OnMenuHelp"/>
-                </MenuItem>
-            </Menu>
-        </Border>
+    <!-- 1px black outer border — System 7 window outline -->
+    <Border BorderBrush="#000000" BorderThickness="1" Background="#C0C0C0">
+        <DockPanel>
 
-        <!-- Status bar at bottom -->
-        <Border DockPanel.Dock="Bottom" Background="#222222" Padding="0">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0"
-                           Text="{Binding StatusText}"
-                           Foreground="#CCCCCC"
-                           FontSize="12"
-                           FontFamily="Consolas, Courier New, monospace"
-                           Padding="8,4"
-                           VerticalAlignment="Center"/>
-                <!-- System 7-style help button, bottom-right -->
-                <Button x:Name="HelpButton"
-                        Grid.Column="1"
-                        Content="?"
-                        Width="22" Height="22"
-                        Margin="4,3,4,3"
-                        Click="OnHelpClick"
-                        Background="#CCCCCC" Foreground="#000000"
-                        BorderBrush="#000000" BorderThickness="1"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        FontFamily="Geneva, Helvetica, Arial, sans-serif"
-                        FontWeight="Bold" FontSize="12" Padding="0"
-                        VerticalAlignment="Center"
-                        ToolTip.Tip="Keyboard Shortcuts (Ctrl+H)"/>
-            </Grid>
-        </Border>
+            <!-- System 7.5 striped title bar (drag + close box) -->
+            <controls:System7TitleBar x:Name="TitleBar"
+                                      DockPanel.Dock="Top"
+                                      Title="{Binding Title}"
+                                      CloseRequested="OnTitleBarClose"/>
 
-        <!-- Card display area — content auto-scales to fit -->
-        <controls:SkiaBitmapControl x:Name="CardDisplay"
-                                     Source="{Binding CurrentBitmap}"
-                                     Margin="4"
-                                     HorizontalAlignment="Stretch"
-                                     VerticalAlignment="Stretch"/>
-    </DockPanel>
+            <!-- Hairline rule under title bar -->
+            <Border DockPanel.Dock="Top" Height="1" Background="#000000"/>
+
+            <!-- Mac System 7 menu bar: white background, Chicago font, 1px black bottom border -->
+            <Border DockPanel.Dock="Top"
+                    Background="#FFFFFF"
+                    BorderBrush="#000000"
+                    BorderThickness="0,0,0,1"
+                    Padding="0">
+                <Menu Background="Transparent"
+                      Foreground="#000000"
+                      FontFamily="avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial, sans-serif"
+                      FontSize="13"
+                      Padding="4,2">
+                    <MenuItem Header="&#x2318;" FontSize="14">
+                        <MenuItem Header="About HyperCard#…"
+                                  Click="OnMenuAbout"/>
+                    </MenuItem>
+                    <MenuItem Header="File">
+                        <MenuItem Header="Open…"
+                                  InputGesture="Ctrl+O"
+                                  Click="OnMenuOpen"/>
+                        <MenuItem Header="Switch Stack…"
+                                  InputGesture="Ctrl+M"
+                                  Click="OnMenuSwitchStack"/>
+                    </MenuItem>
+                    <MenuItem Header="View">
+                        <MenuItem Header="{Binding RenderModeLabel}"
+                                  Click="OnMenuToggleRenderMode"/>
+                        <Separator/>
+                        <MenuItem Header="Zoom 1×"  InputGesture="Ctrl+1"  Click="OnMenuZoom1"/>
+                        <MenuItem Header="Zoom 2×"  InputGesture="Ctrl+2"  Click="OnMenuZoom2"/>
+                        <MenuItem Header="Zoom 3×"  InputGesture="Ctrl+3"  Click="OnMenuZoom3"/>
+                        <MenuItem Header="Zoom 4×"  InputGesture="Ctrl+4"  Click="OnMenuZoom4"/>
+                    </MenuItem>
+                    <MenuItem Header="Help">
+                        <MenuItem Header="Keyboard Shortcuts…"
+                                  InputGesture="Ctrl+H"
+                                  Click="OnMenuHelp"/>
+                    </MenuItem>
+                </Menu>
+            </Border>
+
+            <!-- Card display area — content fills remaining space -->
+            <controls:SkiaBitmapControl x:Name="CardDisplay"
+                                         Source="{Binding CurrentBitmap}"
+                                         Margin="0"
+                                         HorizontalAlignment="Stretch"
+                                         VerticalAlignment="Stretch"/>
+        </DockPanel>
+    </Border>
 </Window>

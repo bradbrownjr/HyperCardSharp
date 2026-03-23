@@ -4,6 +4,59 @@
     <Application.Styles>
         <FluentTheme />
 
+        <!-- ── System 7 Menu Bar styling ────────────────────────────────
+             Override Fluent menu defaults: black text on white/transparent bg
+             for top-level menu items and dropdown menu items.
+        -->
+        <!-- Top-level menu bar items: black text, transparent bg -->
+        <Style Selector="Menu > MenuItem">
+            <Setter Property="Foreground"   Value="#000000"/>
+            <Setter Property="Background"   Value="Transparent"/>
+        </Style>
+        <Style Selector="Menu > MenuItem /template/ ContentPresenter#PART_HeaderPresenter">
+            <Setter Property="TextBlock.Foreground" Value="#000000"/>
+        </Style>
+        <Style Selector="Menu > MenuItem:pointerover /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background"   Value="#000000"/>
+        </Style>
+        <Style Selector="Menu > MenuItem:pointerover /template/ ContentPresenter#PART_HeaderPresenter">
+            <Setter Property="TextBlock.Foreground" Value="#FFFFFF"/>
+        </Style>
+
+        <!-- Dropdown / submenu popup: white background, black text -->
+        <Style Selector="MenuFlyoutPresenter">
+            <Setter Property="Background"   Value="#FFFFFF"/>
+            <Setter Property="BorderBrush"  Value="#000000"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="Padding"      Value="0"/>
+        </Style>
+        <!-- Dropdown menu items -->
+        <Style Selector="MenuItem">
+            <Setter Property="Foreground"   Value="#000000"/>
+        </Style>
+        <Style Selector="MenuItem /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background"   Value="#FFFFFF"/>
+        </Style>
+        <Style Selector="MenuItem:pointerover /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background"   Value="#000000"/>
+        </Style>
+        <Style Selector="MenuItem:pointerover /template/ ContentPresenter#PART_HeaderPresenter">
+            <Setter Property="TextBlock.Foreground" Value="#FFFFFF"/>
+        </Style>
+        <Style Selector="MenuItem:pointerover">
+            <Setter Property="Foreground"   Value="#FFFFFF"/>
+        </Style>
+        <Style Selector="MenuItem:pointerover /template/ ContentPresenter#PART_InputGesturePresenter">
+            <Setter Property="TextBlock.Foreground" Value="#FFFFFF"/>
+        </Style>
+        <!-- Separator inside menus -->
+        <Style Selector="MenuItem > Separator">
+            <Setter Property="Background"   Value="#808080"/>
+            <Setter Property="Height"       Value="1"/>
+            <Setter Property="Margin"       Value="0"/>
+        </Style>
+
         <!-- ── System 7.5 button style ──────────────────────────────────
              Apply Classes="sys7" to any Button inside a System 7 dialog.
              Suppresses Fluent hover glow; uses flat gray with subtle darken

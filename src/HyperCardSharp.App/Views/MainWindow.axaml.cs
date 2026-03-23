@@ -14,9 +14,8 @@ public partial class MainWindow : Window
 {
     private readonly StackViewModel _viewModel = new();
 
-    private const double StatusBarHeight = 28;
-    private const double WindowChromeHeight = 32;
-    private const double CardPadding = 8; // Margin*2 from XAML
+    // System 7 title bar (19px) + 1px rule + menu bar (~24px) + 2px outer border
+    private const double ChromeHeight = 47;
 
     private static readonly double[] ZoomLevels = { 1.0, 1.5, 2.0, 4.0 };
     private int _currentScaleIndex = 0;
@@ -122,8 +121,8 @@ public partial class MainWindow : Window
     {
         double cardW = _viewModel.CardWidth * scale;
         double cardH = _viewModel.CardHeight * scale;
-        double targetW = cardW + CardPadding;
-        double targetH = cardH + CardPadding + StatusBarHeight + WindowChromeHeight;
+        double targetW = cardW + 2; // 1px border each side
+        double targetH = cardH + ChromeHeight;
 
         var screen = Screens.Primary ?? Screens.All.FirstOrDefault();
         if (screen != null)
@@ -163,9 +162,9 @@ public partial class MainWindow : Window
         await help.ShowDialog(this);
     }
 
-    private void OnHelpClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnTitleBarClose(object? sender, EventArgs e)
     {
-        _ = ShowHelpAsync();
+        Close();
     }
 
     private async System.Threading.Tasks.Task OpenFileAsync()
