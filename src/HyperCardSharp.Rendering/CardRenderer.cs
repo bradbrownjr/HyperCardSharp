@@ -5,7 +5,8 @@ using SkiaSharp;
 namespace HyperCardSharp.Rendering;
 
 /// <summary>
-/// Renders a complete HyperCard card by compositing background and card bitmaps.
+/// Renders a complete HyperCard card by compositing background and card bitmaps,
+/// then overlaying field text content from PartContent records.
 /// </summary>
 public class CardRenderer
 {
@@ -20,7 +21,7 @@ public class CardRenderer
     /// <summary>
     /// Render a card to an SKBitmap at stack dimensions.
     /// </summary>
-    public SKBitmap RenderCard(CardBlock card)
+    public SKBitmap RenderCard(CardBlock card, RenderMode mode = RenderMode.BlackAndWhite)
     {
         int width = _stack.StackHeader.CardWidth;
         int height = _stack.StackHeader.CardHeight;
@@ -45,6 +46,14 @@ public class CardRenderer
             if (cardBitmap != null)
                 canvas.DrawBitmap(cardBitmap, 0, 0);
         }
+
+        // Overlay field text (stored separately from the WOBA bitmap)
+        if (bg != null)
+            PartRenderer.RenderBackgroundParts(canvas, bg, card);
+        PartRenderer.RenderCardParts(canvas, card);
+
+        // TODO: Phase 8 Color — apply AddColor overlays when mode == RenderMode.Color
+        // and AddColor resource data is available for this card/background.
 
         // Extract the rendered image
         using var image = surface.Snapshot();

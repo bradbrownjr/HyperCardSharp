@@ -1,4 +1,4 @@
-# GitHub Copilot Instructions for HyperCardSharp
+# GitHub Copilot Instructions for HyperCard#
 
 > Full project context lives in `AGENTS.md` at the repo root. Read it for architecture,
 > engineering principles, planning rules, and the always/never memory protocol.

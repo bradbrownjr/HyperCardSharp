@@ -1,4 +1,4 @@
-# GitHub Copilot Agent Instructions for HyperCardSharp
+# GitHub Copilot Agent Instructions for HyperCard#
 
 > Full project context lives in `AGENTS.md` at the repo root. Read it before acting.
 

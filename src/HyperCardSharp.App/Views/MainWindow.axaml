@@ -9,6 +9,35 @@
         Background="#333333">
 
     <DockPanel>
+        <!-- Menu bar -->
+        <Menu DockPanel.Dock="Top"
+              Background="#C0C0C0"
+              FontFamily="Geneva, Helvetica, Arial, sans-serif"
+              FontSize="12">
+            <MenuItem Header="_File">
+                <MenuItem Header="_Open…"
+                          InputGesture="Ctrl+O"
+                          Click="OnMenuOpen"/>
+                <MenuItem Header="_Switch Stack…"
+                          InputGesture="Ctrl+M"
+                          Click="OnMenuSwitchStack"/>
+            </MenuItem>
+            <MenuItem Header="_View">
+                <MenuItem Header="{Binding RenderModeLabel}"
+                          Click="OnMenuToggleRenderMode"/>
+                <Separator/>
+                <MenuItem Header="Zoom _1× (512×342)"  InputGesture="Ctrl+1"  Click="OnMenuZoom1"/>
+                <MenuItem Header="Zoom _2×"            InputGesture="Ctrl+2"  Click="OnMenuZoom2"/>
+                <MenuItem Header="Zoom _3×"            InputGesture="Ctrl+3"  Click="OnMenuZoom3"/>
+                <MenuItem Header="Zoom _4×"            InputGesture="Ctrl+4"  Click="OnMenuZoom4"/>
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="Keyboard Shortcuts…"
+                          InputGesture="Ctrl+H"
+                          Click="OnMenuHelp"/>
+            </MenuItem>
+        </Menu>
+
         <!-- Status bar at bottom -->
         <Border DockPanel.Dock="Bottom" Background="#222222" Padding="0">
             <Grid>

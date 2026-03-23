@@ -260,4 +260,30 @@ public partial class MainWindow : Window
 
         _viewModel.LoadStack(data, fileName, stackName);
     }
+
+    // ── Menu event handlers ────────────────────────────────────────────────────
+
+    private void OnMenuOpen(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => _ = OpenFileAsync();
+
+    private void OnMenuSwitchStack(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => _ = SwitchStackAsync();
+
+    private void OnMenuToggleRenderMode(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => _viewModel.ToggleRenderMode();
+
+    private void OnMenuZoom1(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    { _currentScaleIndex = 0; ResizeToScale(ZoomLevels[0]); }
+
+    private void OnMenuZoom2(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    { _currentScaleIndex = 1; ResizeToScale(ZoomLevels[1]); }
+
+    private void OnMenuZoom3(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    { _currentScaleIndex = 2; ResizeToScale(ZoomLevels[2]); }
+
+    private void OnMenuZoom4(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    { _currentScaleIndex = 3; ResizeToScale(ZoomLevels[3]); }
+
+    private void OnMenuHelp(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => _ = ShowHelpAsync();
 }
