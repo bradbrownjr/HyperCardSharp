@@ -37,6 +37,8 @@ public class System7MenuBar : Control
     private MenuDropdown? _activeDropdown;
     private Bitmap? _appleLogo;
     private bool _logoLoaded;
+    private bool _useColorLogo;
+    private ImageBrush? _logoMaskBrush;
 
     private const double BarH   = 20;
     private const double StartX = 6;
@@ -55,6 +57,15 @@ public class System7MenuBar : Control
     {
         get => _menus;
         set => SetAndRaise(MenusProperty, ref _menus, value);
+    }
+
+    /// <summary>
+    /// When true, draw the rainbow Apple logo. When false (default), draw a black silhouette.
+    /// </summary>
+    public bool UseColorLogo
+    {
+        get => _useColorLogo;
+        set { _useColorLogo = value; InvalidateVisual(); }
     }
 
     static System7MenuBar() => AffectsRender<System7MenuBar>(MenusProperty);
@@ -93,6 +104,10 @@ public class System7MenuBar : Control
         {
             using var ms = new System.IO.MemoryStream(AppleLogoPng);
             _appleLogo = new Bitmap(ms);
+            _logoMaskBrush = new ImageBrush(_appleLogo)
+            {
+                Stretch = Stretch.Fill
+            };
         }
         catch { _appleLogo = null; }
     }
@@ -223,8 +238,25 @@ public class System7MenuBar : Control
         if (appleOpen)
             context.FillRectangle(Brushes.Black, new Rect(StartX - 2, 2, AppleW, 16));
 
-        if (_appleLogo != null)
-            context.DrawImage(_appleLogo, new Rect(StartX + 1, 3, 14, 14));
+        var logoRect = new Rect(StartX + 1, 3, 14, 14);
+        if (_appleLogo != null && _logoMaskBrush != null)
+        {
+            if (_useColorLogo)
+            {
+                // Rainbow logo drawn directly
+                context.DrawImage(_appleLogo, logoRect);
+            }
+            else
+            {
+                // B&W silhouette: use the logo's alpha channel as an opacity mask,
+                // then fill with solid black (or white when menu is open/highlighted).
+                IBrush fill = appleOpen ? Brushes.White : Brushes.Black;
+                using (context.PushOpacityMask(_logoMaskBrush, logoRect))
+                {
+                    context.FillRectangle(fill, logoRect);
+                }
+            }
+        }
         else
         {
             var sym = MakeFt("⌘", appleOpen ? Brushes.White : Brushes.Black);

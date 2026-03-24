@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Platform.Storage;
@@ -23,6 +24,12 @@ public partial class MainWindow : Window
     // Retained for Ctrl+L "switch stack" within the same file
     private string? _currentOpenFileName;
     private List<(string Name, byte[] Data)>? _currentStacks;
+
+    // Platform detection: on macOS, show ⌘ instead of Ctrl and accept Meta key
+    private static bool IsMac => RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+    private static string Mod(string key) => IsMac ? $"\u2318{key}" : $"Ctrl+{key}";
+    private static bool HasCmdOrCtrl(KeyModifiers mods) =>
+        mods.HasFlag(KeyModifiers.Control) || mods.HasFlag(KeyModifiers.Meta);
 
     public MainWindow()
     {
@@ -57,10 +64,10 @@ public partial class MainWindow : Window
                 Title = "File",
                 Items = new()
                 {
-                    new() { Title = "Open…", Shortcut = "Ctrl+O", Click = (_, _) => OnMenuOpen(null, null) },
-                    new() { Title = "Switch Stack…", Shortcut = "Ctrl+M", Click = (_, _) => OnMenuSwitchStack(null, null) },
+                    new() { Title = "Open\u2026", Shortcut = Mod("O"), Click = (_, _) => OnMenuOpen(null, null) },
+                    new() { Title = "Switch Stack\u2026", Shortcut = Mod("M"), Click = (_, _) => OnMenuSwitchStack(null, null) },
                     new() { IsSeparator = true },
-                    new() { Title = "Quit", Shortcut = "Ctrl+Q", Click = (_, _) => OnMenuQuit(null, null) }
+                    new() { Title = "Quit", Shortcut = Mod("Q"), Click = (_, _) => OnMenuQuit(null, null) }
                 }
             },
             // View menu
@@ -71,10 +78,10 @@ public partial class MainWindow : Window
                 {
                     new() { Title = _viewModel.RenderModeLabel, Click = (_, _) => OnMenuToggleRenderMode(null, null) },
                     new() { IsSeparator = true },
-                    new() { Title = "Zoom 1×", Shortcut = "Ctrl+1", Click = (_, _) => OnMenuZoom1(null, null) },
-                    new() { Title = "Zoom 2×", Shortcut = "Ctrl+2", Click = (_, _) => OnMenuZoom2(null, null) },
-                    new() { Title = "Zoom 3×", Shortcut = "Ctrl+3", Click = (_, _) => OnMenuZoom3(null, null) },
-                    new() { Title = "Zoom 4×", Shortcut = "Ctrl+4", Click = (_, _) => OnMenuZoom4(null, null) }
+                    new() { Title = "Zoom 1\u00d7", Shortcut = Mod("1"), Click = (_, _) => OnMenuZoom1(null, null) },
+                    new() { Title = "Zoom 2\u00d7", Shortcut = Mod("2"), Click = (_, _) => OnMenuZoom2(null, null) },
+                    new() { Title = "Zoom 3\u00d7", Shortcut = Mod("3"), Click = (_, _) => OnMenuZoom3(null, null) },
+                    new() { Title = "Zoom 4\u00d7", Shortcut = Mod("4"), Click = (_, _) => OnMenuZoom4(null, null) }
                 }
             },
             // Help menu
@@ -134,56 +141,56 @@ public partial class MainWindow : Window
                 _viewModel.LastCard();
                 e.Handled = true;
                 break;
-            case Key.O when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+            case Key.O when HasCmdOrCtrl(e.KeyModifiers):
                 _ = OpenFileAsync();
                 e.Handled = true;
                 break;
             // Switch stack within the current multi-stack file
-            case Key.M when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+            case Key.M when HasCmdOrCtrl(e.KeyModifiers):
                 _ = SwitchStackAsync();
                 e.Handled = true;
                 break;
             // Show help dialog — F1 is the cross-platform convention;
             // on classic Mac OS 7, HyperCard used Cmd+? for help.
             case Key.F1:
-            case Key.H when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+            case Key.H when HasCmdOrCtrl(e.KeyModifiers):
                 _ = ShowHelpAsync();
                 e.Handled = true;
                 break;
             // Zoom presets
-            case Key.D1 when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+            case Key.D1 when HasCmdOrCtrl(e.KeyModifiers):
                 _currentScaleIndex = 0;
                 ResizeToScale(ZoomLevels[0]);
                 e.Handled = true;
                 break;
-            case Key.D2 when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+            case Key.D2 when HasCmdOrCtrl(e.KeyModifiers):
                 _currentScaleIndex = 1;
                 ResizeToScale(ZoomLevels[1]);
                 e.Handled = true;
                 break;
-            case Key.D3 when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+            case Key.D3 when HasCmdOrCtrl(e.KeyModifiers):
                 _currentScaleIndex = 2;
                 ResizeToScale(ZoomLevels[2]);
                 e.Handled = true;
                 break;
-            case Key.D4 when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+            case Key.D4 when HasCmdOrCtrl(e.KeyModifiers):
                 _currentScaleIndex = 3;
                 ResizeToScale(ZoomLevels[3]);
                 e.Handled = true;
                 break;
             // Zoom in/out step (Ctrl+= and Ctrl+-)
-            case Key.OemPlus when e.KeyModifiers.HasFlag(KeyModifiers.Control):
-            case Key.Add when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+            case Key.OemPlus when HasCmdOrCtrl(e.KeyModifiers):
+            case Key.Add when HasCmdOrCtrl(e.KeyModifiers):
                 ZoomIn();
                 e.Handled = true;
                 break;
-            case Key.OemMinus when e.KeyModifiers.HasFlag(KeyModifiers.Control):
-            case Key.Subtract when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+            case Key.OemMinus when HasCmdOrCtrl(e.KeyModifiers):
+            case Key.Subtract when HasCmdOrCtrl(e.KeyModifiers):
                 ZoomOut();
                 e.Handled = true;
                 break;
             // Quit
-            case Key.Q when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+            case Key.Q when HasCmdOrCtrl(e.KeyModifiers):
             case Key.F4 when e.KeyModifiers.HasFlag(KeyModifiers.Alt):
                 Close();
                 e.Handled = true;
@@ -343,7 +350,13 @@ public partial class MainWindow : Window
         => _ = SwitchStackAsync();
 
     private void OnMenuToggleRenderMode(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-        => _viewModel.ToggleRenderMode();
+    {
+        _viewModel.ToggleRenderMode();
+        // Sync Apple logo: rainbow in color mode, black silhouette in B&W
+        var menuBar = this.FindControl<HyperCardSharp.App.Controls.System7MenuBar>("MenuBar");
+        if (menuBar != null)
+            menuBar.UseColorLogo = _viewModel.RenderMode == HyperCardSharp.Rendering.RenderMode.Color;
+    }
 
     private void OnMenuZoom1(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     { _currentScaleIndex = 0; ResizeToScale(ZoomLevels[0]); }
