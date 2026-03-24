@@ -31,11 +31,7 @@
                       FontSize="13"
                       FontWeight="Bold"
                       Padding="6,2,6,2">
-                    <MenuItem>
-                        <MenuItem.Header>
-                            <Image Source="avares://HyperCardSharp.App/Assets/apple-logo.png"
-                                   Width="14" Height="14"/>
-                        </MenuItem.Header>
+                    <MenuItem Header="⌘">
                         <MenuItem Header="About HyperCard#…"
                                   Click="OnMenuAbout"/>
                     </MenuItem>
