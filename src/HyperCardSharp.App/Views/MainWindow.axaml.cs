@@ -83,7 +83,7 @@ public partial class MainWindow : Window
                 Title = "Help",
                 Items = new()
                 {
-                    new() { Title = "Keyboard Shortcuts…", Shortcut = "Ctrl+H", Click = (_, _) => OnMenuHelp(null, null) }
+                    new() { Title = "Keyboard Shortcuts\u2026", Shortcut = "F1", Click = (_, _) => OnMenuHelp(null, null) }
                 }
             }
         };
@@ -143,7 +143,9 @@ public partial class MainWindow : Window
                 _ = SwitchStackAsync();
                 e.Handled = true;
                 break;
-            // Show help dialog
+            // Show help dialog — F1 is the cross-platform convention;
+            // on classic Mac OS 7, HyperCard used Cmd+? for help.
+            case Key.F1:
             case Key.H when e.KeyModifiers.HasFlag(KeyModifiers.Control):
                 _ = ShowHelpAsync();
                 e.Handled = true;
@@ -359,7 +361,13 @@ public partial class MainWindow : Window
         => _ = ShowHelpAsync();
 
     private void OnMenuAbout(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-        => _ = ShowHelpAsync();
+        => _ = ShowAboutAsync();
+
+    private async System.Threading.Tasks.Task ShowAboutAsync()
+    {
+        var about = new AboutWindow();
+        await about.ShowDialog(this);
+    }
 
     private void OnMenuQuit(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => Close();

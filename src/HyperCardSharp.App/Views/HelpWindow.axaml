@@ -111,9 +111,11 @@
                         <!-- ── Help ── -->
                         <TextBlock Text="Help" FontWeight="Bold" FontSize="12" Foreground="#000000"/>
                         <Grid Margin="10,0,0,0" ColumnDefinitions="155,*"
-                              RowDefinitions="Auto">
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl+H" Margin="0,2"/>
+                              RowDefinitions="Auto,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="F1  / Ctrl+H" Margin="0,2"/>
                             <TextBlock Grid.Row="0" Grid.Column="1" Text="Show this window" Margin="0,2"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="⌘? (classic Mac)" Margin="0,2" FontSize="11" Foreground="#555555"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="HyperCard help (historical)" Margin="0,2" FontSize="11" Foreground="#555555"/>
                         </Grid>
 
                     </StackPanel>

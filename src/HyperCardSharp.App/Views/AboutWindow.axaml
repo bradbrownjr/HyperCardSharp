@@ -1,0 +1,68 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:HyperCardSharp.App.Controls"
+        x:Class="HyperCardSharp.App.Views.AboutWindow"
+        Title="About HyperCard#"
+        Width="340" Height="220"
+        CanResize="False"
+        SystemDecorations="None"
+        WindowStartupLocation="CenterOwner"
+        Background="#C0C0C0"
+        FontFamily="Geneva, Helvetica, Arial, sans-serif"
+        FontSize="12">
+
+    <!-- 1px black outer border — System 7 window outline -->
+    <Border BorderBrush="#000000" BorderThickness="1" Background="#C0C0C0">
+        <DockPanel>
+
+            <!-- System 7.5 striped title bar -->
+            <controls:System7TitleBar DockPanel.Dock="Top"
+                                      Title="About HyperCard#"
+                                      CloseRequested="OnTitleBarClose"/>
+
+            <!-- Hairline rule under title bar -->
+            <Border DockPanel.Dock="Top" Height="1" Background="#000000"/>
+
+            <!-- OK button pinned to bottom -->
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                        HorizontalAlignment="Center" Margin="0,0,0,14">
+                <Border BorderBrush="#000000" BorderThickness="3" CornerRadius="4" Padding="0">
+                    <Button x:Name="OkButton" Content="OK"
+                            Width="84" Height="20"
+                            Click="OnOkClick" IsDefault="True"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            Background="#DDDDDD"
+                            BorderBrush="#000000" BorderThickness="1"
+                            FontWeight="Bold" CornerRadius="3"
+                            FontSize="12"/>
+                </Border>
+            </StackPanel>
+
+            <!-- Content -->
+            <StackPanel Margin="20,14,20,10" Spacing="6">
+                <TextBlock Text="HyperCard#"
+                           FontWeight="Bold" FontSize="18"
+                           Foreground="#000000"
+                           HorizontalAlignment="Center"/>
+
+                <TextBlock Text="Version 0.1 (alpha)"
+                           FontSize="12" Foreground="#333333"
+                           HorizontalAlignment="Center"/>
+
+                <Border Height="1" Background="#808080" Margin="0,4,0,4"/>
+
+                <TextBlock TextWrapping="Wrap" TextAlignment="Center"
+                           Foreground="#000000" FontSize="12"
+                           Text="A cross-platform HyperCard stack player&#10;and HyperTalk interpreter for retro computing&#10;enthusiasts and digital preservationists."/>
+
+                <Border Height="1" Background="#808080" Margin="0,4,0,4"/>
+
+                <TextBlock Text="© 2024–2026 HyperCard# Contributors"
+                           FontSize="11" Foreground="#555555"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+
+        </DockPanel>
+    </Border>
+</Window>
