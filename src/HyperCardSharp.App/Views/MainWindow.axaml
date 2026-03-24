@@ -18,51 +18,9 @@
 
             <!-- Menu bar: topmost element, white bg, Chicago font.
                  Doubles as drag handle — PointerPressed wired in code-behind. -->
-            <Border x:Name="MenuBarBorder"
-                    DockPanel.Dock="Top"
-                    Background="#FFFFFF"
-                    CornerRadius="7,7,0,0"
-                    BorderBrush="#000000"
-                    BorderThickness="0,0,0,1"
-                    Padding="0">
-                <Menu Background="Transparent"
-                      Foreground="#000000"
-                      FontFamily="avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial, sans-serif"
-                      FontSize="13"
-                      FontWeight="Bold"
-                      Padding="6,2,6,2">
-                    <MenuItem Header="⌘">
-                        <MenuItem Header="About HyperCard#…"
-                                  Click="OnMenuAbout"/>
-                    </MenuItem>
-                    <MenuItem Header="File">
-                        <MenuItem Header="Open…"
-                                  InputGesture="Ctrl+O"
-                                  Click="OnMenuOpen"/>
-                        <MenuItem Header="Switch Stack…"
-                                  InputGesture="Ctrl+M"
-                                  Click="OnMenuSwitchStack"/>
-                        <Separator/>
-                        <MenuItem Header="Quit"
-                                  InputGesture="Ctrl+Q"
-                                  Click="OnMenuQuit"/>
-                    </MenuItem>
-                    <MenuItem Header="View">
-                        <MenuItem Header="{Binding RenderModeLabel}"
-                                  Click="OnMenuToggleRenderMode"/>
-                        <Separator/>
-                        <MenuItem Header="Zoom 1×"  InputGesture="Ctrl+1"  Click="OnMenuZoom1"/>
-                        <MenuItem Header="Zoom 2×"  InputGesture="Ctrl+2"  Click="OnMenuZoom2"/>
-                        <MenuItem Header="Zoom 3×"  InputGesture="Ctrl+3"  Click="OnMenuZoom3"/>
-                        <MenuItem Header="Zoom 4×"  InputGesture="Ctrl+4"  Click="OnMenuZoom4"/>
-                    </MenuItem>
-                    <MenuItem Header="Help">
-                        <MenuItem Header="Keyboard Shortcuts…"
-                                  InputGesture="Ctrl+H"
-                                  Click="OnMenuHelp"/>
-                    </MenuItem>
-                </Menu>
-            </Border>
+            <!-- Custom System 7 menu bar with Apple logo and proper click handling -->
+            <controls:System7MenuBar x:Name="MenuBar"
+                                     DockPanel.Dock="Top"/>
 
             <!-- Card display area — content fills remaining space -->
             <controls:SkiaBitmapControl x:Name="CardDisplay"

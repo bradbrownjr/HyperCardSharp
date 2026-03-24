@@ -31,16 +31,64 @@ public partial class MainWindow : Window
         KeyDown += OnKeyDown;
         _viewModel.ShowAnswerDialog  += OnShowAnswerDialog;
 
-        // Make the menu bar border draggable (it is the top chrome)
-        var menuBarBorder = this.FindControl<Avalonia.Controls.Border>("MenuBarBorder");
-        if (menuBarBorder != null)
+        // Set up the custom menu bar
+        InitializeMenuBar();
+    }
+
+    private void InitializeMenuBar()
+    {
+        var menuBar = this.FindControl<HyperCardSharp.App.Controls.System7MenuBar>("MenuBar");
+        if (menuBar == null) return;
+
+        var menus = new List<HyperCardSharp.App.Controls.System7MenuBar.MenuDef>
         {
-            menuBarBorder.PointerPressed += (_, e) =>
+            // Apple menu
+            new HyperCardSharp.App.Controls.System7MenuBar.MenuDef
             {
-                if (e.GetCurrentPoint(menuBarBorder).Properties.IsLeftButtonPressed)
-                    BeginMoveDrag(e);
-            };
-        }
+                Title = "  ",
+                Items = new()
+                {
+                    new() { Title = "About HyperCard#…", Click = (_, _) => OnMenuAbout(null, null) }
+                }
+            },
+            // File menu
+            new HyperCardSharp.App.Controls.System7MenuBar.MenuDef
+            {
+                Title = "File",
+                Items = new()
+                {
+                    new() { Title = "Open…", Shortcut = "Ctrl+O", Click = (_, _) => OnMenuOpen(null, null) },
+                    new() { Title = "Switch Stack…", Shortcut = "Ctrl+M", Click = (_, _) => OnMenuSwitchStack(null, null) },
+                    new() { IsSeparator = true },
+                    new() { Title = "Quit", Shortcut = "Ctrl+Q", Click = (_, _) => OnMenuQuit(null, null) }
+                }
+            },
+            // View menu
+            new HyperCardSharp.App.Controls.System7MenuBar.MenuDef
+            {
+                Title = "View",
+                Items = new()
+                {
+                    new() { Title = _viewModel.RenderModeLabel, Click = (_, _) => OnMenuToggleRenderMode(null, null) },
+                    new() { IsSeparator = true },
+                    new() { Title = "Zoom 1×", Shortcut = "Ctrl+1", Click = (_, _) => OnMenuZoom1(null, null) },
+                    new() { Title = "Zoom 2×", Shortcut = "Ctrl+2", Click = (_, _) => OnMenuZoom2(null, null) },
+                    new() { Title = "Zoom 3×", Shortcut = "Ctrl+3", Click = (_, _) => OnMenuZoom3(null, null) },
+                    new() { Title = "Zoom 4×", Shortcut = "Ctrl+4", Click = (_, _) => OnMenuZoom4(null, null) }
+                }
+            },
+            // Help menu
+            new HyperCardSharp.App.Controls.System7MenuBar.MenuDef
+            {
+                Title = "Help",
+                Items = new()
+                {
+                    new() { Title = "Keyboard Shortcuts…", Shortcut = "Ctrl+H", Click = (_, _) => OnMenuHelp(null, null) }
+                }
+            }
+        };
+
+        menuBar.Menus = menus;
     }
 
     protected override void OnOpened(EventArgs e)
