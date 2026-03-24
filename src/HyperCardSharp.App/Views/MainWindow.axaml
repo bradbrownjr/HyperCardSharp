@@ -12,7 +12,7 @@
 
     <!-- Outer border with rounded top corners — required for transparent-window chrome -->
     <Border BorderBrush="#000000" BorderThickness="1"
-            CornerRadius="8,8,0,0" ClipToBounds="True"
+            CornerRadius="8,8,0,0" ClipToBounds="False"
             Background="#C0C0C0">
         <DockPanel>
 
