@@ -29,7 +29,8 @@
                       Foreground="#000000"
                       FontFamily="avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial, sans-serif"
                       FontSize="14"
-                      Padding="8,3,8,3">
+                      FontWeight="Bold"
+                      Padding="6,4,6,4">
                     <MenuItem Header="&#x2318;">
                         <MenuItem Header="About HyperCard#…"
                                   Click="OnMenuAbout"/>
@@ -41,6 +42,10 @@
                         <MenuItem Header="Switch Stack…"
                                   InputGesture="Ctrl+M"
                                   Click="OnMenuSwitchStack"/>
+                        <Separator/>
+                        <MenuItem Header="Quit"
+                                  InputGesture="Ctrl+Q"
+                                  Click="OnMenuQuit"/>
                     </MenuItem>
                     <MenuItem Header="View">
                         <MenuItem Header="{Binding RenderModeLabel}"

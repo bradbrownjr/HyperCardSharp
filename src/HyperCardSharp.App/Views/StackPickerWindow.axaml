@@ -3,13 +3,13 @@
         xmlns:controls="clr-namespace:HyperCardSharp.App.Controls"
         x:Class="HyperCardSharp.App.Views.StackPickerWindow"
         Title="Select a Stack"
-        Width="540" Height="420"
-        MinWidth="400" MinHeight="300"
+        Width="480" Height="340"
+        MinWidth="400" MinHeight="280"
         CanResize="False"
         SystemDecorations="None"
         WindowStartupLocation="CenterOwner"
         Background="#C0C0C0"
-        FontFamily="Geneva, Helvetica, Arial, sans-serif"
+        FontFamily="avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial, sans-serif"
         FontSize="12">
 
     <!-- 1px black outer border — System 7 window outline -->
@@ -24,43 +24,20 @@
             <!-- Hairline rule under title bar -->
             <Border DockPanel.Dock="Top" Height="1" Background="#000000"/>
 
-            <!-- Content area -->
-            <DockPanel Margin="14">
+            <!-- Content area: 2-column layout like System 7 file dialog -->
+            <Grid Margin="12,10,12,12" ColumnDefinitions="*,Auto" RowDefinitions="Auto,*">
 
-                <!-- Prompt label -->
-                <TextBlock DockPanel.Dock="Top"
+                <!-- Prompt label spanning both columns -->
+                <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
                            Text="Select a stack to open:"
-                           FontWeight="Bold" FontSize="13"
+                           FontWeight="Bold" FontSize="12"
                            Foreground="#000000"
-                           Margin="0,8,0,10"/>
+                           Margin="0,0,0,8"/>
 
-                <!-- Button row -->
-                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
-                            HorizontalAlignment="Right" Margin="0,12,0,0" Spacing="10">
-                    <Button x:Name="CancelButton" Content="Cancel"
-                            Classes="sys7"
-                            Width="90" Height="26"
-                            Click="OnCancelClick" IsCancel="True"
-                            HorizontalContentAlignment="Center"
-                            VerticalContentAlignment="Center"
-                            FontSize="12"/>
-                    <!-- Default button: 3px outer border = System 7 default-button indicator -->
-                    <Border BorderBrush="#000000" BorderThickness="3" CornerRadius="4" Padding="0">
-                        <Button x:Name="OkButton" Content="Open"
-                                Classes="sys7"
-                                Width="84" Height="20"
-                                Click="OnOkClick" IsDefault="True"
-                                HorizontalContentAlignment="Center"
-                                VerticalContentAlignment="Center"
-                                FontWeight="Bold" CornerRadius="3"
-                                FontSize="12"/>
-                    </Border>
-                </StackPanel>
-
-                <!-- 3D inset bevel border around the list box.
-                     Four nested Borders simulate the System 7.5 sunken-well look:
-                     outer dark/light bevel + inner black/white bevel. -->
-                <Border BorderBrush="#808080" BorderThickness="1,1,0,0">
+                <!-- Left column: beveled list box -->
+                <Border Grid.Row="1" Grid.Column="0"
+                        Margin="0,0,12,0"
+                        BorderBrush="#808080" BorderThickness="1,1,0,0">
                 <Border BorderBrush="#DFDFDF" BorderThickness="0,0,1,1">
                 <Border BorderBrush="#000000" BorderThickness="1,1,0,0">
                 <Border BorderBrush="#FFFFFF" BorderThickness="0,0,1,1" Background="#FFFFFF">
@@ -76,7 +53,33 @@
                 </Border>
                 </Border>
 
-            </DockPanel>
+                <!-- Right column: buttons stacked vertically (System 7 file dialog layout) -->
+                <StackPanel Grid.Row="1" Grid.Column="1"
+                            VerticalAlignment="Top" Spacing="8"
+                            Width="100">
+                    <!-- Default button: 3px outer border = System 7 default-button indicator -->
+                    <Border BorderBrush="#000000" BorderThickness="3" CornerRadius="4" Padding="0">
+                        <Button x:Name="OkButton" Content="Open"
+                                Classes="sys7"
+                                Height="20"
+                                Click="OnOkClick" IsDefault="True"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                FontWeight="Bold" CornerRadius="3"
+                                FontSize="12"/>
+                    </Border>
+                    <Button x:Name="CancelButton" Content="Cancel"
+                            Classes="sys7"
+                            Height="26"
+                            Click="OnCancelClick" IsCancel="True"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            FontSize="12"/>
+                </StackPanel>
+
+            </Grid>
         </DockPanel>
     </Border>
 </Window>

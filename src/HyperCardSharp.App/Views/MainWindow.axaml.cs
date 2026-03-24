@@ -125,6 +125,12 @@ public partial class MainWindow : Window
                 ZoomOut();
                 e.Handled = true;
                 break;
+            // Quit
+            case Key.Q when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+            case Key.F4 when e.KeyModifiers.HasFlag(KeyModifiers.Alt):
+                Close();
+                e.Handled = true;
+                break;
         }
     }
 
@@ -176,17 +182,6 @@ public partial class MainWindow : Window
     private void OnTitleBarClose(object? sender, EventArgs e)
     {
         Close();
-    }
-
-    // Close from keyboard (Alt+F4 may not work without OS chrome)
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        base.OnKeyDown(e);
-        if (e.Key == Key.F4 && e.KeyModifiers.HasFlag(KeyModifiers.Alt))
-        {
-            Close();
-            e.Handled = true;
-        }
     }
 
     private async System.Threading.Tasks.Task OpenFileAsync()
@@ -310,4 +305,7 @@ public partial class MainWindow : Window
 
     private void OnMenuAbout(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => _ = ShowHelpAsync();
+
+    private void OnMenuQuit(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => Close();
 }

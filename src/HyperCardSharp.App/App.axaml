@@ -1,82 +1,82 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="HyperCardSharp.App.App">
+
+    <!-- Override Fluent theme resource keys for menus — this is the ONLY way
+         to change the popup background since Fluent binds via DynamicResource. -->
+    <Application.Resources>
+        <!-- Menu flyout (dropdown popup) -->
+        <SolidColorBrush x:Key="MenuFlyoutPresenterBackground"        Color="White"/>
+        <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush"       Color="Black"/>
+        <Thickness        x:Key="MenuFlyoutPresenterBorderThemeThickness">1</Thickness>
+        <CornerRadius     x:Key="OverlayCornerRadius">0</CornerRadius>
+
+        <!-- Menu flyout items — normal state -->
+        <SolidColorBrush x:Key="MenuFlyoutItemBackground"             Color="White"/>
+        <SolidColorBrush x:Key="MenuFlyoutItemForeground"             Color="Black"/>
+        <!-- Menu flyout items — hover: black highlight, white text (System 7) -->
+        <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver"  Color="Black"/>
+        <SolidColorBrush x:Key="MenuFlyoutItemForegroundPointerOver"  Color="White"/>
+        <!-- Menu flyout items — pressed -->
+        <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed"      Color="Black"/>
+        <SolidColorBrush x:Key="MenuFlyoutItemForegroundPressed"      Color="White"/>
+        <!-- Menu flyout items — disabled -->
+        <SolidColorBrush x:Key="MenuFlyoutItemForegroundDisabled"     Color="#808080"/>
+
+        <!-- Top-level menu bar items -->
+        <SolidColorBrush x:Key="MenuBarItemBackground"                Color="Transparent"/>
+        <SolidColorBrush x:Key="MenuBarItemBackgroundPointerOver"     Color="Black"/>
+        <SolidColorBrush x:Key="MenuBarItemBackgroundSelected"        Color="Black"/>
+    </Application.Resources>
+
     <Application.Styles>
         <FluentTheme />
 
         <!-- ══════════════════════════════════════════════════════════════
-             System 7 Menu Bar — override Fluent theme completely
+             System 7 Menu — style overrides (font, weight, colors)
+             Resource keys above handle the popup bg; styles here handle
+             font family, weight, and text color on state changes.
              ══════════════════════════════════════════════════════════════ -->
 
-        <!-- Top-level menu bar items: black text, transparent bg -->
+        <!-- Top-level menu bar items: bold Chicago, black text -->
         <Style Selector="Menu > MenuItem">
             <Setter Property="Foreground"   Value="#000000"/>
-            <Setter Property="Background"   Value="Transparent"/>
             <Setter Property="FontFamily"   Value="avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial, sans-serif"/>
             <Setter Property="FontSize"     Value="14"/>
+            <Setter Property="FontWeight"   Value="Bold"/>
             <Setter Property="Padding"      Value="6,2"/>
-        </Style>
-        <Style Selector="Menu > MenuItem /template/ Border#PART_LayoutRoot">
-            <Setter Property="Background"   Value="Transparent"/>
         </Style>
         <Style Selector="Menu > MenuItem /template/ ContentPresenter#PART_HeaderPresenter">
             <Setter Property="TextBlock.Foreground" Value="#000000"/>
+            <Setter Property="TextBlock.FontWeight" Value="Bold"/>
         </Style>
-        <Style Selector="Menu > MenuItem:pointerover /template/ Border#PART_LayoutRoot">
-            <Setter Property="Background"   Value="#000000"/>
-        </Style>
+        <!-- Hover / open: white text on black bg (resource handles bg) -->
         <Style Selector="Menu > MenuItem:pointerover /template/ ContentPresenter#PART_HeaderPresenter">
             <Setter Property="TextBlock.Foreground" Value="#FFFFFF"/>
         </Style>
-        <Style Selector="Menu > MenuItem:pressed /template/ Border#PART_LayoutRoot">
-            <Setter Property="Background"   Value="#000000"/>
-        </Style>
         <Style Selector="Menu > MenuItem:pressed /template/ ContentPresenter#PART_HeaderPresenter">
             <Setter Property="TextBlock.Foreground" Value="#FFFFFF"/>
-        </Style>
-        <!-- While submenu is open, keep top-level item highlighted -->
-        <Style Selector="Menu > MenuItem:open /template/ Border#PART_LayoutRoot">
-            <Setter Property="Background"   Value="#000000"/>
         </Style>
         <Style Selector="Menu > MenuItem:open /template/ ContentPresenter#PART_HeaderPresenter">
             <Setter Property="TextBlock.Foreground" Value="#FFFFFF"/>
         </Style>
 
-        <!-- Dropdown popup container: white bg, black 1px border, no rounded corners -->
-        <Style Selector="MenuFlyoutPresenter">
-            <Setter Property="Background"       Value="#FFFFFF"/>
-            <Setter Property="BorderBrush"       Value="#000000"/>
-            <Setter Property="BorderThickness"   Value="1"/>
-            <Setter Property="CornerRadius"      Value="0"/>
-            <Setter Property="Padding"           Value="0"/>
-            <Setter Property="Foreground"        Value="#000000"/>
-            <Setter Property="FontFamily"        Value="avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial, sans-serif"/>
-            <Setter Property="FontSize"          Value="14"/>
-        </Style>
-        <!-- Override the Fluent inner template border too -->
-        <Style Selector="MenuFlyoutPresenter /template/ Border">
-            <Setter Property="Background"       Value="#FFFFFF"/>
-            <Setter Property="CornerRadius"      Value="0"/>
-        </Style>
-
-        <!-- All dropdown menu items: white bg, black text, Chicago font -->
+        <!-- Dropdown menu items: Chicago font, normal weight, black text -->
         <Style Selector="MenuItem">
             <Setter Property="Foreground"   Value="#000000"/>
-            <Setter Property="Background"   Value="Transparent"/>
             <Setter Property="FontFamily"   Value="avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial, sans-serif"/>
             <Setter Property="FontSize"     Value="14"/>
-            <Setter Property="Padding"      Value="8,3"/>
+            <Setter Property="Padding"      Value="8,4"/>
         </Style>
-        <Style Selector="MenuItem /template/ Border#PART_LayoutRoot">
-            <Setter Property="Background"   Value="#FFFFFF"/>
-            <Setter Property="CornerRadius" Value="0"/>
+        <Style Selector="MenuItem /template/ ContentPresenter#PART_HeaderPresenter">
+            <Setter Property="TextBlock.Foreground" Value="#000000"/>
         </Style>
-        <!-- Hover: black bar with white text (System 7 highlight) -->
-        <Style Selector="MenuItem:pointerover /template/ Border#PART_LayoutRoot">
-            <Setter Property="Background"   Value="#000000"/>
+        <Style Selector="MenuItem /template/ ContentPresenter#PART_InputGesturePresenter">
+            <Setter Property="TextBlock.Foreground" Value="#000000"/>
         </Style>
+        <!-- Hover: white text (bg handled by resource) -->
         <Style Selector="MenuItem:pointerover">
-            <Setter Property="Foreground"   Value="#FFFFFF"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
         </Style>
         <Style Selector="MenuItem:pointerover /template/ ContentPresenter#PART_HeaderPresenter">
             <Setter Property="TextBlock.Foreground" Value="#FFFFFF"/>
@@ -84,26 +84,12 @@
         <Style Selector="MenuItem:pointerover /template/ ContentPresenter#PART_InputGesturePresenter">
             <Setter Property="TextBlock.Foreground" Value="#FFFFFF"/>
         </Style>
-        <!-- Pressed state -->
-        <Style Selector="MenuItem:pressed /template/ Border#PART_LayoutRoot">
-            <Setter Property="Background"   Value="#000000"/>
-        </Style>
-        <Style Selector="MenuItem:pressed">
-            <Setter Property="Foreground"   Value="#FFFFFF"/>
-        </Style>
-        <!-- Selected/open state for items with submenus -->
-        <Style Selector="MenuItem:open /template/ Border#PART_LayoutRoot">
-            <Setter Property="Background"   Value="#000000"/>
-        </Style>
-        <Style Selector="MenuItem:open">
-            <Setter Property="Foreground"   Value="#FFFFFF"/>
-        </Style>
 
-        <!-- Separator inside menus: gray line -->
+        <!-- Separator: thin gray line -->
         <Style Selector="MenuItem > Separator">
-            <Setter Property="Background"   Value="#808080"/>
-            <Setter Property="Height"       Value="1"/>
-            <Setter Property="Margin"       Value="0"/>
+            <Setter Property="Background" Value="#808080"/>
+            <Setter Property="Height"     Value="1"/>
+            <Setter Property="Margin"     Value="0"/>
         </Style>
 
         <!-- ── System 7.5 button style ──────────────────────────────────
