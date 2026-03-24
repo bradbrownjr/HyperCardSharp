@@ -10,8 +10,9 @@
         Background="Transparent"
         TransparencyLevelHint="Transparent">
 
-    <!-- Outer border — System 7 windows have square corners -->
+    <!-- Outer border with rounded top corners — required for transparent-window chrome -->
     <Border BorderBrush="#000000" BorderThickness="1"
+            CornerRadius="8,8,0,0" ClipToBounds="True"
             Background="#C0C0C0">
         <DockPanel>
 
@@ -20,6 +21,7 @@
             <Border x:Name="MenuBarBorder"
                     DockPanel.Dock="Top"
                     Background="#FFFFFF"
+                    CornerRadius="7,7,0,0"
                     BorderBrush="#000000"
                     BorderThickness="0,0,0,1"
                     Padding="0">
