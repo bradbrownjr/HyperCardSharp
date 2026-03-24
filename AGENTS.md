@@ -60,6 +60,7 @@ The HyperCard binary format is partially reverse-engineered. These areas need fu
 - Foreign language script system encodings
 
 Primary references:
+- [HyperCard.org](https://hypercard.org/) — comprehensive resource hub (format docs, community, tools)
 - [HyperCardPreview by Pierre Lorenzi](https://github.com/PierreLorenzi/HyperCardPreview) — deepest binary format work, WOBA decoder (Swift)
 - [hypercard4net](https://github.com/giawa/hypercard4net) — partial C# HyperCard parser
 - [ViperCard](https://github.com/vipercard/vipercard) — browser-based HyperCard reimplementation
