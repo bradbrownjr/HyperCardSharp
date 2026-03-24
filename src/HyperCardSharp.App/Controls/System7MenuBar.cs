@@ -1,18 +1,20 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Primitives.PopupPositioning;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
-using SkiaSharp;
+using System.Globalization;
 
 namespace HyperCardSharp.App.Controls;
 
 /// <summary>
-/// System 7-style custom menu bar with Apple logo, rendered entirely with SkiaSharp
-/// to avoid Avalonia MenuItem rendering bugs. Handles menu clicks and dropdown rendering.
+/// System 7-style menu bar rendered with Avalonia native DrawingContext.
+/// Dropdowns are displayed via Popup controls positioned below each menu title.
 /// </summary>
 public class System7MenuBar : Control
 {
@@ -32,19 +34,23 @@ public class System7MenuBar : Control
 
     private List<MenuDef> _menus = new();
     private int _openMenuIndex = -1;
-    private int _hoverItemIndex = -1;
+    private Popup? _activePopup;
+    private MenuDropdown? _activeDropdown;
     private Bitmap? _appleLogo;
-    private bool _logoLoaded = false;
-    private DispatcherTimer? _flashTimer;
-    private int _flashCount = 0;
-    private int _flashingItemIndex = -1;
-    private EventHandler<RoutedEventArgs>? _pendingClick;
+    private bool _logoLoaded;
+
+    private const double BarH   = 20;
+    private const double StartX = 6;
+    private const double AppleW = 20;
+    private const double ItemPad = 8;
+    private const double FontSz = 13;
+
+    private static readonly Typeface ChicagoTyp = new Typeface(
+        "avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial");
 
     public static readonly DirectProperty<System7MenuBar, List<MenuDef>> MenusProperty =
         AvaloniaProperty.RegisterDirect<System7MenuBar, List<MenuDef>>(
-            nameof(Menus),
-            o => o._menus,
-            (o, v) => o._menus = v);
+            nameof(Menus), o => o._menus, (o, v) => o._menus = v);
 
     public List<MenuDef> Menus
     {
@@ -52,315 +58,293 @@ public class System7MenuBar : Control
         set => SetAndRaise(MenusProperty, ref _menus, value);
     }
 
-    static System7MenuBar()
-    {
-        AffectsRender<System7MenuBar>(MenusProperty);
-        AffectsMeasure<System7MenuBar>(MenusProperty);
-    }
+    static System7MenuBar() => AffectsRender<System7MenuBar>(MenusProperty);
 
     public System7MenuBar()
     {
-        Height = 20;
+        Height = BarH;
         PointerPressed += OnPointerPressed;
-        PointerMoved += OnPointerMoved;
-        LostFocus += (_, _) => { _openMenuIndex = -1; InvalidateVisual(); };
     }
 
-    private void LoadAppleLogo()
+    // ── Asset loading ────────────────────────────────────────────────────────
+
+    private void EnsureAppleLogo()
     {
         if (_logoLoaded) return;
         _logoLoaded = true;
-        
         try
         {
-            var uri = "avares://HyperCardSharp.App/Assets/apple-logo.png";
-            _appleLogo = new Bitmap(uri);
+            var uri = new Uri("avares://HyperCardSharp.App/Assets/apple-logo.png");
+            using var stream = AssetLoader.Open(uri);
+            _appleLogo = new Bitmap(stream);
         }
-        catch
-        {
-            _appleLogo = null;
-        }
+        catch { _appleLogo = null; }
     }
 
-    private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        var pos = e.GetPosition(this);
-        var click = GetMenuClickAt((int)pos.X, (int)pos.Y);
+    // ── Layout helpers ───────────────────────────────────────────────────────
 
-        if (click.MenuIndex >= 0)
-        {
-            if (click.MenuIndex == _openMenuIndex)
-                _openMenuIndex = -1;
-            else
-                _openMenuIndex = click.MenuIndex;
-            _hoverItemIndex = -1;
-            InvalidateVisual();
-            e.Handled = true;
-        }
-        else if (_openMenuIndex >= 0 && click.ItemIndex >= 0)
-        {
-            var item = _menus[_openMenuIndex].Items[click.ItemIndex];
-            if (!item.IsSeparator && item.Click != null)
-            {
-                // Start flash animation
-                _flashingItemIndex = click.ItemIndex;
-                _flashCount = 0;
-                _pendingClick = item.Click;
-                StartFlashAnimation();
-                e.Handled = true;
-            }
-        }
-        else if (_openMenuIndex >= 0)
-        {
-            _openMenuIndex = -1;
-            InvalidateVisual();
-        }
+    private double TitleWidth(int idx)
+    {
+        var ft = MakeFt(_menus[idx].Title, Brushes.Black);
+        return ft.Width + ItemPad * 2;
     }
 
-    private void StartFlashAnimation()
+    private double MenuLeft(int idx)
     {
-        if (_flashTimer != null)
-            _flashTimer.Stop();
-
-        _flashTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
-        _flashTimer.Tick += (_, _) =>
-        {
-            _flashCount++;
-            if (_flashCount >= 4)
-            {
-                // Animation complete - invoke the click handler
-                _flashTimer?.Stop();
-                _openMenuIndex = -1;
-                _flashingItemIndex = -1;
-                InvalidateVisual();
-                _pendingClick?.Invoke(this, new RoutedEventArgs());
-                _pendingClick = null;
-            }
-            else
-            {
-                InvalidateVisual();
-            }
-        };
-        _flashTimer.Start();
-    }
-
-    private void OnPointerMoved(object? sender, PointerEventArgs e)
-    {
-        var pos = e.GetPosition(this);
-        if (_openMenuIndex >= 0)
-        {
-            var click = GetMenuClickAt((int)pos.X, (int)pos.Y);
-            if (click.ItemIndex != _hoverItemIndex)
-            {
-                _hoverItemIndex = click.ItemIndex;
-                InvalidateVisual();
-            }
-        }
-    }
-
-    private (int MenuIndex, int ItemIndex) GetMenuClickAt(int x, int y)
-    {
-        if (y < 0 || y >= Height)
-            return (-1, -1);
-
-        int currX = 6;
-
-        // Apple menu
-        if (x >= currX && x < currX + 14)
-            return (0, -2);
-        currX += 20;
-
-        // Top-level menus
-        for (int i = 1; i < _menus.Count; i++)
-        {
-            int width = _menus[i].Title.Length * 8 + 12;
-            if (x >= currX && x < currX + width && y < 20)
-                return (i, -2);
-            currX += width;
-        }
-
-        // Dropdown items
-        if (_openMenuIndex >= 0)
-        {
-            int dropX = GetMenuDropdownX(_openMenuIndex);
-            int dropY = 20;
-            int dropWidth = 200;
-
-            if (x >= dropX && x < dropX + dropWidth)
-            {
-                var items = _menus[_openMenuIndex].Items;
-                int itemY = dropY + 4;
-                for (int i = 0; i < items.Count; i++)
-                {
-                    if (y >= itemY && y < itemY + 16)
-                        return (_openMenuIndex, i);
-                    itemY += 16;
-                }
-            }
-        }
-
-        return (-1, -1);
-    }
-
-    private int GetMenuDropdownX(int menuIndex)
-    {
-        if (menuIndex == 0) return 6;
-        int x = 26;
-        for (int i = 1; i < menuIndex; i++)
-            x += _menus[i].Title.Length * 8 + 12;
+        if (idx == 0) return StartX;
+        double x = StartX + AppleW;
+        for (int i = 1; i < idx; i++) x += TitleWidth(i);
         return x;
     }
 
+    private int HitTest(double x)
+    {
+        if (x >= StartX && x < StartX + AppleW) return 0;
+        double cur = StartX + AppleW;
+        for (int i = 1; i < _menus.Count; i++)
+        {
+            double w = TitleWidth(i);
+            if (x >= cur && x < cur + w) return i;
+            cur += w;
+        }
+        return -1;
+    }
+
+    private FormattedText MakeFt(string text, IBrush fg) =>
+        new FormattedText(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            ChicagoTyp, FontSz, fg);
+
+    // ── Input ────────────────────────────────────────────────────────────────
+
+    private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        int idx = HitTest(e.GetPosition(this).X);
+        if (idx >= 0)
+        {
+            if (_openMenuIndex == idx)
+                CloseMenu();
+            else
+                OpenMenu(idx);
+            e.Handled = true;
+        }
+        else if (_openMenuIndex >= 0)
+        {
+            CloseMenu();
+            e.Handled = true;  // absorb click that closes menu so we don't start drag
+        }
+    }
+
+    // ── Menu open / close ────────────────────────────────────────────────────
+
+    private void OpenMenu(int idx)
+    {
+        CloseMenu();
+        _openMenuIndex = idx;
+        InvalidateVisual();
+
+        var dropdown = new MenuDropdown(_menus[idx]);
+        dropdown.ItemSelected += (_, item) =>
+        {
+            dropdown.BeginFlash(item, () =>
+            {
+                _activePopup?.Close();
+                item.Click?.Invoke(this, new RoutedEventArgs());
+            });
+        };
+
+        var popup = new Popup
+        {
+            PlacementTarget    = this,
+            Placement          = PlacementMode.AnchorAndGravity,
+            PlacementAnchor    = PopupAnchor.BottomLeft,
+            PlacementGravity   = PopupGravity.BottomRight,
+            HorizontalOffset   = MenuLeft(idx),
+            IsLightDismissEnabled = true,
+            Child              = dropdown
+        };
+
+        popup.Closed += (_, _) =>
+        {
+            LogicalChildren.Remove(popup);
+            _openMenuIndex = -1;
+            _activePopup   = null;
+            _activeDropdown = null;
+            InvalidateVisual();
+        };
+
+        _activePopup    = popup;
+        _activeDropdown = dropdown;
+        LogicalChildren.Add(popup);
+        popup.Open();
+    }
+
+    private void CloseMenu()
+    {
+        if (_activePopup != null)
+        {
+            LogicalChildren.Remove(_activePopup);
+            _activePopup.Close();
+            _activePopup    = null;
+            _activeDropdown = null;
+        }
+        _openMenuIndex = -1;
+        InvalidateVisual();
+    }
+
+    // ── Rendering ────────────────────────────────────────────────────────────
+
     public override void Render(DrawingContext context)
     {
-        LoadAppleLogo();  // Load on first render
-        
-        using (var surface = SKSurface.Create(new SKImageInfo((int)Bounds.Width, (int)Height)))
+        EnsureAppleLogo();
+
+        // White bar
+        context.FillRectangle(Brushes.White, new Rect(0, 0, Bounds.Width, BarH));
+        // Bottom border
+        context.FillRectangle(Brushes.Black, new Rect(0, BarH - 1, Bounds.Width, 1));
+
+        // Apple logo
+        bool appleOpen = _openMenuIndex == 0;
+        if (appleOpen)
+            context.FillRectangle(Brushes.Black, new Rect(StartX - 2, 2, AppleW, 16));
+
+        if (_appleLogo != null)
+            context.DrawImage(_appleLogo, new Rect(StartX + 1, 3, 14, 14));
+        else
         {
-            var canvas = surface.Canvas;
-            canvas.Clear(SKColors.White);
-
-            int x = 6;
-
-            // Apple logo
-            DrawAppleMenuItem(canvas, x);
-            x += 20;
-
-            // Top-level menus
-            for (int i = 1; i < _menus.Count; i++)
-            {
-                int width = _menus[i].Title.Length * 8 + 12;
-                DrawTopMenuItem(canvas, x, _menus[i].Title, _openMenuIndex == i);
-                x += width;
-            }
-
-            // Dropdown menu
-            if (_openMenuIndex >= 0)
-            {
-                DrawDropdownMenu(canvas);
-            }
-
-            // Convert SkiaSharp surface to Avalonia image
-            using (var image = surface.Snapshot())
-            using (var pixmap = image.PeekPixels())
-            {
-                var bmp = new WriteableBitmap(new PixelSize((int)Bounds.Width, (int)Height), Vector.One, PixelFormat.Rgba8888);
-                using (var buf = bmp.Lock())
-                {
-                    unsafe
-                    {
-                        long copySize = (long)pixmap.Width * pixmap.Height * 4;
-                        System.Buffer.MemoryCopy(
-                            pixmap.GetPixels().ToPointer(),
-                            buf.Address.ToPointer(),
-                            copySize,
-                            copySize);
-                    }
-                }
-                context.DrawImage(bmp, new Rect(0, 0, Bounds.Width, Height));
-            }
-        }
-    }
-
-    private void DrawAppleMenuItem(SKCanvas canvas, int x)
-    {
-        if (_appleLogo != null && _openMenuIndex == 0)
-        {
-            var paint = new SKPaint { Color = SKColors.Black };
-            canvas.DrawRect(x - 2, 2, 14, 16, paint);
+            var sym = MakeFt("⌘", appleOpen ? Brushes.White : Brushes.Black);
+            context.DrawText(sym, new Point(StartX, 2));
         }
 
-        // Draw ⌘ or apple outline
-        var textPaint = new SKPaint
+        // Menu titles
+        double x = StartX + AppleW;
+        for (int i = 1; i < _menus.Count; i++)
         {
-            Color = _openMenuIndex == 0 ? SKColors.White : SKColors.Black,
-            Typeface = SKTypeface.FromFamilyName("Geneva", SKFontStyle.Bold),
-            TextSize = 13
-        };
-        canvas.DrawText("⌘", x + 1, 15, textPaint);
-    }
-
-    private void DrawTopMenuItem(SKCanvas canvas, int x, string title, bool isOpen)
-    {
-        if (isOpen)
-        {
-            var paint = new SKPaint { Color = SKColors.Black };
-            canvas.DrawRect(x - 2, 2, title.Length * 8 + 8, 16, paint);
-        }
-
-        var textPaint = new SKPaint
-        {
-            Color = isOpen ? SKColors.White : SKColors.Black,
-            Typeface = SKTypeface.FromFamilyName("Geneva", SKFontStyle.Bold),
-            TextSize = 13
-        };
-        canvas.DrawText(title, x + 2, 15, textPaint);
-    }
-
-    private void DrawDropdownMenu(SKCanvas canvas)
-    {
-        var menu = _menus[_openMenuIndex];
-        int x = GetMenuDropdownX(_openMenuIndex);
-        int y = 20;
-        int width = 200;
-        int height = menu.Items.Count * 16 + 8;
-
-        // Background
-        var bgPaint = new SKPaint { Color = SKColors.White };
-        canvas.DrawRect(x, y, width, height, bgPaint);
-
-        // Border
-        var borderPaint = new SKPaint { Color = SKColors.Black, StrokeWidth = 1, Style = SKPaintStyle.Stroke };
-        canvas.DrawRect(x, y, width, height, borderPaint);
-
-        // Items
-        var textPaint = new SKPaint
-        {
-            Color = SKColors.Black,
-            Typeface = SKTypeface.FromFamilyName("Geneva"),
-            TextSize = 12
-        };
-
-        int itemY = y + 4;
-        for (int i = 0; i < menu.Items.Count; i++)
-        {
-            var item = menu.Items[i];
-
-            // Show highlight if hovering or flashing
-            bool showHighlight = (_hoverItemIndex == i && _flashingItemIndex < 0) ||
-                                 (_flashingItemIndex == i && _flashCount % 2 == 0);
-
-            if (showHighlight && !item.IsSeparator)
-            {
-                var hoverPaint = new SKPaint { Color = SKColors.Black };
-                canvas.DrawRect(x + 2, itemY, width - 4, 14, hoverPaint);
-                textPaint.Color = SKColors.White;
-            }
-
-            if (item.IsSeparator)
-            {
-                var linePaint = new SKPaint { Color = new SKColor(128, 128, 128), StrokeWidth = 1 };
-                canvas.DrawLine(x + 4, itemY + 6, x + width - 4, itemY + 6, linePaint);
-            }
-            else
-            {
-                canvas.DrawText(item.Title, x + 8, itemY + 11, textPaint);
-                if (item.Shortcut != null)
-                {
-                    canvas.DrawText(item.Shortcut, x + width - 60, itemY + 11, textPaint);
-                }
-            }
-
-            if (showHighlight && !item.IsSeparator)
-                textPaint.Color = SKColors.Black;
-
-            itemY += 16;
+            bool isOpen = _openMenuIndex == i;
+            double w = TitleWidth(i);
+            if (isOpen)
+                context.FillRectangle(Brushes.Black, new Rect(x - 2, 2, w, 16));
+            var ft = MakeFt(_menus[i].Title, isOpen ? Brushes.White : Brushes.Black);
+            context.DrawText(ft, new Point(x + ItemPad, 3));
+            x += w;
         }
     }
 
     protected override Size MeasureOverride(Size availableSize)
-    {
-        return new Size(availableSize.Width, 20);
-    }
+        => new(availableSize.Width, BarH);
 }
 
+/// <summary>
+/// The dropdown panel rendered inside a Popup. Uses native DrawingContext.
+/// Supports hover highlight and classic Mac flash-on-select animation.
+/// </summary>
+internal class MenuDropdown : Control
+{
+    private readonly System7MenuBar.MenuDef _menu;
+    private int _hoverIndex = -1;
+    private int _flashIndex = -1;
+    private bool _flashHighlit;
+    private DispatcherTimer? _flashTimer;
+    private Action? _afterFlash;
+
+    private const int RowH   = 18;
+    private const int PadX   = 8;
+    private const double W   = 200;
+    private const double FtSz = 12;
+
+    private static readonly Typeface ItemTyp = new Typeface("Geneva, Helvetica, Arial");
+
+    public event EventHandler<System7MenuBar.MenuItem>? ItemSelected;
+
+    public MenuDropdown(System7MenuBar.MenuDef menu)
+    {
+        _menu  = menu;
+        Width  = W;
+        Height = menu.Items.Count * RowH + 8;
+        PointerMoved   += OnPointerMoved;
+        PointerPressed += OnPointerPressed;
+    }
+
+    private int HitItem(double y)
+    {
+        int idx = (int)((y - 4) / RowH);
+        return (idx >= 0 && idx < _menu.Items.Count) ? idx : -1;
+    }
+
+    private void OnPointerMoved(object? sender, PointerEventArgs e)
+    {
+        int idx = HitItem(e.GetPosition(this).Y);
+        if (idx >= 0 && _menu.Items[idx].IsSeparator) idx = -1;
+        if (idx != _hoverIndex) { _hoverIndex = idx; InvalidateVisual(); }
+    }
+
+    private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        int idx = HitItem(e.GetPosition(this).Y);
+        if (idx >= 0 && !_menu.Items[idx].IsSeparator)
+        {
+            ItemSelected?.Invoke(this, _menu.Items[idx]);
+            e.Handled = true;
+        }
+    }
+
+    public void BeginFlash(System7MenuBar.MenuItem item, Action onDone)
+    {
+        _flashIndex  = _menu.Items.IndexOf(item);
+        if (_flashIndex < 0) { onDone(); return; }
+        _hoverIndex  = -1;
+        _afterFlash  = onDone;
+        _flashHighlit = true;
+        int count = 0;
+        _flashTimer?.Stop();
+        _flashTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        _flashTimer.Tick += (_, _) =>
+        {
+            _flashHighlit = !_flashHighlit;
+            count++;
+            InvalidateVisual();
+            if (count >= 4) { _flashTimer?.Stop(); _afterFlash?.Invoke(); }
+        };
+        InvalidateVisual();
+        _flashTimer.Start();
+    }
+
+    public override void Render(DrawingContext context)
+    {
+        // White background with 1px black border
+        context.FillRectangle(Brushes.White, new Rect(0, 0, W, Bounds.Height));
+        context.DrawRectangle(null, new Pen(Brushes.Black, 1), new Rect(0.5, 0.5, W - 1, Bounds.Height - 1));
+
+        for (int i = 0; i < _menu.Items.Count; i++)
+        {
+            var item = _menu.Items[i];
+            double y  = 4 + i * RowH;
+            bool hl   = !item.IsSeparator &&
+                        ((_flashIndex == i && _flashHighlit) ||
+                         (_flashIndex < 0 && _hoverIndex == i));
+
+            if (hl)
+                context.FillRectangle(Brushes.Black, new Rect(2, y, W - 4, RowH - 2));
+
+            IBrush fg = hl ? Brushes.White : Brushes.Black;
+
+            if (item.IsSeparator)
+            {
+                context.FillRectangle(new SolidColorBrush(Color.FromRgb(128, 128, 128)),
+                    new Rect(4, y + RowH / 2.0 - 0.5, W - 8, 1));
+            }
+            else
+            {
+                var ft = new FormattedText(item.Title, CultureInfo.CurrentCulture,
+                    FlowDirection.LeftToRight, ItemTyp, FtSz, fg);
+                context.DrawText(ft, new Point(PadX, y + 2));
+
+                if (item.Shortcut != null)
+                {
+                    var sft = new FormattedText(item.Shortcut, CultureInfo.CurrentCulture,
+                        FlowDirection.LeftToRight, ItemTyp, 11, fg);
+                    context.DrawText(sft, new Point(W - 65, y + 2));
+                }
+            }
+        }
+    }
+}

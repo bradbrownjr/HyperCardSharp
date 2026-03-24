@@ -89,6 +89,13 @@ public partial class MainWindow : Window
         };
 
         menuBar.Menus = menus;
+
+        // Clicking empty menu bar space triggers window drag
+        menuBar.PointerPressed += (_, e) =>
+        {
+            if (!e.Handled && e.GetCurrentPoint(menuBar).Properties.IsLeftButtonPressed)
+                BeginMoveDrag(e);
+        };
     }
 
     protected override void OnOpened(EventArgs e)
