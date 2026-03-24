@@ -14,8 +14,8 @@ public partial class MainWindow : Window
 {
     private readonly StackViewModel _viewModel = new();
 
-    // Menu bar height (~28px) + 2px outer border
-    private const double ChromeHeight = 30;
+    // Menu bar height (~20px) + 2px outer border
+    private const double ChromeHeight = 22;
 
     private static readonly double[] ZoomLevels = { 1.0, 1.5, 2.0, 4.0 };
     private int _currentScaleIndex = 0;

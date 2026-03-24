@@ -7,12 +7,10 @@
         MinWidth="400" MinHeight="300"
         CanResize="True"
         SystemDecorations="None"
-        Background="Transparent"
-        TransparencyLevelHint="Transparent">
+        Background="#C0C0C0">
 
-    <!-- Outer border with rounded top corners — System 7 menu-bar window -->
+    <!-- Outer border — System 7 windows have square corners -->
     <Border BorderBrush="#000000" BorderThickness="1"
-            CornerRadius="8,8,0,0" ClipToBounds="True"
             Background="#C0C0C0">
         <DockPanel>
 
@@ -21,17 +19,20 @@
             <Border x:Name="MenuBarBorder"
                     DockPanel.Dock="Top"
                     Background="#FFFFFF"
-                    CornerRadius="7,7,0,0"
                     BorderBrush="#000000"
                     BorderThickness="0,0,0,1"
                     Padding="0">
                 <Menu Background="Transparent"
                       Foreground="#000000"
                       FontFamily="avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial, sans-serif"
-                      FontSize="14"
+                      FontSize="13"
                       FontWeight="Bold"
-                      Padding="6,4,6,4">
-                    <MenuItem Header="&#x2318;">
+                      Padding="6,2,6,2">
+                    <MenuItem>
+                        <MenuItem.Header>
+                            <Image Source="avares://HyperCardSharp.App/Assets/apple-logo.png"
+                                   Width="14" Height="14"/>
+                        </MenuItem.Header>
                         <MenuItem Header="About HyperCard#…"
                                   Click="OnMenuAbout"/>
                     </MenuItem>

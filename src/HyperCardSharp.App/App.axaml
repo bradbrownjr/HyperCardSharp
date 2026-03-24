@@ -42,9 +42,9 @@
         <Style Selector="Menu > MenuItem">
             <Setter Property="Foreground"   Value="#000000"/>
             <Setter Property="FontFamily"   Value="avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial, sans-serif"/>
-            <Setter Property="FontSize"     Value="14"/>
+            <Setter Property="FontSize"     Value="13"/>
             <Setter Property="FontWeight"   Value="Bold"/>
-            <Setter Property="Padding"      Value="6,2"/>
+            <Setter Property="Padding"      Value="5,2"/>
         </Style>
         <Style Selector="Menu > MenuItem /template/ ContentPresenter#PART_HeaderPresenter">
             <Setter Property="TextBlock.Foreground" Value="#000000"/>
@@ -65,8 +65,8 @@
         <Style Selector="MenuItem">
             <Setter Property="Foreground"   Value="#000000"/>
             <Setter Property="FontFamily"   Value="avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial, sans-serif"/>
-            <Setter Property="FontSize"     Value="14"/>
-            <Setter Property="Padding"      Value="8,4"/>
+            <Setter Property="FontSize"     Value="13"/>
+            <Setter Property="Padding"      Value="8,3"/>
         </Style>
         <Style Selector="MenuItem /template/ ContentPresenter#PART_HeaderPresenter">
             <Setter Property="TextBlock.Foreground" Value="#000000"/>
