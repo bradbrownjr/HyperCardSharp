@@ -55,7 +55,7 @@ public partial class MainWindow : Window
                 Title = "  ",
                 Items = new()
                 {
-                    new() { Title = "About HyperCard#…", Click = (_, _) => OnMenuAbout(null, null) }
+                    new() { Title = "About HyperCard#…", Click = (s, e) => OnMenuAbout(s, e) }
                 }
             },
             // File menu
@@ -64,10 +64,10 @@ public partial class MainWindow : Window
                 Title = "File",
                 Items = new()
                 {
-                    new() { Title = "Open\u2026", Shortcut = Mod("O"), Click = (_, _) => OnMenuOpen(null, null) },
-                    new() { Title = "Switch Stack\u2026", Shortcut = Mod("M"), Click = (_, _) => OnMenuSwitchStack(null, null) },
+                    new() { Title = "Open\u2026", Shortcut = Mod("O"), Click = (s, e) => OnMenuOpen(s, e) },
+                    new() { Title = "Switch Stack\u2026", Shortcut = Mod("M"), Click = (s, e) => OnMenuSwitchStack(s, e) },
                     new() { IsSeparator = true },
-                    new() { Title = "Quit", Shortcut = Mod("Q"), Click = (_, _) => OnMenuQuit(null, null) }
+                    new() { Title = "Quit", Shortcut = Mod("Q"), Click = (s, e) => OnMenuQuit(s, e) }
                 }
             },
             // View menu
@@ -76,12 +76,12 @@ public partial class MainWindow : Window
                 Title = "View",
                 Items = new()
                 {
-                    new() { Title = _viewModel.RenderModeLabel, Click = (_, _) => OnMenuToggleRenderMode(null, null) },
+                    new() { Title = _viewModel.RenderModeLabel, Click = (s, e) => OnMenuToggleRenderMode(s, e) },
                     new() { IsSeparator = true },
-                    new() { Title = "Zoom 1\u00d7", Shortcut = Mod("1"), Click = (_, _) => OnMenuZoom1(null, null) },
-                    new() { Title = "Zoom 2\u00d7", Shortcut = Mod("2"), Click = (_, _) => OnMenuZoom2(null, null) },
-                    new() { Title = "Zoom 3\u00d7", Shortcut = Mod("3"), Click = (_, _) => OnMenuZoom3(null, null) },
-                    new() { Title = "Zoom 4\u00d7", Shortcut = Mod("4"), Click = (_, _) => OnMenuZoom4(null, null) }
+                    new() { Title = "Zoom 1\u00d7", Shortcut = Mod("1"), Click = (s, e) => OnMenuZoom1(s, e) },
+                    new() { Title = "Zoom 2\u00d7", Shortcut = Mod("2"), Click = (s, e) => OnMenuZoom2(s, e) },
+                    new() { Title = "Zoom 3\u00d7", Shortcut = Mod("3"), Click = (s, e) => OnMenuZoom3(s, e) },
+                    new() { Title = "Zoom 4\u00d7", Shortcut = Mod("4"), Click = (s, e) => OnMenuZoom4(s, e) }
                 }
             },
             // Help menu
@@ -90,7 +90,7 @@ public partial class MainWindow : Window
                 Title = "Help",
                 Items = new()
                 {
-                    new() { Title = "Keyboard Shortcuts\u2026", Shortcut = "F1", Click = (_, _) => OnMenuHelp(null, null) }
+                    new() { Title = "Keyboard Shortcuts\u2026", Shortcut = "F1", Click = (s, e) => OnMenuHelp(s, e) }
                 }
             }
         };
