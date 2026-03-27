@@ -10,10 +10,10 @@
         Background="Transparent"
         TransparencyLevelHint="Transparent">
 
-    <!-- System 7 window: 1px black border, sharp corners, gray background.
+    <!-- System 7 window: 1px black border, rounded top corners, gray background.
          Popup dropdowns render in their own top-level window. -->
     <Border BorderBrush="#000000" BorderThickness="1"
-            CornerRadius="0" ClipToBounds="True"
+            CornerRadius="8,8,0,0" ClipToBounds="True"
             Background="#C0C0C0">
         <DockPanel>
 

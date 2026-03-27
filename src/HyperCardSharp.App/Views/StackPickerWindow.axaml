@@ -30,9 +30,9 @@
                 <!-- Prompt label spanning both columns -->
                 <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
                            Text="Select a stack to open:"
-                           FontWeight="Bold" FontSize="12"
+                           FontSize="12"
                            Foreground="#000000"
-                           Margin="0,0,0,8"/>
+                           Margin="0,0,0,6"/>
 
                 <!-- Left column: beveled list box -->
                 <Border Grid.Row="1" Grid.Column="0"
@@ -61,7 +61,7 @@
                     <Border BorderBrush="#000000" BorderThickness="3" CornerRadius="4" Padding="0">
                         <Button x:Name="OkButton" Content="Open"
                                 Classes="sys7"
-                                Height="20"
+                                Height="26"
                                 Click="OnOkClick" IsDefault="True"
                                 HorizontalAlignment="Stretch"
                                 HorizontalContentAlignment="Center"

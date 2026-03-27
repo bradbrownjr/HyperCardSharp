@@ -224,9 +224,9 @@ public class SkiaBitmapControl : Control
                 pixels[y * w + x] = ((x + y) % 2 == 0) ? 0xFFFFFFFF : 0xFF000000;
 
         // Scale floppy proportionally to the window size.
-        // Formula: min(w,h)/160 → scale 2/3/4/8 at 1×/1.5×/2×/4× zoom.
-        // Produces ~64px disk at 1×, ~96px at 1.5×, ~128px at 2× — authentic Mac startup proportions.
-        int scale = Math.Max(2, Math.Min(w, h) / 160);
+        // Divisor 240 with clamp 2–3 keeps the icon small and proportionate
+        // to the real Macintosh startup screen (~9% of display height).
+        int scale = Math.Clamp(Math.Min(w, h) / 240, 2, 3);
         int renderW = DiskW * scale;
         int renderH = DiskH * scale;
         int ox = (w - renderW) / 2;

@@ -75,40 +75,40 @@ public class System7MenuBar : Control
     // ── Apple logo ─────────────────────────────────────────────────────────
 
     // Procedural 16×16 pixel-art Apple logo.
-    // Matches the authentic System 7 menu bar apple silhouette:
-    // rounded body, bite on right side, leaf going up-right, two bottom bumps.
+    // Classic bitten-apple silhouette: leaf pointing up-right, rounded body,
+    // concave bite on right side, smoothly tapered bottom.
     // Each string is 16 chars: '#' = filled, '.' = transparent.
     // Rainbow stripe colors top→bottom: GREEN, YELLOW, ORANGE, RED, PURPLE, BLUE.
     private static readonly string[] AppleShape =
     [
-        "......##........",  // row  0  leaf tip
-        ".....##.........",  // row  1  leaf
-        "....###.........",  // row  2  leaf base
-        "..####.####.....",  // row  3  top of apple body
-        ".###########....",  // row  4
-        ".############...",  // row  5
-        ".############...",  // row  6
-        ".############...",  // row  7
-        ".############...",  // row  8
-        ".###########....",  // row  9
-        ".###########....",  // row 10
-        "..#########.....",  // row 11
-        "..#########.....",  // row 12
-        "...##...##......",  // row 13  two bottom bumps
-        "...##...##......",  // row 14
+        ".......##.......",  // row  0  leaf tip
+        "......##........",  // row  1  leaf
+        "...####.####....",  // row  2  top body + stem dip
+        "..###########...",  // row  3  upper body
+        "..############..",  // row  4  widest
+        "..########.###..",  // row  5  bite starts (right side)
+        "..#######..###..",  // row  6  bite deeper
+        "..#######..###..",  // row  7  bite
+        "..########.###..",  // row  8  bite closing
+        "..############..",  // row  9  full body
+        "..###########...",  // row 10  narrowing
+        "...#########....",  // row 11  narrow
+        "....#######.....",  // row 12  more narrow
+        ".....#####......",  // row 13  bottom
+        "................",  // row 14
         "................",  // row 15
     ];
 
     // Rainbow stripe bands (row ranges, inclusive) and their ARGB colors.
     private static readonly (int FromRow, int ToRow, uint Color)[] RainbowStripes =
     [
-        (0,  2,  0xFF00B300),  // GREEN   (leaf + top)
-        (3,  4,  0xFF00B300),  // GREEN   (body top)
-        (5,  6,  0xFFFFFF00),  // YELLOW
-        (7,  8,  0xFFFF8000),  // ORANGE
-        (9, 10,  0xFFFF0000),  // RED
-        (11, 12, 0xFF8000FF),  // PURPLE
-        (13, 14, 0xFF0066FF),  // BLUE
+        (0,  1,  0xFF00B300),  // GREEN   (leaf)
+        (2,  3,  0xFF00B300),  // GREEN   (body top)
+        (4,  5,  0xFFFFFF00),  // YELLOW
+        (6,  7,  0xFFFF8000),  // ORANGE
+        (8,  9,  0xFFFF0000),  // RED
+        (10, 11, 0xFF8000FF),  // PURPLE
+        (12, 13, 0xFF0066FF),  // BLUE
     ];
 
     private uint GetRainbowColor(int row)
