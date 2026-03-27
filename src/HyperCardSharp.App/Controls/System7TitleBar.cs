@@ -8,7 +8,7 @@ using Avalonia.Media;
 namespace HyperCardSharp.App.Controls;
 
 /// <summary>
-/// Draws an authentic System 7.5-style title bar: alternating 1px black/gray
+/// Draws an authentic System 7-style title bar: alternating 1px black/white
 /// horizontal stripes, a close box on the left, and the window title centred
 /// in a cleared zone. Handles window dragging and close-box clicks.
 /// </summary>
@@ -26,7 +26,6 @@ public class System7TitleBar : Control
     /// <summary>Raised when the user clicks the close box.</summary>
     public event EventHandler? CloseRequested;
 
-    private static readonly SolidColorBrush BgGray  = new(Color.Parse("#C0C0C0"));
     private static readonly SolidColorBrush BgWhite = new(Colors.White);
     private static readonly SolidColorBrush BgBlack = new(Colors.Black);
     private static readonly IPen BlackPen = new Pen(new SolidColorBrush(Colors.Black), 1);
@@ -49,8 +48,9 @@ public class System7TitleBar : Control
         double w = Bounds.Width;
         double h = Bounds.Height;
 
-        // ── Stripe background ─────────────────────────────────────────
-        ctx.DrawRectangle(BgGray, null, new Rect(0, 0, w, h));
+        // ── System 7 title bar: alternating black/white 1px stripes ──
+        // Fill white first, then draw black stripes every other line.
+        ctx.DrawRectangle(BgWhite, null, new Rect(0, 0, w, h));
         for (double y = 0.5; y < h; y += 2)
             ctx.DrawLine(BlackPen, new Point(0, y), new Point(w, y));
 
@@ -87,8 +87,8 @@ public class System7TitleBar : Control
         double tx = Math.Floor((w - ft.Width) / 2);
         double ty = Math.Floor((h - ft.Height) / 2);
 
-        // Gray band clears the stripes so text is legible.
-        ctx.DrawRectangle(BgGray, null, new Rect(tx - 6, 0, ft.Width + 12, h));
+        // White band clears the stripes so text is legible.
+        ctx.DrawRectangle(BgWhite, null, new Rect(tx - 6, 0, ft.Width + 12, h));
         ctx.DrawText(ft, new Point(tx, ty));
     }
 

@@ -10,11 +10,10 @@
         Background="Transparent"
         TransparencyLevelHint="Transparent">
 
-    <!-- Outer border with rounded top corners — required for transparent-window chrome.
-         ClipToBounds clips the menu bar's sharp white fill to the rounded corners.
-         Popup dropdowns are unaffected (they render in their own top-level window). -->
+    <!-- System 7 window: 1px black border, sharp corners, gray background.
+         Popup dropdowns render in their own top-level window. -->
     <Border BorderBrush="#000000" BorderThickness="1"
-            CornerRadius="8,8,0,0" ClipToBounds="True"
+            CornerRadius="0" ClipToBounds="True"
             Background="#C0C0C0">
         <DockPanel>
 

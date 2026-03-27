@@ -5,7 +5,6 @@ using Avalonia.Controls.Primitives.PopupPositioning;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
-using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using System.Globalization;
 
@@ -35,10 +34,7 @@ public class System7MenuBar : Control
     private int _openMenuIndex = -1;
     private Popup? _activePopup;
     private MenuDropdown? _activeDropdown;
-    private Bitmap? _appleLogo;
-    private bool _logoLoaded;
     private bool _useColorLogo;
-    private ImageBrush? _logoMaskBrush;
 
     private const double BarH   = 20;
     private const double StartX = 6;
@@ -76,42 +72,87 @@ public class System7MenuBar : Control
         PointerPressed += OnPointerPressed;
     }
 
-    // ── Asset loading ────────────────────────────────────────────────────────
+    // ── Apple logo ─────────────────────────────────────────────────────────
 
-    // PNG bytes embedded directly to avoid AssetLoader path issues on Windows.
-    // 150 bytes — 16×16 RGBA rainbow Apple logo.
-    // Shape: rounded body, bite on right, leaf going up-right, two bottom bumps.
-    // Stripes top→bottom: GREEN, YELLOW, ORANGE, RED, PURPLE, BLUE.
-    private static readonly byte[] AppleLogoPng = {
-        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
-        0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x10,
-        0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0xf3, 0xff, 0x61, 0x00, 0x00, 0x00,
-        0x5d, 0x49, 0x44, 0x41, 0x54, 0x78, 0xda, 0x63, 0x60, 0x20, 0x00, 0x62,
-        0x77, 0xbb, 0xfd, 0x07, 0x61, 0x06, 0x72, 0x00, 0x7d, 0x35, 0xc3, 0x34,
-        0x20, 0x63, 0x7c, 0xe2, 0x04, 0x35, 0x13, 0xc2, 0x28, 0x06, 0xfc, 0xd9,
-        0xa1, 0xfe, 0x9f, 0x1c, 0x4c, 0x3d, 0x03, 0xbe, 0x36, 0x29, 0xfc, 0x27,
-        0x05, 0x63, 0x84, 0x01, 0x45, 0x9a, 0x41, 0xe0, 0x9e, 0xb5, 0xfe, 0x7f,
-        0x52, 0x30, 0xc5, 0x06, 0x60, 0x18, 0x34, 0xcd, 0x76, 0xfa, 0x7f, 0x52,
-        0x31, 0x86, 0x2b, 0x28, 0x36, 0x00, 0x0c, 0xe6, 0xde, 0xf9, 0x4f, 0x14,
-        0xc6, 0x0b, 0xb0, 0x29, 0x26, 0xc9, 0x00, 0x12, 0x01, 0x00, 0x21, 0xc5,
-        0x73, 0xd2, 0x59, 0x72, 0xb0, 0xb7, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
-        0x4e, 0x44, 0xae, 0x42, 0x60, 0x82
-    };
+    // Procedural 16×16 pixel-art Apple logo.
+    // Matches the authentic System 7 menu bar apple silhouette:
+    // rounded body, bite on right side, leaf going up-right, two bottom bumps.
+    // Each string is 16 chars: '#' = filled, '.' = transparent.
+    // Rainbow stripe colors top→bottom: GREEN, YELLOW, ORANGE, RED, PURPLE, BLUE.
+    private static readonly string[] AppleShape =
+    [
+        "......##........",  // row  0  leaf tip
+        ".....##.........",  // row  1  leaf
+        "....###.........",  // row  2  leaf base
+        "..####.####.....",  // row  3  top of apple body
+        ".###########....",  // row  4
+        ".############...",  // row  5
+        ".############...",  // row  6
+        ".############...",  // row  7
+        ".############...",  // row  8
+        ".###########....",  // row  9
+        ".###########....",  // row 10
+        "..#########.....",  // row 11
+        "..#########.....",  // row 12
+        "...##...##......",  // row 13  two bottom bumps
+        "...##...##......",  // row 14
+        "................",  // row 15
+    ];
 
-    private void EnsureAppleLogo()
+    // Rainbow stripe bands (row ranges, inclusive) and their ARGB colors.
+    private static readonly (int FromRow, int ToRow, uint Color)[] RainbowStripes =
+    [
+        (0,  2,  0xFF00B300),  // GREEN   (leaf + top)
+        (3,  4,  0xFF00B300),  // GREEN   (body top)
+        (5,  6,  0xFFFFFF00),  // YELLOW
+        (7,  8,  0xFFFF8000),  // ORANGE
+        (9, 10,  0xFFFF0000),  // RED
+        (11, 12, 0xFF8000FF),  // PURPLE
+        (13, 14, 0xFF0066FF),  // BLUE
+    ];
+
+    private uint GetRainbowColor(int row)
     {
-        if (_logoLoaded) return;
-        _logoLoaded = true;
-        try
+        foreach (var (from, to, color) in RainbowStripes)
+            if (row >= from && row <= to) return color;
+        return 0xFF000000;
+    }
+
+    /// <summary>
+    /// Draw the Apple logo procedurally into the DrawingContext at the given rect.
+    /// </summary>
+    private void DrawAppleLogo(DrawingContext ctx, Rect destRect, bool inverted)
+    {
+        double pxW = destRect.Width  / 16.0;
+        double pxH = destRect.Height / 16.0;
+
+        for (int row = 0; row < 16; row++)
         {
-            using var ms = new System.IO.MemoryStream(AppleLogoPng);
-            _appleLogo = new Bitmap(ms);
-            _logoMaskBrush = new ImageBrush(_appleLogo)
+            var line = AppleShape[row];
+            for (int col = 0; col < 16; col++)
             {
-                Stretch = Stretch.Fill
-            };
+                if (line[col] != '#') continue;
+
+                IBrush brush;
+                if (inverted)
+                {
+                    brush = Brushes.White;
+                }
+                else if (_useColorLogo)
+                {
+                    uint c = GetRainbowColor(row);
+                    brush = new SolidColorBrush(Color.FromUInt32(c));
+                }
+                else
+                {
+                    brush = Brushes.Black;
+                }
+
+                double x = destRect.X + col * pxW;
+                double y = destRect.Y + row * pxH;
+                ctx.FillRectangle(brush, new Rect(x, y, Math.Ceiling(pxW), Math.Ceiling(pxH)));
+            }
         }
-        catch { _appleLogo = null; }
     }
 
     // ── Layout helpers ───────────────────────────────────────────────────────
@@ -228,8 +269,6 @@ public class System7MenuBar : Control
 
     public override void Render(DrawingContext context)
     {
-        EnsureAppleLogo();
-
         // White bar
         context.FillRectangle(Brushes.White, new Rect(0, 0, Bounds.Width, BarH));
         // Bottom border
@@ -238,32 +277,10 @@ public class System7MenuBar : Control
         // Apple logo
         bool appleOpen = _openMenuIndex == 0;
         if (appleOpen)
-            context.FillRectangle(Brushes.Black, new Rect(StartX - 2, 2, AppleW, 16));
+            context.FillRectangle(Brushes.Black, new Rect(StartX - 2, 0, AppleW, BarH - 1));
 
-        var logoRect = new Rect(StartX + 1, 3, 14, 14);
-        if (_appleLogo != null && _logoMaskBrush != null)
-        {
-            if (_useColorLogo)
-            {
-                // Rainbow logo drawn directly
-                context.DrawImage(_appleLogo, logoRect);
-            }
-            else
-            {
-                // B&W silhouette: use the logo's alpha channel as an opacity mask,
-                // then fill with solid black (or white when menu is open/highlighted).
-                IBrush fill = appleOpen ? Brushes.White : Brushes.Black;
-                using (context.PushOpacityMask(_logoMaskBrush, logoRect))
-                {
-                    context.FillRectangle(fill, logoRect);
-                }
-            }
-        }
-        else
-        {
-            var sym = MakeFt("⌘", appleOpen ? Brushes.White : Brushes.Black);
-            context.DrawText(sym, new Point(StartX, 2));
-        }
+        var logoRect = new Rect(StartX + 2, 2, 14, 14);
+        DrawAppleLogo(context, logoRect, appleOpen);
 
         // Menu titles
         double x = StartX + AppleW;
@@ -272,7 +289,7 @@ public class System7MenuBar : Control
             bool isOpen = _openMenuIndex == i;
             double w = TitleWidth(i);
             if (isOpen)
-                context.FillRectangle(Brushes.Black, new Rect(x - 2, 2, w, 16));
+                context.FillRectangle(Brushes.Black, new Rect(x - 2, 0, w, BarH - 1));
             var ft = MakeFt(_menus[i].Title, isOpen ? Brushes.White : Brushes.Black);
             context.DrawText(ft, new Point(x + ItemPad, 3));
             x += w;
@@ -308,8 +325,10 @@ internal class MenuDropdown : Control
     public MenuDropdown(System7MenuBar.MenuDef menu)
     {
         _menu  = menu;
-        Width  = W;
-        Height = menu.Items.Count * RowH + 8;
+        // +1 for drop shadow on right edge
+        Width  = W + 1;
+        // +1 for drop shadow on bottom edge
+        Height = menu.Items.Count * RowH + 8 + 1;
         PointerMoved   += OnPointerMoved;
         PointerPressed += OnPointerPressed;
     }
@@ -360,9 +379,16 @@ internal class MenuDropdown : Control
 
     public override void Render(DrawingContext context)
     {
+        double menuW = W;
+        double menuH = Bounds.Height - 1; // Exclude shadow row
+
+        // Drop shadow — 1px black line on right and bottom edges (System 7 style)
+        context.FillRectangle(Brushes.Black, new Rect(1, menuH, menuW, 1));  // bottom shadow
+        context.FillRectangle(Brushes.Black, new Rect(menuW, 1, 1, menuH));  // right shadow
+
         // White background with 1px black border
-        context.FillRectangle(Brushes.White, new Rect(0, 0, W, Bounds.Height));
-        context.DrawRectangle(null, new Pen(Brushes.Black, 1), new Rect(0.5, 0.5, W - 1, Bounds.Height - 1));
+        context.FillRectangle(Brushes.White, new Rect(0, 0, menuW, menuH));
+        context.DrawRectangle(null, new Pen(Brushes.Black, 1), new Rect(0.5, 0.5, menuW - 1, menuH - 1));
 
         for (int i = 0; i < _menu.Items.Count; i++)
         {
