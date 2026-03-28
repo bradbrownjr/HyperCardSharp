@@ -8,12 +8,12 @@
         CanResize="False"
         SystemDecorations="None"
         WindowStartupLocation="CenterOwner"
-        Background="#C0C0C0"
+        Background="#FFFFFF"
         FontFamily="avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial, sans-serif"
         FontSize="12">
 
     <!-- 1px black outer border — System 7 window outline -->
-    <Border BorderBrush="#000000" BorderThickness="1" Background="#C0C0C0">
+    <Border BorderBrush="#000000" BorderThickness="1" Background="#FFFFFF">
         <DockPanel>
 
             <!-- System 7.5 striped title bar -->

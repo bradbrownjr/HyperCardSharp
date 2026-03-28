@@ -40,7 +40,7 @@ public class System7TitleBar : Control
 
     public System7TitleBar()
     {
-        Height = 19;
+        Height = 20;
     }
 
     public override void Render(DrawingContext ctx)
@@ -48,26 +48,32 @@ public class System7TitleBar : Control
         double w = Bounds.Width;
         double h = Bounds.Height;
 
-        // ── System 7 title bar: alternating black/white 1px stripes ──
-        // Fill white first, then draw black stripes every other line.
+        // ── System 7 title bar: 6 thick black stripes with white gaps ──
+        // Reference: System 7 Finder windows show ~6 black bars (2px each)
+        // separated by 1px white gaps, filling the bar height.
         ctx.DrawRectangle(BgWhite, null, new Rect(0, 0, w, h));
-        for (double y = 0.5; y < h; y += 2)
-            ctx.DrawLine(BlackPen, new Point(0, y), new Point(w, y));
+
+        // 6 stripes × 2px + 5 gaps × 1px = 17px of pattern.
+        // Centre the pattern vertically in the bar.
+        const int stripeCount = 6;
+        const double stripeH = 2;
+        const double gapH = 1;
+        double patternH = stripeCount * stripeH + (stripeCount - 1) * gapH;
+        double startY = Math.Floor((h - patternH) / 2);
+
+        for (int i = 0; i < stripeCount; i++)
+        {
+            double y = startY + i * (stripeH + gapH);
+            ctx.FillRectangle(BgBlack, new Rect(0, y, w, stripeH));
+        }
 
         // ── Close box ─────────────────────────────────────────────────
-        // 11×11 box, 4px from left edge, vertically centred
+        // Simple empty 11×11 square — no inner box (authentic System 7).
         const double boxSize = 11;
         double boxTop = Math.Floor((h - boxSize) / 2);
-        _closeBoxRect = new Rect(4, boxTop, boxSize, boxSize);
+        _closeBoxRect = new Rect(8, boxTop, boxSize, boxSize);
 
         ctx.DrawRectangle(BgWhite, BlackPen, _closeBoxRect);
-        // Inner box: 3px inset on every side → 5×5
-        var inner = new Rect(
-            _closeBoxRect.X + 3,
-            _closeBoxRect.Y + 3,
-            boxSize - 6,
-            boxSize - 6);
-        ctx.DrawRectangle(null, BlackPen, inner);
 
         // ── Title text ────────────────────────────────────────────────
         // Clear stripes behind title, then draw bold text centred.
@@ -88,7 +94,7 @@ public class System7TitleBar : Control
         double ty = Math.Floor((h - ft.Height) / 2);
 
         // White band clears the stripes so text is legible.
-        ctx.DrawRectangle(BgWhite, null, new Rect(tx - 6, 0, ft.Width + 12, h));
+        ctx.DrawRectangle(BgWhite, null, new Rect(tx - 8, 0, ft.Width + 16, h));
         ctx.DrawText(ft, new Point(tx, ty));
     }
 
