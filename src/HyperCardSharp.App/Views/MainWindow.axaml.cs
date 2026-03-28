@@ -15,8 +15,8 @@ public partial class MainWindow : Window
 {
     private readonly StackViewModel _viewModel = new();
 
-    // Menu bar height (~20px) + 2px outer border
-    private const double ChromeHeight = 22;
+    // Menu bar (20px) + title bar (20px) + 2px outer border
+    private const double ChromeHeight = 42;
 
     private static readonly double[] ZoomLevels = { 1.0, 1.5, 2.0, 4.0 };
     private int _currentScaleIndex = 0;
@@ -24,6 +24,9 @@ public partial class MainWindow : Window
     // Retained for Ctrl+L "switch stack" within the same file
     private string? _currentOpenFileName;
     private List<StackEntry>? _currentStacks;
+
+    // Held so its Title can be updated when the render mode toggles
+    private HyperCardSharp.App.Controls.System7MenuBar.MenuItem? _renderModeMenuItem;
 
     // Platform detection: on macOS, show ⌘ instead of Ctrl and accept Meta key
     private static bool IsMac => RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
@@ -76,7 +79,7 @@ public partial class MainWindow : Window
                 Title = "View",
                 Items = new()
                 {
-                    new() { Title = _viewModel.RenderModeLabel, Click = (s, e) => OnMenuToggleRenderMode(s, e) },
+                    (_renderModeMenuItem = new() { Title = _viewModel.RenderModeLabel, Click = (s, e) => OnMenuToggleRenderMode(s, e) }),
                     new() { IsSeparator = true },
                     new() { Title = "Zoom 1\u00d7", Shortcut = Mod("1"), Click = (s, e) => OnMenuZoom1(s, e) },
                     new() { Title = "Zoom 2\u00d7", Shortcut = Mod("2"), Click = (s, e) => OnMenuZoom2(s, e) },
@@ -354,10 +357,18 @@ public partial class MainWindow : Window
     private void OnMenuToggleRenderMode(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         _viewModel.ToggleRenderMode();
+        bool isColor = _viewModel.RenderMode == HyperCardSharp.Rendering.RenderMode.Color;
+        // Update the menu item label to reflect the new mode
+        if (_renderModeMenuItem != null)
+            _renderModeMenuItem.Title = _viewModel.RenderModeLabel;
         // Sync Apple logo: rainbow in color mode, black silhouette in B&W
         var menuBar = this.FindControl<HyperCardSharp.App.Controls.System7MenuBar>("MenuBar");
         if (menuBar != null)
-            menuBar.UseColorLogo = _viewModel.RenderMode == HyperCardSharp.Rendering.RenderMode.Color;
+            menuBar.UseColorLogo = isColor;
+        // Sync title bar: Platinum stripe palette in color mode, B&W in normal mode
+        var titleBar = this.FindControl<HyperCardSharp.App.Controls.System7TitleBar>("TitleBar");
+        if (titleBar != null)
+            titleBar.ColorMode = isColor;
     }
 
     private void OnMenuZoom1(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

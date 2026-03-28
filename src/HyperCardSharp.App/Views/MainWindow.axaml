@@ -17,9 +17,14 @@
             Background="#FFFFFF">
         <DockPanel>
 
-            <!-- Menu bar: topmost element, white bg, Chicago font.
-                 Doubles as drag handle — PointerPressed wired in code-behind. -->
-            <!-- Custom System 7 menu bar with Apple logo and proper click handling -->
+            <!-- System 7 title bar: horizontal stripes, close box, and window title.
+                 Handles window drag and close. ColorMode set in code-behind. -->
+            <controls:System7TitleBar x:Name="TitleBar"
+                                      DockPanel.Dock="Top"
+                                      Title="{Binding Title}"
+                                      CloseRequested="OnTitleBarClose"/>
+
+            <!-- Menu bar: Chicago font, Apple logo, dropdowns. -->
             <controls:System7MenuBar x:Name="MenuBar"
                                      DockPanel.Dock="Top"/>
 
