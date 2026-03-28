@@ -239,11 +239,17 @@ public class System7MenuBar : Control
             Child              = dropdown
         };
 
+        // Capture popup in a local so the closure doesn't hold a stale reference.
+        // Only reset shared state if this popup is still the active one — guards
+        // against a light-dismiss Closed event firing after OpenMenu() has already
+        // replaced the popup with a new one.
+        var cp = popup;
         popup.Closed += (_, _) =>
         {
-            LogicalChildren.Remove(popup);
-            _openMenuIndex = -1;
-            _activePopup   = null;
+            if (!ReferenceEquals(_activePopup, cp)) return;
+            LogicalChildren.Remove(cp);
+            _openMenuIndex  = -1;
+            _activePopup    = null;
             _activeDropdown = null;
             InvalidateVisual();
         };
@@ -258,10 +264,13 @@ public class System7MenuBar : Control
     {
         if (_activePopup != null)
         {
-            LogicalChildren.Remove(_activePopup);
-            _activePopup.Close();
+            // Null _activePopup BEFORE calling Close() so the popup.Closed capture
+            // guard sees a null and returns early, avoiding duplicate state resets.
+            var p = _activePopup;
             _activePopup    = null;
             _activeDropdown = null;
+            LogicalChildren.Remove(p);
+            p.Close();
         }
         _openMenuIndex = -1;
         InvalidateVisual();
@@ -281,9 +290,9 @@ public class System7MenuBar : Control
         if (appleOpen)
             context.FillRectangle(Brushes.Black, new Rect(StartX - 2, 0, AppleW, BarH - 1));
 
-        // Logo rendered at 18×18 so each 9-unit grid cell = 2px.
-        // This makes the 1-unit bite gap 2px wide — visibly distinct.
-        var logoRect = new Rect(StartX + 2, 1, 18, 18);
+        // Logo 13×14px: each 9×11 grid cell ≈ 1.4×1.3 screen pixels.
+        // Fits comfortably in the 20px bar with ~3px margin top and bottom.
+        var logoRect = new Rect(StartX + 3, 3, 13, 14);
         DrawAppleLogo(context, logoRect, appleOpen);
 
         // Menu titles — vertically centred in the bar

@@ -101,7 +101,10 @@ public partial class MainWindow : Window
         menuBar.PointerPressed += (_, e) =>
         {
             if (!e.Handled && e.GetCurrentPoint(menuBar).Properties.IsLeftButtonPressed)
-                BeginMoveDrag(e);
+            {
+                try { BeginMoveDrag(e); }
+                catch { /* BeginMoveDrag can fail on some platforms if pointer state is stale */ }
+            }
         };
     }
 
