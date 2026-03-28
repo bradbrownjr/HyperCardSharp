@@ -23,7 +23,7 @@ public partial class MainWindow : Window
 
     // Retained for Ctrl+L "switch stack" within the same file
     private string? _currentOpenFileName;
-    private List<(string Name, byte[] Data)>? _currentStacks;
+    private List<StackEntry>? _currentStacks;
 
     // Platform detection: on macOS, show ⌘ instead of Ctrl and accept Meta key
     private static bool IsMac => RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
@@ -273,7 +273,7 @@ public partial class MainWindow : Window
             var raw = ms.ToArray();
 
             var logLines = new List<string>();
-            var stacks = ContainerPipeline.UnwrapMultiple(raw, msg => logLines.Add(msg));
+            var stacks = ContainerPipeline.UnwrapEntries(raw, msg => logLines.Add(msg));
 
             if (stacks.Count == 0)
             {
@@ -312,15 +312,14 @@ public partial class MainWindow : Window
     }
 
     private async System.Threading.Tasks.Task PickAndLoadStack(
-        string fileName, List<(string Name, byte[] Data)> stacks)
+        string fileName, List<StackEntry> stacks)
     {
         byte[] data;
         string? stackName = null;
 
         if (stacks.Count > 1)
         {
-            var names = stacks.Select(s => s.Name).ToList();
-            var picker = new StackPickerWindow(names);
+            var picker = new StackPickerWindow(stacks);
             var result = await picker.ShowDialog<int?>(this);
             int selectedIndex = result ?? -1;
 

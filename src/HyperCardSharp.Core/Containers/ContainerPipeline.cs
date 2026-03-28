@@ -64,6 +64,19 @@ public static class ContainerPipeline
     }
 
     /// <summary>
+    /// Like UnwrapMultiple, but returns fully enriched StackEntry records
+    /// with card count, size, and resolution metadata read from the STAK header.
+    /// </summary>
+    public static List<StackEntry> UnwrapEntries(byte[] data, Action<string>? log = null)
+    {
+        var tuples = UnwrapMultiple(data, log);
+        var entries = new List<StackEntry>(tuples.Count);
+        foreach (var (name, stackData) in tuples)
+            entries.Add(StackEntry.FromRaw(name, stackData));
+        return entries;
+    }
+
+    /// <summary>
     /// Like Unwrap, but when a disk image contains multiple STAK files, returns all of them.
     /// Each entry is (Name, Data) where Data is the recursively unwrapped stack bytes.
     /// Returns an empty list if no stacks could be extracted.

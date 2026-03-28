@@ -3,8 +3,8 @@
         xmlns:controls="clr-namespace:HyperCardSharp.App.Controls"
         x:Class="HyperCardSharp.App.Views.StackPickerWindow"
         Title="Select a Stack"
-        Width="480" Height="340"
-        MinWidth="400" MinHeight="280"
+        Width="520" Height="380"
+        MinWidth="420" MinHeight="280"
         CanResize="False"
         SystemDecorations="None"
         WindowStartupLocation="CenterOwner"
@@ -12,11 +12,11 @@
         FontFamily="avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial, sans-serif"
         FontSize="12">
 
-    <!-- 1px black outer border — System 7 window outline -->
+    <!-- System 7 window: 1px black outline, white background -->
     <Border BorderBrush="#000000" BorderThickness="1" Background="#FFFFFF">
         <DockPanel>
 
-            <!-- System 7.5 striped title bar -->
+            <!-- Striped title bar -->
             <controls:System7TitleBar DockPanel.Dock="Top"
                                       Title="Select a Stack"
                                       CloseRequested="OnTitleBarClose"/>
@@ -24,62 +24,142 @@
             <!-- Hairline rule under title bar -->
             <Border DockPanel.Dock="Top" Height="1" Background="#000000"/>
 
-            <!-- Content area: 2-column layout like System 7 file dialog -->
-            <Grid Margin="12,10,12,12" ColumnDefinitions="*,Auto" RowDefinitions="Auto,*">
+            <!-- Content area -->
+            <DockPanel Margin="10,8,10,10">
 
-                <!-- Prompt label spanning both columns -->
-                <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
-                           Text="Select a stack to open:"
-                           FontSize="12"
-                           Foreground="#000000"
-                           Margin="0,0,0,6"/>
+                <!-- Info line + buttons across the top -->
+                <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+                    <TextBlock x:Name="InfoText" Grid.Column="0"
+                               Text="0 stacks"
+                               FontSize="11"
+                               Foreground="#000000"
+                               VerticalAlignment="Center"
+                               FontFamily="Geneva, Helvetica, Arial, sans-serif"/>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="CancelButton" Content="Cancel"
+                                Classes="sys7"
+                                Width="80" Height="24"
+                                Click="OnCancelClick" IsCancel="True"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                FontSize="12"/>
+                        <Border BorderBrush="#000000" BorderThickness="3" CornerRadius="4" Padding="0">
+                            <Button x:Name="OkButton" Content="Open"
+                                    Classes="sys7"
+                                    Width="76" Height="20"
+                                    Click="OnOkClick" IsDefault="True"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    FontWeight="Bold" CornerRadius="3"
+                                    FontSize="12"/>
+                        </Border>
+                    </StackPanel>
+                </Grid>
 
-                <!-- Left column: beveled list box -->
-                <Border Grid.Row="1" Grid.Column="0"
-                        Margin="0,0,12,0"
-                        BorderBrush="#808080" BorderThickness="1,1,0,0">
-                <Border BorderBrush="#DFDFDF" BorderThickness="0,0,1,1">
-                <Border BorderBrush="#000000" BorderThickness="1,1,0,0">
-                <Border BorderBrush="#FFFFFF" BorderThickness="0,0,1,1" Background="#FFFFFF">
+                <!-- Column headers (Finder-style) -->
+                <Border DockPanel.Dock="Top"
+                        Background="#FFFFFF"
+                        BorderBrush="#000000" BorderThickness="1,1,1,1"
+                        Padding="0" Height="18">
+                    <Grid ColumnDefinitions="*,52,60,76">
+                        <TextBlock Grid.Column="0" Text="Name"
+                                   FontWeight="Bold" FontSize="10"
+                                   Foreground="#000000"
+                                   FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                   VerticalAlignment="Center"
+                                   Margin="6,0,0,0"/>
+                        <Border Grid.Column="1" BorderBrush="#000000" BorderThickness="1,0,0,0">
+                            <TextBlock Text="Cards"
+                                       FontWeight="Bold" FontSize="10"
+                                       Foreground="#000000"
+                                       FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,4,0"/>
+                        </Border>
+                        <Border Grid.Column="2" BorderBrush="#000000" BorderThickness="1,0,0,0">
+                            <TextBlock Text="Size"
+                                       FontWeight="Bold" FontSize="10"
+                                       Foreground="#000000"
+                                       FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,4,0"/>
+                        </Border>
+                        <Border Grid.Column="3" BorderBrush="#000000" BorderThickness="1,0,0,0">
+                            <TextBlock Text="Resolution"
+                                       FontWeight="Bold" FontSize="10"
+                                       Foreground="#000000"
+                                       FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,4,0"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- Beveled list area (Finder-style inset border, no top rule — header provides it) -->
+                <Border BorderBrush="#808080" BorderThickness="1,0,0,1">
+                <Border BorderBrush="#DFDFDF" BorderThickness="0,0,1,0">
+                <Border BorderBrush="#000000" BorderThickness="1,0,0,1">
+                <Border BorderBrush="#FFFFFF" BorderThickness="0,0,1,0" Background="#FFFFFF">
                     <ListBox x:Name="StackList"
                              Classes="sys7"
                              Background="#FFFFFF"
                              Foreground="#000000"
                              SelectionMode="Single"
-                             FontFamily="avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial, sans-serif"
-                             FontSize="12"/>
+                             BorderThickness="0"
+                             Padding="0"
+                             FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                             FontSize="11">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="*,52,60,76" Height="18">
+                                    <!-- Stack icon + name -->
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal"
+                                                VerticalAlignment="Center" Margin="4,0,0,0">
+                                        <TextBlock Text="&#x25A1;" FontSize="10"
+                                                   Foreground="#000000"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,4,0"
+                                                   FontFamily="Geneva, Helvetica, Arial, sans-serif"/>
+                                        <TextBlock Text="{Binding Name}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center"
+                                                   FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                                   FontSize="11"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding CardCount}"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,4,0"
+                                               FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                               FontSize="11"/>
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding SizeText}"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,4,0"
+                                               FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                               FontSize="11"/>
+                                    <TextBlock Grid.Column="3"
+                                               Text="{Binding Resolution}"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,4,0"
+                                               FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                               FontSize="11"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                 </Border>
                 </Border>
                 </Border>
                 </Border>
 
-                <!-- Right column: buttons stacked vertically (System 7 file dialog layout) -->
-                <StackPanel Grid.Row="1" Grid.Column="1"
-                            VerticalAlignment="Top" Spacing="8"
-                            Width="100">
-                    <!-- Default button: 3px outer border = System 7 default-button indicator -->
-                    <Border BorderBrush="#000000" BorderThickness="3" CornerRadius="4" Padding="0">
-                        <Button x:Name="OkButton" Content="Open"
-                                Classes="sys7"
-                                Height="26"
-                                Click="OnOkClick" IsDefault="True"
-                                HorizontalAlignment="Stretch"
-                                HorizontalContentAlignment="Center"
-                                VerticalContentAlignment="Center"
-                                FontWeight="Bold" CornerRadius="3"
-                                FontSize="12"/>
-                    </Border>
-                    <Button x:Name="CancelButton" Content="Cancel"
-                            Classes="sys7"
-                            Height="26"
-                            Click="OnCancelClick" IsCancel="True"
-                            HorizontalAlignment="Stretch"
-                            HorizontalContentAlignment="Center"
-                            VerticalContentAlignment="Center"
-                            FontSize="12"/>
-                </StackPanel>
-
-            </Grid>
+            </DockPanel>
         </DockPanel>
     </Border>
 </Window>

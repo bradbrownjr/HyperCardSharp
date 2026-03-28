@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using HyperCardSharp.Core.Containers;
 
 namespace HyperCardSharp.App.Views;
 
@@ -14,13 +15,17 @@ public partial class StackPickerWindow : Window
         InitializeComponent();
     }
 
-    public StackPickerWindow(IReadOnlyList<string> stackNames) : this()
+    public StackPickerWindow(IReadOnlyList<StackEntry> entries) : this()
     {
-        foreach (var name in stackNames)
-            StackList.Items.Add(name);
+        foreach (var entry in entries)
+            StackList.Items.Add(entry);
 
-        if (stackNames.Count > 0)
+        if (entries.Count > 0)
             StackList.SelectedIndex = 0;
+
+        InfoText.Text = entries.Count == 1
+            ? "1 stack"
+            : $"{entries.Count} stacks";
 
         StackList.DoubleTapped += OnListDoubleTapped;
     }
