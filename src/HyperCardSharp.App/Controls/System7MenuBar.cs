@@ -81,18 +81,21 @@ public class System7MenuBar : Control
     // ── Apple logo ─────────────────────────────────────────────────────────
 
     // ── Pixel-art Apple logo ────────────────────────────────────────────────
-    // Matches the system.css apple.svg: 9×11 pixel grid rendered with rects.
+    // Classic Mac Apple logo: 9×11 pixel grid.
+    // The body has a concave bite on the RIGHT side (rows 4-7).
     // Each tuple is (x, y, width, height) in the 9-wide × 11-tall space.
     private static readonly (int X, int Y, int W, int H)[] ApplePixels =
     [
         (5, 0, 2, 1),   // stem
         (4, 1, 2, 1),   // leaf upper
         (4, 2, 1, 1),   // leaf lower
-        (1, 3, 3, 1),   // body top-left  (bite gap at x=4)
+        (1, 3, 3, 1),   // body top-left  (gap at x=4 where leaf meets body)
         (5, 3, 3, 1),   // body top-right
-        (0, 4, 9, 1),   // body full
-        (0, 5, 9, 2),   // body mid
-        (0, 7, 9, 2),   // body lower-mid
+        (0, 4, 7, 1),   // body row 4 — bite starts (x=7,8 missing)
+        (0, 5, 6, 1),   // body row 5 — bite deepest (x=6,7,8 missing)
+        (0, 6, 7, 1),   // body row 6 — bite easing (x=7,8 missing)
+        (0, 7, 8, 1),   // body row 7 — bite end (x=8 missing)
+        (0, 8, 9, 1),   // body row 8 — full width
         (1, 9, 7, 1),   // body narrow
         (2, 10, 2, 1),  // left foot
         (5, 10, 2, 1),  // right foot
@@ -297,11 +300,15 @@ public class System7MenuBar : Control
         if (appleOpen)
             context.FillRectangle(Brushes.Black, new Rect(StartX - 2, 0, AppleW, BarH - 1));
 
-        // Logo at exactly 1px/unit: 9x11px. Centered in the 20px bar.
-        // At 1px/unit the bite gap (1 unit wide at grid x=4, row 3) is a
-        // crisp 1px white gap between two black columns. Small but pixel-exact,
-        // matching the proportions of the original Mac menu bar apple icon.
-        var logoRect = new Rect(StartX + 4, 5, 9, 11);
+        // Logo sized to 13×15 → scale ≈ 1.44px/unit so the bite (2-3 units
+        // wide on the right) renders as a clearly visible 3-4px gap.
+        // Centered horizontally in the 20px apple area and vertically in the
+        // bar using the same formula as the menu title text.
+        const double logoW = 13;
+        const double logoH = 15;
+        double logoX = Math.Floor(StartX + (AppleW - logoW) / 2);
+        double logoY = Math.Floor((BarH - 1 - logoH) / 2);
+        var logoRect = new Rect(logoX, logoY, logoW, logoH);
         DrawAppleLogo(context, logoRect, appleOpen);
 
         // Menu titles — vertically centred in the bar
@@ -341,7 +348,8 @@ internal class MenuDropdown : Control
     private const double W   = 200;
     private const double FtSz = 12;
 
-    private static readonly Typeface ItemTyp = new Typeface("Geneva, Helvetica, Arial");
+    private static readonly Typeface ItemTyp = new Typeface(
+        new FontFamily("avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF"));
 
     public event EventHandler<System7MenuBar.MenuItem>? ItemSelected;
 
