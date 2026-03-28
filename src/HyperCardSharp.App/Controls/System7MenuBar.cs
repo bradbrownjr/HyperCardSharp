@@ -40,15 +40,15 @@ public class System7MenuBar : Control
     private const double StartX = 6;
     private const double AppleW = 20;
     private const double ItemPad = 8;
-    // ChiKareGo2 is the exact bitmap pixel font used by system.css as "Chicago_12".
-    // It was created by Giles Booth (blogmywiki) and is licensed free.
-    // We converted ChiKareGo2.woff2 from the system.css npm package to TTF.
-    // Font weight: "Medium" (only variant). FontSize 12pt = authentic Chicago 12.
+    // ChicagoFLF is a vector outline recreation of Mac Chicago 12pt.
+    // It is the closest freely embeddable font to the original — and critically,
+    // it is the one SkiaSharp on Windows can successfully rasterize.
+    // ChiKareGo2 (system.css bitmap recreation) causes SkiaSharp to throw
+    // "Could not create glyphTypeface" on Windows; do not use it.
     private const double FontSz = 12;
 
     private static readonly Typeface ChicagoTyp = new Typeface(
-        new FontFamily("avares://HyperCardSharp.App/Assets/Fonts#ChiKareGo2"),
-        FontStyle.Normal, FontWeight.Medium);
+        new FontFamily("avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF"));
 
     public static readonly DirectProperty<System7MenuBar, List<MenuDef>> MenusProperty =
         AvaloniaProperty.RegisterDirect<System7MenuBar, List<MenuDef>>(
