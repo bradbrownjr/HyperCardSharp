@@ -90,12 +90,12 @@ public class System7MenuBar : Control
         (4, 1, 2, 1),   // leaf upper
         (4, 2, 1, 1),   // leaf lower
         (1, 3, 3, 1),   // body top-left  (gap at x=4 where leaf meets body)
-        (5, 3, 3, 1),   // body top-right
-        (0, 4, 7, 1),   // body row 4 — bite starts (x=7,8 missing)
-        (0, 5, 6, 1),   // body row 5 — bite deepest (x=6,7,8 missing)
-        (0, 6, 7, 1),   // body row 6 — bite easing (x=7,8 missing)
-        (0, 7, 8, 1),   // body row 7 — bite end (x=8 missing)
-        (0, 8, 9, 1),   // body row 8 — full width
+        (5, 3, 4, 1),   // body top-right
+        (0, 4, 7, 1),   // body row 4 — bite 2px wide (x=7,8 cut)
+        (0, 5, 6, 1),   // body row 5 — bite 3px wide (x=6,7,8 cut)
+        (0, 6, 6, 1),   // body row 6 — bite 3px wide (same as row 5 — circular arc)
+        (0, 7, 7, 1),   // body row 7 — bite 2px wide (mirrors row 4 — arc closes)
+        (0, 8, 9, 1),   // body row 8 — full width (bite fully closed)
         (1, 9, 7, 1),   // body narrow
         (2, 10, 2, 1),  // left foot
         (5, 10, 2, 1),  // right foot
