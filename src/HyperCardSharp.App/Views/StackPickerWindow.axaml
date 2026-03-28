@@ -98,11 +98,8 @@
                     </Grid>
                 </Border>
 
-                <!-- Beveled list area (Finder-style inset border, no top rule — header provides it) -->
-                <Border BorderBrush="#808080" BorderThickness="1,0,0,1">
-                <Border BorderBrush="#DFDFDF" BorderThickness="0,0,1,0">
-                <Border BorderBrush="#000000" BorderThickness="1,0,0,1">
-                <Border BorderBrush="#FFFFFF" BorderThickness="0,0,1,0" Background="#FFFFFF">
+                <!-- List area — simple 1px black border (B&W, no gray bevels) -->
+                <Border BorderBrush="#000000" BorderThickness="1,0,1,1" Background="#FFFFFF">
                     <ListBox x:Name="StackList"
                              Classes="sys7"
                              Background="#FFFFFF"
@@ -154,9 +151,6 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
-                </Border>
-                </Border>
-                </Border>
                 </Border>
 
             </DockPanel>

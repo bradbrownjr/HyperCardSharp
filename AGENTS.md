@@ -197,16 +197,18 @@ Use this map to locate code without re-exploring the codebase.
 ## System 7 Dialog Styling Conventions
 
 All modal dialogs in this project must follow these conventions to stay visually consistent.
+The UI targets the **1-bit (black & white) Macintosh look** — no gray tones.
 
-- **Background:** `#C0C0C0` (System 7.5 authentic gray)
-- **Outer border:** `BorderBrush="#888888" BorderThickness="2" CornerRadius="0"`
+- **Background:** `#FFFFFF` (pure white — B&W displays had no gray)
+- **Outer border:** `BorderBrush="#000000" BorderThickness="1" CornerRadius="0"`
 - **Font:** `FontFamily="Geneva, Helvetica, Arial, sans-serif" FontSize="12"`
 - **Text color:** `#000000`
-- **List box background:** `#FFFFFF` with `BorderBrush="#666666" BorderThickness="1"`
-- **Default button:** wrapped in `<Border BorderBrush="#000000" BorderThickness="3" CornerRadius="4">`, inner button uses `Background="#DDDDDD" BorderBrush="#000000" BorderThickness="1" FontWeight="Bold"`
-- **Cancel / secondary button:** `Background="#DDDDDD" BorderBrush="#000000" BorderThickness="1"` (no outer wrapper)
+- **List box background:** `#FFFFFF` with `BorderBrush="#000000" BorderThickness="1"`
+- **Default button:** wrapped in `<Border BorderBrush="#000000" BorderThickness="3" CornerRadius="4">`, inner button uses `Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1" FontWeight="Bold"`
+- **Cancel / secondary button:** `Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1"` (no outer wrapper)
 - **Section headers inside dialogs:** `FontWeight="Bold" FontSize="13"`
 - **`WindowStartupLocation="CenterOwner"`** on all dialogs
+- **Never use gray** (`#808080`, `#C0C0C0`, `#DDDDDD`, etc.) in B&W mode UI elements. Only `#000000` and `#FFFFFF`.
 
 Reference implementations: `StackPickerWindow.axaml`, `HelpWindow.axaml`.
 

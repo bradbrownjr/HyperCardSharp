@@ -53,10 +53,11 @@ public class System7TitleBar : Control
         // separated by 1px white gaps, filling the bar height.
         ctx.DrawRectangle(BgWhite, null, new Rect(0, 0, w, h));
 
-        // 6 stripes × 2px + 5 gaps × 1px = 17px of pattern.
-        // Centre the pattern vertically in the bar.
+        // 6 stripes × 1px + 5 gaps × 1px = 11px of pattern.
+        // Centre the pattern vertically in the bar — leaving white space at
+        // top and bottom, matching authentic System 7 Finder title bars.
         const int stripeCount = 6;
-        const double stripeH = 2;
+        const double stripeH = 1;
         const double gapH = 1;
         double patternH = stripeCount * stripeH + (stripeCount - 1) * gapH;
         double startY = Math.Floor((h - patternH) / 2);
