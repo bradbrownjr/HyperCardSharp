@@ -40,11 +40,13 @@ public class System7MenuBar : Control
     private const double StartX = 6;
     private const double AppleW = 20;
     private const double ItemPad = 8;
-    private const double FontSz = 13;
+    // 12pt matches Chicago_12 design size (system.css reference).
+    // ChicagoFLF has no Bold variant — do NOT set FontWeight.Bold or Avalonia
+    // falls back to a different system font (e.g. Arial Bold) which looks wrong.
+    private const double FontSz = 12;
 
     private static readonly Typeface ChicagoTyp = new Typeface(
-        "avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial",
-        FontStyle.Normal, FontWeight.Bold);
+        "avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial");
 
     public static readonly DirectProperty<System7MenuBar, List<MenuDef>> MenusProperty =
         AvaloniaProperty.RegisterDirect<System7MenuBar, List<MenuDef>>(
@@ -71,6 +73,7 @@ public class System7MenuBar : Control
     {
         Height = BarH;
         PointerPressed += OnPointerPressed;
+        PointerMoved   += OnPointerMoved;
     }
 
     // ── Apple logo ─────────────────────────────────────────────────────────
@@ -197,6 +200,16 @@ public class System7MenuBar : Control
         }
     }
 
+    // Mac-style fluid menu switching: when a menu is open, hovering over
+    // another menu title immediately switches to that menu.
+    private void OnPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_openMenuIndex < 0) return;
+        int idx = HitTest(e.GetPosition(this).X);
+        if (idx >= 0 && idx != _openMenuIndex)
+            OpenMenu(idx);
+    }
+
     // ── Menu open / close ────────────────────────────────────────────────────
 
     private void OpenMenu(int idx)
@@ -268,7 +281,9 @@ public class System7MenuBar : Control
         if (appleOpen)
             context.FillRectangle(Brushes.Black, new Rect(StartX - 2, 0, AppleW, BarH - 1));
 
-        var logoRect = new Rect(StartX + 4, 3, 11, 14);
+        // Logo rendered at 18×18 so each 9-unit grid cell = 2px.
+        // This makes the 1-unit bite gap 2px wide — visibly distinct.
+        var logoRect = new Rect(StartX + 2, 1, 18, 18);
         DrawAppleLogo(context, logoRect, appleOpen);
 
         // Menu titles — vertically centred in the bar
