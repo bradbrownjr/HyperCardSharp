@@ -109,21 +109,25 @@
             <Setter Property="Padding"      Value="0"/>
         </Style>
         <Style Selector="Button.sys7 /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background"   Value="#FFFFFF"/>
-            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Background"              Value="#FFFFFF"/>
+            <Setter Property="TextElement.Foreground"  Value="#000000"/>
+            <Setter Property="CornerRadius"            Value="4"/>
         </Style>
         <Style Selector="Button.sys7:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background"   Value="#FFFFFF"/>
+            <Setter Property="Background"              Value="#FFFFFF"/>
+            <Setter Property="TextElement.Foreground"  Value="#000000"/>
         </Style>
         <Style Selector="Button.sys7:pressed /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background"   Value="#000000"/>
+            <Setter Property="Background"              Value="#000000"/>
+            <Setter Property="TextElement.Foreground"  Value="#FFFFFF"/>
         </Style>
         <Style Selector="Button.sys7:pressed">
             <Setter Property="Foreground"   Value="#FFFFFF"/>
         </Style>
         <!-- Remove Fluent focus ring -->
         <Style Selector="Button.sys7:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background"   Value="#FFFFFF"/>
+            <Setter Property="Background"              Value="#FFFFFF"/>
+            <Setter Property="TextElement.Foreground"  Value="#000000"/>
         </Style>
 
         <!-- ── System 7.5 ListBox selection highlight ───────────────────
