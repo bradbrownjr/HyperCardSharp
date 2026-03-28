@@ -15,8 +15,8 @@ public partial class MainWindow : Window
 {
     private readonly StackViewModel _viewModel = new();
 
-    // Menu bar (20px) + title bar (20px) + 2px outer border
-    private const double ChromeHeight = 42;
+    // Menu bar (20px) + 2px outer border
+    private const double ChromeHeight = 22;
 
     private static readonly double[] ZoomLevels = { 1.0, 1.5, 2.0, 4.0 };
     private int _currentScaleIndex = 0;
@@ -246,6 +246,7 @@ public partial class MainWindow : Window
     private async System.Threading.Tasks.Task ShowHelpAsync()
     {
         var help = new HelpWindow();
+        help.ColorMode = _viewModel.RenderMode == HyperCardSharp.Rendering.RenderMode.Color;
         await help.ShowDialog(this);
     }
 
@@ -326,6 +327,7 @@ public partial class MainWindow : Window
         if (stacks.Count > 1)
         {
             var picker = new StackPickerWindow(stacks);
+            picker.ColorMode = _viewModel.RenderMode == HyperCardSharp.Rendering.RenderMode.Color;
             var result = await picker.ShowDialog<int?>(this);
             int selectedIndex = result ?? -1;
 
@@ -365,10 +367,6 @@ public partial class MainWindow : Window
         var menuBar = this.FindControl<HyperCardSharp.App.Controls.System7MenuBar>("MenuBar");
         if (menuBar != null)
             menuBar.UseColorLogo = isColor;
-        // Sync title bar: Platinum stripe palette in color mode, B&W in normal mode
-        var titleBar = this.FindControl<HyperCardSharp.App.Controls.System7TitleBar>("TitleBar");
-        if (titleBar != null)
-            titleBar.ColorMode = isColor;
     }
 
     private void OnMenuZoom1(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -392,6 +390,7 @@ public partial class MainWindow : Window
     private async System.Threading.Tasks.Task ShowAboutAsync()
     {
         var about = new AboutWindow();
+        about.ColorMode = _viewModel.RenderMode == HyperCardSharp.Rendering.RenderMode.Color;
         await about.ShowDialog(this);
     }
 

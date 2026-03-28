@@ -44,9 +44,10 @@ public class System7TitleBar : Control
     private static readonly SolidColorBrush BgWhite  = new(Colors.White);
     private static readonly SolidColorBrush BgBlack  = new(Colors.Black);
 
-    // System 7 Platinum (color mode) palette
-    private static readonly SolidColorBrush PlatinumBg     = new(Color.FromRgb(187, 187, 187));
-    private static readonly SolidColorBrush PlatinumStripe = new(Color.FromRgb(102, 102, 102));
+    // System 7 color palette — the title bar stripes used the user's Highlight
+    // Color setting (Color control panel). The System 7 default was a deep blue,
+    // approximately RGB(0, 0, 153). Background stays white; only stripes change.
+    private static readonly SolidColorBrush Sys7Blue = new(Color.FromRgb(0, 0, 153));
 
     private static readonly IPen BlackPen = new Pen(new SolidColorBrush(Colors.Black), 1);
 
@@ -72,8 +73,8 @@ public class System7TitleBar : Control
         double h = Bounds.Height;
 
         bool color = ColorMode;
-        var bg     = color ? PlatinumBg     : BgWhite;
-        var stripe = color ? PlatinumStripe : BgBlack;
+        var bg     = BgWhite;               // System 7: background is always white
+        var stripe = color ? Sys7Blue : BgBlack;  // color → deep blue stripes; B&W → black
 
         // ── Background ────────────────────────────────────────────────────────
         ctx.DrawRectangle(bg, null, new Rect(0, 0, w, h));

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using HyperCardSharp.App.Controls;
 using HyperCardSharp.Core.Containers;
 
 namespace HyperCardSharp.App.Views;
@@ -9,6 +10,15 @@ namespace HyperCardSharp.App.Views;
 public partial class StackPickerWindow : Window
 {
     private int _selectedIndex = -1;
+
+    public bool ColorMode
+    {
+        set
+        {
+            var tb = this.FindControl<System7TitleBar>("TitleBar");
+            if (tb != null) tb.ColorMode = value;
+        }
+    }
 
     public StackPickerWindow()
     {

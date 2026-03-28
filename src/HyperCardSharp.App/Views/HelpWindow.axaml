@@ -16,7 +16,8 @@
         <DockPanel>
 
             <!-- System 7.5 striped title bar -->
-            <controls:System7TitleBar DockPanel.Dock="Top"
+            <controls:System7TitleBar x:Name="TitleBar"
+                                      DockPanel.Dock="Top"
                                       Title="HyperCardSharp Help"
                                       CloseRequested="OnTitleBarClose"/>
 
