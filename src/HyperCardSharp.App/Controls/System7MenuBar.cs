@@ -40,13 +40,15 @@ public class System7MenuBar : Control
     private const double StartX = 6;
     private const double AppleW = 20;
     private const double ItemPad = 8;
-    // 12pt matches Chicago_12 design size (system.css reference).
-    // ChicagoFLF has no Bold variant — do NOT set FontWeight.Bold or Avalonia
-    // falls back to a different system font (e.g. Arial Bold) which looks wrong.
     private const double FontSz = 12;
 
+    // Specify ONLY the embedded avares font with no system fallbacks.
+    // A fallback list like ", Chicago, Geneva, Arial" causes Avalonia to search
+    // for a Bold variant and eventually find Arial Bold. With only one font family
+    // SkiaSharp synthesises fake-bold on ChicagoFLF itself instead.
     private static readonly Typeface ChicagoTyp = new Typeface(
-        "avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial");
+        new FontFamily("avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF"),
+        FontStyle.Normal, FontWeight.Bold);
 
     public static readonly DirectProperty<System7MenuBar, List<MenuDef>> MenusProperty =
         AvaloniaProperty.RegisterDirect<System7MenuBar, List<MenuDef>>(
@@ -236,6 +238,11 @@ public class System7MenuBar : Control
             PlacementGravity   = PopupGravity.BottomRight,
             HorizontalOffset   = MenuLeft(idx),
             IsLightDismissEnabled = true,
+            // Let the dismissal click also reach controls beneath the overlay.
+            // Without this, clicking another menu title while one is open eats
+            // the click (closes the popup) but the menu bar PointerPressed never
+            // fires, so the new menu never opens — requiring a double-click.
+            OverlayDismissEventPassThrough = true,
             Child              = dropdown
         };
 
@@ -290,9 +297,11 @@ public class System7MenuBar : Control
         if (appleOpen)
             context.FillRectangle(Brushes.Black, new Rect(StartX - 2, 0, AppleW, BarH - 1));
 
-        // Logo 13×14px: each 9×11 grid cell ≈ 1.4×1.3 screen pixels.
-        // Fits comfortably in the 20px bar with ~3px margin top and bottom.
-        var logoRect = new Rect(StartX + 3, 3, 13, 14);
+        // Logo at 18x22px = exactly 2px per grid unit (9 wide x 11 tall).
+        // Positioned at y=-2 so the stem clips above the bar; body (grid rows
+        // 3-10) sits at screen y=4..20. The bite gap (1 unit at x=4 in row 3)
+        // is a hard 2x2px white space — clearly visible at any DPI.
+        var logoRect = new Rect(StartX + 2, -2, 18, 22);
         DrawAppleLogo(context, logoRect, appleOpen);
 
         // Menu titles — vertically centred in the bar
