@@ -116,11 +116,31 @@
                                     <!-- Stack icon + name -->
                                     <StackPanel Grid.Column="0" Orientation="Horizontal"
                                                 VerticalAlignment="Center" Margin="4,0,0,0">
-                                        <TextBlock Text="&#x25A1;" FontSize="10"
-                                                   Foreground="#000000"
-                                                   VerticalAlignment="Center"
-                                                   Margin="0,0,4,0"
-                                                   FontFamily="Geneva, Helvetica, Arial, sans-serif"/>
+                                        <!-- HyperCard stack icon: two offset document shapes with dog-eared
+                                             corners. Strokes bind to ListBoxItem.Foreground so they
+                                             automatically invert (white-on-black) when the row is selected. -->
+                                        <Canvas Width="14" Height="16"
+                                                VerticalAlignment="Center" Margin="0,0,4,0">
+                                            <!-- Back card body -->
+                                            <Path Data="M 3,2 L 10,2 L 13,4 L 13,15 L 3,15 Z"
+                                                  Stroke="{Binding $parent[ListBoxItem].Foreground}"
+                                                  StrokeThickness="1" Fill="Transparent"/>
+                                            <!-- Back card dog-ear -->
+                                            <Path Data="M 10,2 L 13,4 L 10,4 Z"
+                                                  Stroke="{Binding $parent[ListBoxItem].Foreground}"
+                                                  StrokeThickness="1"
+                                                  Fill="{Binding $parent[ListBoxItem].Foreground}"/>
+                                            <!-- Front card body (white fill occludes back card strokes
+                                                 in the overlap area, just like a real stack of cards) -->
+                                            <Path Data="M 0,0 L 7,0 L 10,3 L 10,13 L 0,13 Z"
+                                                  Stroke="{Binding $parent[ListBoxItem].Foreground}"
+                                                  StrokeThickness="1" Fill="White"/>
+                                            <!-- Front card dog-ear -->
+                                            <Path Data="M 7,0 L 10,3 L 7,3 Z"
+                                                  Stroke="{Binding $parent[ListBoxItem].Foreground}"
+                                                  StrokeThickness="1"
+                                                  Fill="{Binding $parent[ListBoxItem].Foreground}"/>
+                                        </Canvas>
                                         <TextBlock Text="{Binding Name}"
                                                    TextTrimming="CharacterEllipsis"
                                                    VerticalAlignment="Center"
