@@ -48,9 +48,10 @@ public class System7TitleBar : Control
         double w = Bounds.Width;
         double h = Bounds.Height;
 
-        // ── System 7 title bar: 6 thick black stripes with white gaps ──
-        // Reference: System 7 Finder windows show ~6 black bars (2px each)
-        // separated by 1px white gaps, filling the bar height.
+        // ── System 7 title bar: thin stripes with white space at edges ──
+        // Reference: system.css uses background-clip: content-box with padding
+        // to create white border around stripe area. We replicate this by
+        // insetting stripes 2px from left/right and centering vertically.
         ctx.DrawRectangle(BgWhite, null, new Rect(0, 0, w, h));
 
         // 6 stripes × 1px + 5 gaps × 1px = 11px of pattern.
@@ -62,17 +63,28 @@ public class System7TitleBar : Control
         double patternH = stripeCount * stripeH + (stripeCount - 1) * gapH;
         double startY = Math.Floor((h - patternH) / 2);
 
+        // Horizontal inset — stripes don't touch left/right window edges.
+        const double insetX = 1;
+
         for (int i = 0; i < stripeCount; i++)
         {
             double y = startY + i * (stripeH + gapH);
-            ctx.FillRectangle(BgBlack, new Rect(0, y, w, stripeH));
+            ctx.FillRectangle(BgBlack, new Rect(insetX, y, w - insetX * 2, stripeH));
         }
 
         // ── Close box ─────────────────────────────────────────────────
-        // Simple empty 11×11 square — no inner box (authentic System 7).
+        // Simple empty square with white clearing around it (System 7 style).
         const double boxSize = 11;
+        const double clearing = 3;  // white space around close box
         double boxTop = Math.Floor((h - boxSize) / 2);
         _closeBoxRect = new Rect(8, boxTop, boxSize, boxSize);
+
+        // White clearing rect — larger than the box to erase stripes around it.
+        ctx.FillRectangle(BgWhite, new Rect(
+            _closeBoxRect.X - clearing,
+            _closeBoxRect.Y - clearing,
+            _closeBoxRect.Width + clearing * 2,
+            _closeBoxRect.Height + clearing * 2));
 
         ctx.DrawRectangle(BgWhite, BlackPen, _closeBoxRect);
 

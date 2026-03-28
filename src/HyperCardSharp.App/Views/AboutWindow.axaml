@@ -32,7 +32,7 @@
                             Click="OnOkClick" IsDefault="True"
                             HorizontalContentAlignment="Center"
                             VerticalContentAlignment="Center"
-                            Background="#DDDDDD"
+                            Background="#FFFFFF"
                             BorderBrush="#000000" BorderThickness="1"
                             FontWeight="Bold" CornerRadius="3"
                             FontSize="12"/>
@@ -47,19 +47,19 @@
                            HorizontalAlignment="Center"/>
 
                 <TextBlock Text="Version 0.1 (alpha)"
-                           FontSize="12" Foreground="#333333"
+                           FontSize="12" Foreground="#000000"
                            HorizontalAlignment="Center"/>
 
-                <Border Height="1" Background="#808080" Margin="0,4,0,4"/>
+                <Border Height="1" Background="#000000" Margin="0,4,0,4"/>
 
                 <TextBlock TextWrapping="Wrap" TextAlignment="Center"
                            Foreground="#000000" FontSize="12"
                            Text="A cross-platform HyperCard stack player&#10;and HyperTalk interpreter for retro computing&#10;enthusiasts and digital preservationists."/>
 
-                <Border Height="1" Background="#808080" Margin="0,4,0,4"/>
+                <Border Height="1" Background="#000000" Margin="0,4,0,4"/>
 
                 <TextBlock Text="© 2024–2026 HyperCard# Contributors"
-                           FontSize="11" Foreground="#555555"
+                           FontSize="11" Foreground="#000000"
                            HorizontalAlignment="Center"/>
             </StackPanel>
 

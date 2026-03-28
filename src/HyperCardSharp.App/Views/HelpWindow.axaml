@@ -54,12 +54,12 @@
                 <!-- macOS note -->
                 <TextBlock DockPanel.Dock="Bottom"
                            Text="On macOS, use ⌘ (Command) instead of Ctrl."
-                           FontSize="11" Foreground="#555555"
+                           FontSize="11" Foreground="#000000"
                            HorizontalAlignment="Center"
                            Margin="0,6,0,0"/>
 
                 <!-- Divider above macOS note -->
-                <Border DockPanel.Dock="Bottom" Height="1" Background="#808080" Margin="0,8,0,0"/>
+                <Border DockPanel.Dock="Bottom" Height="1" Background="#000000" Margin="0,8,0,0"/>
 
                 <!-- Scrollable shortcut list -->
                 <ScrollViewer HorizontalScrollBarVisibility="Disabled"
@@ -114,8 +114,8 @@
                               RowDefinitions="Auto,Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="F1  / Ctrl+H" Margin="0,2"/>
                             <TextBlock Grid.Row="0" Grid.Column="1" Text="Show this window" Margin="0,2"/>
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="⌘? (classic Mac)" Margin="0,2" FontSize="11" Foreground="#555555"/>
-                            <TextBlock Grid.Row="1" Grid.Column="1" Text="HyperCard help (historical)" Margin="0,2" FontSize="11" Foreground="#555555"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="⌘? (classic Mac)" Margin="0,2" FontSize="11" Foreground="#000000"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="HyperCard help (historical)" Margin="0,2" FontSize="11" Foreground="#000000"/>
                         </Grid>
 
                     </StackPanel>

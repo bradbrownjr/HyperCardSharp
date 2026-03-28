@@ -95,7 +95,8 @@ public class System7MenuBar : Control
     /// Build the Apple silhouette as a StreamGeometry.
     /// Coordinate space: 14 wide × 16 tall.
     /// Nearly circular body with prominent right-side bite — styled after
-    /// the Apple Inc. logo, not a natural apple shape.
+    /// the Apple Inc. corporate logo, not a natural apple shape.
+    /// Reference: system.css uses an 18×22px SVG of the same logo.
     /// </summary>
     private static StreamGeometry BuildAppleGeometry()
     {
@@ -104,45 +105,48 @@ public class System7MenuBar : Control
 
         // ── Leaf ─────────────────────────────────────────────
         // Small stylised leaf tilting right from top of body.
-        ctx.BeginFigure(new Point(7.5, 0.5), true);
-        ctx.QuadraticBezierTo(new Point(10.5, -0.5), new Point(10.0, 2.8));
-        ctx.QuadraticBezierTo(new Point(8.5, 1.5), new Point(7.5, 0.5));
+        ctx.BeginFigure(new Point(8.0, 0.5), true);
+        ctx.QuadraticBezierTo(new Point(11.0, -0.5), new Point(9.5, 2.8));
+        ctx.QuadraticBezierTo(new Point(8.5, 1.5), new Point(8.0, 0.5));
         ctx.EndFigure(true);
 
         // ── Body ─────────────────────────────────────────────
-        // Nearly round silhouette — wide at top and bottom (not tapered)
-        // with a prominent bite on the upper-right side.
-        ctx.BeginFigure(new Point(7.0, 3.2), true);
+        // Very round silhouette — nearly circular with a deep
+        // concave bite on the upper-right side.
+        ctx.BeginFigure(new Point(7.0, 3.0), true);
 
-        // Left lobe — round to left edge
+        // Left arc: top → left midpoint → bottom
         ctx.CubicBezierTo(
-            new Point(3.5, 2.0),
-            new Point(0.0, 4.5),
-            new Point(0.0, 8.5));
-        // Left side to bottom
+            new Point(2.5, 2.0),
+            new Point(0.0, 5.5),
+            new Point(0.0, 9.0));
         ctx.CubicBezierTo(
-            new Point(0.0, 12.5),
+            new Point(0.0, 13.0),
             new Point(3.0, 16.0),
             new Point(7.0, 16.0));
-        // Bottom to right side
+
+        // Right arc: bottom → right midpoint
         ctx.CubicBezierTo(
             new Point(11.0, 16.0),
-            new Point(14.0, 12.5),
-            new Point(14.0, 8.5));
+            new Point(14.0, 13.0),
+            new Point(14.0, 9.0));
+
         // Right side up to bite entry
         ctx.CubicBezierTo(
-            new Point(14.0, 6.0),
-            new Point(13.5, 4.5),
-            new Point(12.5, 3.5));
-        // Bite — prominent concave arc
+            new Point(14.0, 7.0),
+            new Point(13.5, 5.5),
+            new Point(12.5, 4.2));
+
+        // Bite — deep concave arc (the corporate Apple notch)
         ctx.QuadraticBezierTo(
-            new Point(10.0, 5.5),
-            new Point(10.5, 3.2));
+            new Point(9.5, 7.0),
+            new Point(10.5, 3.0));
+
         // Right lobe back to top centre
         ctx.CubicBezierTo(
-            new Point(10.5, 2.0),
-            new Point(8.5, 2.0),
-            new Point(7.0, 3.2));
+            new Point(9.5, 2.0),
+            new Point(8.0, 2.0),
+            new Point(7.0, 3.0));
         ctx.EndFigure(true);
 
         return geo;

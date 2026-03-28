@@ -21,6 +21,9 @@
         <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed"      Color="Black"/>
         <SolidColorBrush x:Key="MenuFlyoutItemForegroundPressed"      Color="White"/>
         <!-- Menu flyout items — disabled -->
+        <!-- Disabled menu text: #808080 approximates the 1-bit dither pattern
+             real Macs used. A SolidColorBrush cannot replicate the checkerboard,
+             so gray is the closest visual equivalent for disabled state. -->
         <SolidColorBrush x:Key="MenuFlyoutItemForegroundDisabled"     Color="#808080"/>
 
         <!-- Top-level menu bar items -->
