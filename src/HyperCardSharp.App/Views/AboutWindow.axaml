@@ -29,12 +29,11 @@
                         HorizontalAlignment="Center" Margin="0,0,0,14">
                 <Border BorderBrush="#000000" BorderThickness="3" CornerRadius="4" Padding="0">
                     <Button x:Name="OkButton" Content="OK"
+                            Classes="sys7"
                             Width="84" Height="20"
                             Click="OnOkClick" IsDefault="True"
                             HorizontalContentAlignment="Center"
                             VerticalContentAlignment="Center"
-                            Background="#FFFFFF"
-                            BorderBrush="#000000" BorderThickness="1"
                             FontWeight="Bold" CornerRadius="3"
                             FontSize="12"/>
                 </Border>
