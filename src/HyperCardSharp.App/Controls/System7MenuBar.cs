@@ -40,15 +40,15 @@ public class System7MenuBar : Control
     private const double StartX = 6;
     private const double AppleW = 20;
     private const double ItemPad = 8;
+    // ChiKareGo2 is the exact bitmap pixel font used by system.css as "Chicago_12".
+    // It was created by Giles Booth (blogmywiki) and is licensed free.
+    // We converted ChiKareGo2.woff2 from the system.css npm package to TTF.
+    // Font weight: "Medium" (only variant). FontSize 12pt = authentic Chicago 12.
     private const double FontSz = 12;
 
-    // Specify ONLY the embedded avares font with no system fallbacks.
-    // A fallback list like ", Chicago, Geneva, Arial" causes Avalonia to search
-    // for a Bold variant and eventually find Arial Bold. With only one font family
-    // SkiaSharp synthesises fake-bold on ChicagoFLF itself instead.
     private static readonly Typeface ChicagoTyp = new Typeface(
-        new FontFamily("avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF"),
-        FontStyle.Normal, FontWeight.Bold);
+        new FontFamily("avares://HyperCardSharp.App/Assets/Fonts#ChiKareGo2"),
+        FontStyle.Normal, FontWeight.Medium);
 
     public static readonly DirectProperty<System7MenuBar, List<MenuDef>> MenusProperty =
         AvaloniaProperty.RegisterDirect<System7MenuBar, List<MenuDef>>(
@@ -297,11 +297,11 @@ public class System7MenuBar : Control
         if (appleOpen)
             context.FillRectangle(Brushes.Black, new Rect(StartX - 2, 0, AppleW, BarH - 1));
 
-        // Logo at 18x22px = exactly 2px per grid unit (9 wide x 11 tall).
-        // Positioned at y=-2 so the stem clips above the bar; body (grid rows
-        // 3-10) sits at screen y=4..20. The bite gap (1 unit at x=4 in row 3)
-        // is a hard 2x2px white space — clearly visible at any DPI.
-        var logoRect = new Rect(StartX + 2, -2, 18, 22);
+        // Logo at exactly 1px/unit: 9x11px. Centered in the 20px bar.
+        // At 1px/unit the bite gap (1 unit wide at grid x=4, row 3) is a
+        // crisp 1px white gap between two black columns. Small but pixel-exact,
+        // matching the proportions of the original Mac menu bar apple icon.
+        var logoRect = new Rect(StartX + 4, 5, 9, 11);
         DrawAppleLogo(context, logoRect, appleOpen);
 
         // Menu titles — vertically centred in the bar
