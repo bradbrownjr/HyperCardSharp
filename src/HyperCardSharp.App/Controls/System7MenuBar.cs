@@ -43,7 +43,8 @@ public class System7MenuBar : Control
     private const double FontSz = 13;
 
     private static readonly Typeface ChicagoTyp = new Typeface(
-        "avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial");
+        "avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial",
+        FontStyle.Normal, FontWeight.Bold);
 
     public static readonly DirectProperty<System7MenuBar, List<MenuDef>> MenusProperty =
         AvaloniaProperty.RegisterDirect<System7MenuBar, List<MenuDef>>(
@@ -74,118 +75,71 @@ public class System7MenuBar : Control
 
     // ── Apple logo ─────────────────────────────────────────────────────────
 
-    // Vector Apple logo drawn as a StreamGeometry path.
-    // Scales cleanly at any DPI — avoids pixel-grid artifacts at small sizes.
-    // The geometry is defined in a 14×16 unit coordinate space and scaled
-    // to the destination rect at render time.
-
-    // Rainbow stripe bands (fractional Y ranges, normalised 0..1) and ARGB.
-    private static readonly (double FromY, double ToY, uint Color)[] RainbowStripes =
+    // ── Pixel-art Apple logo ────────────────────────────────────────────────
+    // Matches the system.css apple.svg: 9×11 pixel grid rendered with rects.
+    // Each tuple is (x, y, width, height) in the 9-wide × 11-tall space.
+    private static readonly (int X, int Y, int W, int H)[] ApplePixels =
     [
-        (0.00, 0.15, 0xFF00B300),  // GREEN   (leaf)
-        (0.15, 0.30, 0xFF00B300),  // GREEN   (body top)
-        (0.30, 0.45, 0xFFFFFF00),  // YELLOW
-        (0.45, 0.58, 0xFFFF8000),  // ORANGE
-        (0.58, 0.72, 0xFFFF0000),  // RED
-        (0.72, 0.86, 0xFF8000FF),  // PURPLE
-        (0.86, 1.00, 0xFF0066FF),  // BLUE
+        (5, 0, 2, 1),   // stem
+        (4, 1, 2, 1),   // leaf upper
+        (4, 2, 1, 1),   // leaf lower
+        (1, 3, 3, 1),   // body top-left  (bite gap at x=4)
+        (5, 3, 3, 1),   // body top-right
+        (0, 4, 9, 1),   // body full
+        (0, 5, 9, 2),   // body mid
+        (0, 7, 9, 2),   // body lower-mid
+        (1, 9, 7, 1),   // body narrow
+        (2, 10, 2, 1),  // left foot
+        (5, 10, 2, 1),  // right foot
+    ];
+
+    // Rainbow color per pixel row (rows 0-10). Classic 6-stripe Apple logo.
+    private static readonly uint[] RainbowRowColors =
+    [
+        0xFF00B300,  // row 0  — green  (stem)
+        0xFF00B300,  // row 1  — green  (leaf)
+        0xFFFFFF00,  // row 2  — yellow
+        0xFFFFFF00,  // row 3  — yellow (top body)
+        0xFFFF8000,  // row 4  — orange
+        0xFFFF8000,  // row 5  — orange
+        0xFFFF0000,  // row 6  — red
+        0xFFFF0000,  // row 7  — red
+        0xFF8000FF,  // row 8  — purple
+        0xFF0066FF,  // row 9  — blue
+        0xFF0066FF,  // row 10 — blue
     ];
 
     /// <summary>
-    /// Build the Apple silhouette as a StreamGeometry.
-    /// Coordinate space: 14 wide × 16 tall.
-    /// Nearly circular body with prominent right-side bite — styled after
-    /// the Apple Inc. corporate logo, not a natural apple shape.
-    /// Reference: system.css uses an 18×22px SVG of the same logo.
-    /// </summary>
-    private static StreamGeometry BuildAppleGeometry()
-    {
-        var geo = new StreamGeometry();
-        using var ctx = geo.Open();
-
-        // ── Leaf ─────────────────────────────────────────────
-        // Small stylised leaf tilting right from top of body.
-        ctx.BeginFigure(new Point(8.0, 0.5), true);
-        ctx.QuadraticBezierTo(new Point(11.0, -0.5), new Point(9.5, 2.8));
-        ctx.QuadraticBezierTo(new Point(8.5, 1.5), new Point(8.0, 0.5));
-        ctx.EndFigure(true);
-
-        // ── Body ─────────────────────────────────────────────
-        // Very round silhouette — nearly circular with a deep
-        // concave bite on the upper-right side.
-        ctx.BeginFigure(new Point(7.0, 3.0), true);
-
-        // Left arc: top → left midpoint → bottom
-        ctx.CubicBezierTo(
-            new Point(2.5, 2.0),
-            new Point(0.0, 5.5),
-            new Point(0.0, 9.0));
-        ctx.CubicBezierTo(
-            new Point(0.0, 13.0),
-            new Point(3.0, 16.0),
-            new Point(7.0, 16.0));
-
-        // Right arc: bottom → right midpoint
-        ctx.CubicBezierTo(
-            new Point(11.0, 16.0),
-            new Point(14.0, 13.0),
-            new Point(14.0, 9.0));
-
-        // Right side up to bite entry
-        ctx.CubicBezierTo(
-            new Point(14.0, 7.0),
-            new Point(13.5, 5.5),
-            new Point(12.5, 4.2));
-
-        // Bite — deep concave arc (the corporate Apple notch)
-        ctx.QuadraticBezierTo(
-            new Point(9.5, 7.0),
-            new Point(10.5, 3.0));
-
-        // Right lobe back to top centre
-        ctx.CubicBezierTo(
-            new Point(9.5, 2.0),
-            new Point(8.0, 2.0),
-            new Point(7.0, 3.0));
-        ctx.EndFigure(true);
-
-        return geo;
-    }
-
-    private static readonly StreamGeometry AppleGeo = BuildAppleGeometry();
-
-    /// <summary>
-    /// Draw the Apple logo as a filled vector path, scaled to destRect.
-    /// In color mode, draws horizontal rainbow stripes clipped to the path.
+    /// Draw the Apple logo as pixel-art rectangles scaled to destRect.
+    /// Matches the system.css apple.svg (9×11 grid of rects).
     /// </summary>
     private void DrawAppleLogo(DrawingContext ctx, Rect destRect, bool inverted)
     {
-        double sx = destRect.Width / 14.0;
-        double sy = destRect.Height / 16.0;
+        double sx = destRect.Width / 9.0;
+        double sy = destRect.Height / 11.0;
 
-        using (ctx.PushTransform(Matrix.CreateScale(sx, sy) *
-                                  Matrix.CreateTranslation(destRect.X, destRect.Y)))
+        foreach (var (px, py, pw, ph) in ApplePixels)
         {
+            double rx = destRect.X + px * sx;
+            double ry = destRect.Y + py * sy;
+            double rw = pw * sx;
+            double rh = ph * sy;
+
             if (_useColorLogo && !inverted)
             {
-                // Draw rainbow stripes clipped to the apple shape
-                using (ctx.PushGeometryClip(AppleGeo))
+                // Draw each pixel row in its rainbow color
+                for (int row = py; row < py + ph; row++)
                 {
-                    foreach (var (fromY, toY, color) in RainbowStripes)
-                    {
-                        double y0 = fromY * 16.0;
-                        double y1 = toY * 16.0;
-                        ctx.FillRectangle(
-                            new SolidColorBrush(Color.FromUInt32(color)),
-                            new Rect(0, y0, 14, y1 - y0));
-                    }
+                    var color = new SolidColorBrush(Color.FromUInt32(RainbowRowColors[row]));
+                    double rowY = destRect.Y + row * sy;
+                    ctx.FillRectangle(color, new Rect(rx, rowY, rw, sy));
                 }
             }
             else
             {
-                ctx.DrawGeometry(
+                ctx.FillRectangle(
                     inverted ? Brushes.White : Brushes.Black,
-                    null, AppleGeo);
+                    new Rect(rx, ry, rw, rh));
             }
         }
     }
@@ -314,7 +268,7 @@ public class System7MenuBar : Control
         if (appleOpen)
             context.FillRectangle(Brushes.Black, new Rect(StartX - 2, 0, AppleW, BarH - 1));
 
-        var logoRect = new Rect(StartX + 2, 3, 13, 15);
+        var logoRect = new Rect(StartX + 4, 3, 11, 14);
         DrawAppleLogo(context, logoRect, appleOpen);
 
         // Menu titles — vertically centred in the bar

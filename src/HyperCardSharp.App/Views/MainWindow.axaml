@@ -13,7 +13,7 @@
     <!-- System 7 window: 1px black border, rounded top corners, white background.
          Popup dropdowns render in their own top-level window. -->
     <Border BorderBrush="#000000" BorderThickness="1"
-            CornerRadius="8,8,0,0" ClipToBounds="True"
+            CornerRadius="8" ClipToBounds="True"
             Background="#FFFFFF">
         <DockPanel>
 
