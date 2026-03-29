@@ -116,30 +116,26 @@
                                     <!-- Stack icon + name -->
                                     <StackPanel Grid.Column="0" Orientation="Horizontal"
                                                 VerticalAlignment="Center" Margin="4,0,0,0">
-                                        <!-- HyperCard stack icon: two offset document shapes with dog-eared
-                                             corners. Strokes bind to ListBoxItem.Foreground so they
-                                             automatically invert (white-on-black) when the row is selected. -->
-                                        <Canvas Width="14" Height="16"
+                                        <!-- HyperCard stack icon: three plain cards stacked with 2px
+                                             x/y offsets, viewed straight-on (System 7 list-view style).
+                                             No dog-ears — too small. Front card white fill occludes cards
+                                             behind it. All strokes bind to Foreground so selection inverts. -->
+                                        <Canvas Width="16" Height="16"
                                                 VerticalAlignment="Center" Margin="0,0,4,0">
-                                            <!-- Back card body -->
-                                            <Path Data="M 3,2 L 10,2 L 13,4 L 13,15 L 3,15 Z"
+                                            <!-- Card 3 — bottommost -->
+                                            <Path Data="M 4,4 H 15 V 15 H 4 Z"
                                                   Stroke="{Binding $parent[ListBoxItem].Foreground}"
                                                   StrokeThickness="1" Fill="Transparent"/>
-                                            <!-- Back card dog-ear -->
-                                            <Path Data="M 10,2 L 13,4 L 10,4 Z"
+                                            <!-- Card 2 — middle -->
+                                            <Path Data="M 2,2 H 13 V 13 H 2 Z"
                                                   Stroke="{Binding $parent[ListBoxItem].Foreground}"
-                                                  StrokeThickness="1"
-                                                  Fill="{Binding $parent[ListBoxItem].Foreground}"/>
-                                            <!-- Front card body (white fill occludes back card strokes
-                                                 in the overlap area, just like a real stack of cards) -->
-                                            <Path Data="M 0,0 L 7,0 L 10,3 L 10,13 L 0,13 Z"
+                                                  StrokeThickness="1" Fill="Transparent"/>
+                                            <!-- Card 1 — front. White fill occludes cards behind,
+                                                 giving depth. On selection it shows as a white card
+                                                 on the black highlight bar — authentic Mac behaviour. -->
+                                            <Path Data="M 0,0 H 11 V 11 H 0 Z"
                                                   Stroke="{Binding $parent[ListBoxItem].Foreground}"
                                                   StrokeThickness="1" Fill="White"/>
-                                            <!-- Front card dog-ear -->
-                                            <Path Data="M 7,0 L 10,3 L 7,3 Z"
-                                                  Stroke="{Binding $parent[ListBoxItem].Foreground}"
-                                                  StrokeThickness="1"
-                                                  Fill="{Binding $parent[ListBoxItem].Foreground}"/>
                                         </Canvas>
                                         <TextBlock Text="{Binding Name}"
                                                    TextTrimming="CharacterEllipsis"

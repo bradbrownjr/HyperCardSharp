@@ -147,7 +147,8 @@
             <Setter Property="Foreground"   Value="#FFFFFF"/>
         </Style>
         <Style Selector="ListBox.sys7 ListBoxItem:not(:selected):pointerover /template/ ContentPresenter">
-            <Setter Property="Background"   Value="Transparent"/>
+            <Setter Property="Background"             Value="Transparent"/>
+            <Setter Property="TextElement.Foreground" Value="#000000"/>
         </Style>
         <!-- Keep text black on hover — Fluent theme's default hover state can
              change foreground to white, making text invisible on a white background. -->
