@@ -328,8 +328,8 @@ public partial class MainWindow : Window
         {
             var picker = new StackPickerWindow(stacks);
             picker.ColorMode = _viewModel.RenderMode == HyperCardSharp.Rendering.RenderMode.Color;
-            var result = await picker.ShowDialog<int?>(this);
-            int selectedIndex = result ?? -1;
+            await picker.ShowDialog(this);
+            int selectedIndex = picker.SelectedIndex;
 
             if (selectedIndex < 0 || selectedIndex >= stacks.Count)
             {

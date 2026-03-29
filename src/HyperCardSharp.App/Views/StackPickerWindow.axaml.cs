@@ -48,19 +48,19 @@ public partial class StackPickerWindow : Window
     private void OnTitleBarClose(object? sender, EventArgs e)
     {
         _selectedIndex = -1;
-        Close(-1);
+        Close();
     }
 
     private void OnOkClick(object? sender, RoutedEventArgs e)
     {
         _selectedIndex = StackList.SelectedIndex;
-        Close(_selectedIndex);
+        Close();
     }
 
     private void OnCancelClick(object? sender, RoutedEventArgs e)
     {
         _selectedIndex = -1;
-        Close(-1);
+        Close();
     }
 
     private void OnListDoubleTapped(object? sender, TappedEventArgs e)
@@ -68,7 +68,7 @@ public partial class StackPickerWindow : Window
         if (StackList.SelectedIndex >= 0)
         {
             _selectedIndex = StackList.SelectedIndex;
-            Close(_selectedIndex);
+            Close();
         }
     }
 }
