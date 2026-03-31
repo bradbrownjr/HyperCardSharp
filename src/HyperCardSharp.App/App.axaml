@@ -137,7 +137,8 @@
             <Setter Property="Foreground"   Value="#000000"/>
             <Setter Property="FontFamily"   Value="avares://HyperCardSharp.App/Assets/Fonts#ChicagoFLF, Chicago, Geneva, Helvetica, Arial, sans-serif"/>
             <Setter Property="FontSize"     Value="12"/>
-            <Setter Property="Padding"      Value="6,3"/>
+            <Setter Property="Padding"      Value="2,0"/>
+            <Setter Property="MinHeight"    Value="0"/>
         </Style>
         <Style Selector="ListBox.sys7 ListBoxItem:selected /template/ ContentPresenter">
             <Setter Property="Background"             Value="#000000"/>

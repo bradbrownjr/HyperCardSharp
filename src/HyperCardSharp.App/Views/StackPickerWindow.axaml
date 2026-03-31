@@ -3,8 +3,8 @@
         xmlns:controls="clr-namespace:HyperCardSharp.App.Controls"
         x:Class="HyperCardSharp.App.Views.StackPickerWindow"
         Title="Select a Stack"
-        Width="520" Height="380"
-        MinWidth="420" MinHeight="280"
+        Width="480" Height="340"
+        MinWidth="400" MinHeight="260"
         CanResize="False"
         SystemDecorations="None"
         WindowStartupLocation="CenterOwner"
@@ -26,17 +26,17 @@
             <Border DockPanel.Dock="Top" Height="1" Background="#000000"/>
 
             <!-- Content area -->
-            <DockPanel Margin="10,8,10,10">
+            <DockPanel Margin="6,4,6,6">
 
                 <!-- Info line + buttons across the top -->
-                <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+                <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,4">
                     <TextBlock x:Name="InfoText" Grid.Column="0"
                                Text="0 stacks"
-                               FontSize="11"
+                               FontSize="10"
                                Foreground="#000000"
                                VerticalAlignment="Center"
                                FontFamily="Geneva, Helvetica, Arial, sans-serif"/>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
                         <Button x:Name="CancelButton" Content="Cancel"
                                 Classes="sys7"
                                 Width="80" Height="24"
@@ -57,83 +57,92 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- Column headers (Finder-style) -->
-                <Border DockPanel.Dock="Top"
-                        Background="#FFFFFF"
-                        BorderBrush="#000000" BorderThickness="1,1,1,1"
-                        Padding="0" Height="18">
-                    <Grid ColumnDefinitions="*,52,60,76">
-                        <TextBlock Grid.Column="0" Text="Name"
-                                   FontWeight="Bold" FontSize="10"
-                                   Foreground="#000000"
-                                   FontFamily="Geneva, Helvetica, Arial, sans-serif"
-                                   VerticalAlignment="Center"
-                                   Margin="6,0,0,0"/>
-                        <Border Grid.Column="1" BorderBrush="#000000" BorderThickness="1,0,0,0">
-                            <TextBlock Text="Cards"
-                                       FontWeight="Bold" FontSize="10"
-                                       Foreground="#000000"
-                                       FontFamily="Geneva, Helvetica, Arial, sans-serif"
-                                       HorizontalAlignment="Right"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,4,0"/>
-                        </Border>
-                        <Border Grid.Column="2" BorderBrush="#000000" BorderThickness="1,0,0,0">
-                            <TextBlock Text="Size"
-                                       FontWeight="Bold" FontSize="10"
-                                       Foreground="#000000"
-                                       FontFamily="Geneva, Helvetica, Arial, sans-serif"
-                                       HorizontalAlignment="Right"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,4,0"/>
-                        </Border>
-                        <Border Grid.Column="3" BorderBrush="#000000" BorderThickness="1,0,0,0">
-                            <TextBlock Text="Resolution"
-                                       FontWeight="Bold" FontSize="10"
-                                       Foreground="#000000"
-                                       FontFamily="Geneva, Helvetica, Arial, sans-serif"
-                                       HorizontalAlignment="Right"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,4,0"/>
-                        </Border>
-                    </Grid>
-                </Border>
+                <!-- Data area: column headers + list + scrollbar in a grid.
+                     Column 0 holds headers and list (same width for alignment).
+                     Column 1 holds the 16px System 7 scrollbar. The scrollbar
+                     draws its own left border (separator from content) so
+                     headers and list omit their right border. -->
+                <Grid ColumnDefinitions="*,16">
 
-                <!-- List area — simple 1px black border (B&W, no gray bevels) -->
-                <Border BorderBrush="#000000" BorderThickness="1,0,1,1" Background="#FFFFFF">
-                    <ListBox x:Name="StackList"
-                             Classes="sys7"
-                             Background="#FFFFFF"
-                             Foreground="#000000"
-                             SelectionMode="Single"
-                             BorderThickness="0"
-                             Padding="0"
-                             FontFamily="Geneva, Helvetica, Arial, sans-serif"
-                             FontSize="11">
+                    <DockPanel Grid.Column="0">
+                        <!-- Column headers (Finder-style) -->
+                        <Border DockPanel.Dock="Top"
+                                Background="#FFFFFF"
+                                BorderBrush="#000000" BorderThickness="1,1,0,1"
+                                Padding="0" Height="16">
+                            <Grid ColumnDefinitions="*,52,60,76">
+                                <TextBlock Grid.Column="0" Text="Name"
+                                           FontSize="10"
+                                           Foreground="#000000"
+                                           FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                           VerticalAlignment="Center"
+                                           Margin="4,0,0,0"/>
+                                <Border Grid.Column="1" BorderBrush="#000000" BorderThickness="1,0,0,0">
+                                    <TextBlock Text="Cards"
+                                               FontSize="10"
+                                               Foreground="#000000"
+                                               FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,4,0"/>
+                                </Border>
+                                <Border Grid.Column="2" BorderBrush="#000000" BorderThickness="1,0,0,0">
+                                    <TextBlock Text="Size"
+                                               FontSize="10"
+                                               Foreground="#000000"
+                                               FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,4,0"/>
+                                </Border>
+                                <Border Grid.Column="3" BorderBrush="#000000" BorderThickness="1,0,0,0">
+                                    <TextBlock Text="Resolution"
+                                               FontSize="10"
+                                               Foreground="#000000"
+                                               FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,4,0"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <!-- List area — no right border (scrollbar provides separator) -->
+                        <Border BorderBrush="#000000" BorderThickness="1,0,0,1" Background="#FFFFFF">
+                            <ListBox x:Name="StackList"
+                                     Classes="sys7"
+                                     Background="#FFFFFF"
+                                     Foreground="#000000"
+                                     SelectionMode="Single"
+                                     BorderThickness="0"
+                                     Padding="0"
+                                     FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                     FontSize="11"
+                                     ScrollViewer.VerticalScrollBarVisibility="Hidden">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Grid ColumnDefinitions="*,52,60,76" Height="18">
+                                <Grid ColumnDefinitions="*,52,60,76" Height="16">
                                     <!-- Stack icon + name -->
                                     <StackPanel Grid.Column="0" Orientation="Horizontal"
-                                                VerticalAlignment="Center" Margin="4,0,0,0">
+                                                VerticalAlignment="Center" Margin="2,0,0,0">
                                         <!-- HyperCard stack icon: three plain cards stacked with 2px
                                              x/y offsets, viewed straight-on (System 7 list-view style).
                                              No dog-ears — too small. Front card white fill occludes cards
                                              behind it. All strokes bind to Foreground so selection inverts. -->
-                                        <Canvas Width="16" Height="16"
-                                                VerticalAlignment="Center" Margin="0,0,4,0">
+                                        <Canvas Width="13" Height="13"
+                                                VerticalAlignment="Center" Margin="0,0,3,0">
                                             <!-- Card 3 — bottommost -->
-                                            <Path Data="M 4,4 H 15 V 15 H 4 Z"
+                                            <Path Data="M 4,4 H 13 V 13 H 4 Z"
                                                   Stroke="{Binding $parent[ListBoxItem].Foreground}"
                                                   StrokeThickness="1" Fill="Transparent"/>
                                             <!-- Card 2 — middle -->
-                                            <Path Data="M 2,2 H 13 V 13 H 2 Z"
+                                            <Path Data="M 2,2 H 11 V 11 H 2 Z"
                                                   Stroke="{Binding $parent[ListBoxItem].Foreground}"
                                                   StrokeThickness="1" Fill="Transparent"/>
                                             <!-- Card 1 — front. White fill occludes cards behind,
                                                  giving depth. On selection it shows as a white card
                                                  on the black highlight bar — authentic Mac behaviour. -->
-                                            <Path Data="M 0,0 H 11 V 11 H 0 Z"
+                                            <Path Data="M 0,0 H 9 V 9 H 0 Z"
                                                   Stroke="{Binding $parent[ListBoxItem].Foreground}"
                                                   StrokeThickness="1" Fill="White"/>
                                         </Canvas>
@@ -141,7 +150,7 @@
                                                    TextTrimming="CharacterEllipsis"
                                                    VerticalAlignment="Center"
                                                    FontFamily="Geneva, Helvetica, Arial, sans-serif"
-                                                   FontSize="11"/>
+                                                   FontSize="10"/>
                                     </StackPanel>
                                     <TextBlock Grid.Column="1"
                                                Text="{Binding CardCount}"
@@ -149,26 +158,31 @@
                                                VerticalAlignment="Center"
                                                Margin="0,0,4,0"
                                                FontFamily="Geneva, Helvetica, Arial, sans-serif"
-                                               FontSize="11"/>
+                                               FontSize="10"/>
                                     <TextBlock Grid.Column="2"
                                                Text="{Binding SizeText}"
                                                HorizontalAlignment="Right"
                                                VerticalAlignment="Center"
                                                Margin="0,0,4,0"
                                                FontFamily="Geneva, Helvetica, Arial, sans-serif"
-                                               FontSize="11"/>
+                                               FontSize="10"/>
                                     <TextBlock Grid.Column="3"
                                                Text="{Binding Resolution}"
                                                HorizontalAlignment="Right"
                                                VerticalAlignment="Center"
                                                Margin="0,0,4,0"
                                                FontFamily="Geneva, Helvetica, Arial, sans-serif"
-                                               FontSize="11"/>
+                                               FontSize="10"/>
                                 </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
-                </Border>
+                        </Border>
+                    </DockPanel>
+
+                    <!-- Authentic System 7 scrollbar -->
+                    <controls:System7ScrollBar Grid.Column="1" x:Name="ListScrollBar"/>
+                </Grid>
 
             </DockPanel>
         </DockPanel>
