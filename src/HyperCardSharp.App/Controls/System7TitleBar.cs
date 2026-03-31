@@ -44,10 +44,10 @@ public class System7TitleBar : Control
     private static readonly SolidColorBrush BgWhite  = new(Colors.White);
     private static readonly SolidColorBrush BgBlack  = new(Colors.Black);
 
-    // System 7 color palette — the title bar stripes used the user's Highlight
-    // Color setting (Color control panel). The System 7 default was a deep blue,
-    // approximately RGB(0, 0, 153). Background stays white; only stripes change.
-    private static readonly SolidColorBrush Sys7Blue = new(Color.FromRgb(0, 0, 153));
+    // System 7 color palette — the title bar stripes used the Window Color from
+    // the Color control panel. The default was a medium-bright blue matching
+    // the Mac 256-color system palette (clut 8) entry at RGB(0, 0, 204).
+    private static readonly SolidColorBrush Sys7Blue = new(Color.FromRgb(0, 0, 204));
 
     private static readonly IPen BlackPen = new Pen(new SolidColorBrush(Colors.Black), 1);
 

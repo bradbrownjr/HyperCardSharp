@@ -21,31 +21,12 @@
             <controls:System7MenuBar x:Name="MenuBar"
                                      DockPanel.Dock="Top"/>
 
-            <!-- Bottom row: grow box sits at bottom-right -->
-            <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,16" Height="16">
-                <!-- Bottom border area under card (left of grow box) -->
-                <Border Grid.Column="0" Background="#FFFFFF"
-                        BorderBrush="#000000" BorderThickness="0,1,0,0"/>
-                <!-- Grow box: classic Mac resize handle -->
-                <controls:System7GrowBox Grid.Column="1" x:Name="GrowBox"/>
-            </Grid>
-
-            <!-- Main content: card + scrollbar side by side -->
-            <Grid ColumnDefinitions="*,16">
-                <!-- Card display area -->
-                <controls:SkiaBitmapControl Grid.Column="0"
-                                             x:Name="CardDisplay"
-                                             Source="{Binding CurrentBitmap}"
-                                             Margin="0"
-                                             HorizontalAlignment="Stretch"
-                                             VerticalAlignment="Stretch"/>
-
-                <!-- Authentic System 7 scrollbar (decorative — HyperCard
-                     stacks are fixed-size so there's nothing to scroll,
-                     but the scrollbar is always present visually). -->
-                <controls:System7ScrollBar Grid.Column="1"
-                                            x:Name="CardScrollBar"/>
-            </Grid>
+            <!-- Card display area — content fills remaining space -->
+            <controls:SkiaBitmapControl x:Name="CardDisplay"
+                                         Source="{Binding CurrentBitmap}"
+                                         Margin="0"
+                                         HorizontalAlignment="Stretch"
+                                         VerticalAlignment="Stretch"/>
         </DockPanel>
     </Border>
 </Window>

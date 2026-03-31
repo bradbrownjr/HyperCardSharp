@@ -17,8 +17,6 @@ public partial class MainWindow : Window
 
     // Menu bar (20px) + 2px outer border
     private const double ChromeHeight = 22;
-    // Scrollbar (16px) + 2px outer border
-    private const double ChromeWidth = 18;
 
     private static readonly double[] ZoomLevels = { 1.0, 1.5, 2.0, 4.0 };
     private int _currentScaleIndex = 0;
@@ -210,8 +208,8 @@ public partial class MainWindow : Window
     {
         double cardW = _viewModel.CardWidth * scale;
         double cardH = _viewModel.CardHeight * scale;
-        double targetW = cardW + ChromeWidth; // border + scrollbar
-        double targetH = cardH + ChromeHeight + 16; // border + menu + grow-box row
+        double targetW = cardW + 2; // 1px border each side
+        double targetH = cardH + ChromeHeight;
 
         var screen = Screens.Primary ?? Screens.All.FirstOrDefault();
         if (screen != null)
