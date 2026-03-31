@@ -13,6 +13,7 @@ public class HyperTalkInterpreter
     // ── Injected UI callbacks ─────────────────────────────────────────────────
 
     public Action<int>          GoToCardByIndex  { get; set; } = _ => {};
+    public Action<string>       GoToCardByName   { get; set; } = _ => {};
     public Action               GoNext           { get; set; } = () => {};
     public Action               GoPrev           { get; set; } = () => {};
     public Action               GoFirst          { get; set; } = () => {};
@@ -323,7 +324,7 @@ public class HyperTalkInterpreter
             if (val.TryAsNumber(out double n))
                 GoToCardByIndex((int)n); // pass 1-based; callback converts to 0-based index
             else
-                LogMessage($"HyperTalk: go to card '{val.Raw}' — name navigation not implemented");
+                GoToCardByName(val.Raw);
         }
         return ExecutionResult.Normal;
     }

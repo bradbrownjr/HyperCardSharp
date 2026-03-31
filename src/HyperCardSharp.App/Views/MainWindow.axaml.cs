@@ -116,7 +116,19 @@ public partial class MainWindow : Window
         base.OnOpened(e);
         var cardDisplay = this.FindControl<HyperCardSharp.App.Controls.SkiaBitmapControl>("CardDisplay");
         if (cardDisplay != null)
+        {
             cardDisplay.CardPointerReleased += (x, y) => _viewModel.HandleCardClick(x, y);
+            cardDisplay.CardPointerMoved += (x, y) =>
+            {
+                cardDisplay.Cursor = _viewModel.IsOverClickableButton(x, y)
+                    ? new Cursor(StandardCursorType.Hand)
+                    : Cursor.Default;
+            };
+            cardDisplay.CardPointerExited += () =>
+            {
+                cardDisplay.Cursor = Cursor.Default;
+            };
+        }
     }
 
     private void OnShowAnswerDialog(string message)

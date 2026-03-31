@@ -38,6 +38,12 @@ public class SkiaBitmapControl : Control
     /// <summary>Fired (card X, card Y) on pointer release over a loaded card bitmap.</summary>
     public event Action<float, float>? CardPointerReleased;
 
+    /// <summary>Fired (card X, card Y) on pointer move over a loaded card bitmap.</summary>
+    public event Action<float, float>? CardPointerMoved;
+
+    /// <summary>Fired when pointer exits the card bitmap area.</summary>
+    public event Action? CardPointerExited;
+
     // -------------------------------------------------------------------------
     // Hardcoded 24×28 pixel-art floppy disk.  B = black, W = white.
     // Each string is exactly 28 characters — visually verifiable by inspection.
@@ -346,5 +352,29 @@ public class SkiaBitmapControl : Control
 
         CardPointerReleased?.Invoke((float)cardX, (float)cardY);
         e.Handled = true;
+    }
+
+    protected override void OnPointerMoved(Avalonia.Input.PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+        if (_writeableBitmap == null || _renderScale <= 0) return;
+
+        var pt = e.GetPosition(this);
+        double cardX = (pt.X - _renderOffsetX) / _renderScale;
+        double cardY = (pt.Y - _renderOffsetY) / _renderScale;
+
+        if (cardX < 0 || cardY < 0 || cardX >= _renderSourceW || cardY >= _renderSourceH)
+        {
+            CardPointerExited?.Invoke();
+            return;
+        }
+
+        CardPointerMoved?.Invoke((float)cardX, (float)cardY);
+    }
+
+    protected override void OnPointerExited(Avalonia.Input.PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+        CardPointerExited?.Invoke();
     }
 }

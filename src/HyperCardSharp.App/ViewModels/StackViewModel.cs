@@ -74,6 +74,21 @@ public partial class StackViewModel : ObservableObject
             CurrentCardIndex = zeroIdx;
             RenderCurrentCard();
         };
+        _interpreter.GoToCardByName = name =>
+        {
+            if (_stack == null || _cardOrder.Count == 0) return;
+            for (int i = 0; i < _cardOrder.Count; i++)
+            {
+                var card = _stack.Cards.FirstOrDefault(c => c.Header.Id == _cardOrder[i]);
+                if (card != null && string.Equals(card.Name, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    CurrentCardIndex = i;
+                    RenderCurrentCard();
+                    return;
+                }
+            }
+            _interpreter.LogMessage($"HyperTalk: card \"{name}\" not found");
+        };
         _interpreter.GetFieldText = fieldSpec =>
         {
             var card = CurrentCard();
@@ -105,9 +120,42 @@ public partial class StackViewModel : ObservableObject
         var bg = CurrentBackground(card);
 
         var part = HitTest(cardX, cardY, card, bg);
-        if (part == null || string.IsNullOrWhiteSpace(part.Script)) return;
 
-        _dispatcher.DispatchMessage("mouseUp", part.Script, _interpreter);
+        // HyperCard message hierarchy: button → card → background → stack
+        // If the button has a mouseUp handler, run it. Otherwise, climb the hierarchy.
+        if (part != null && !string.IsNullOrWhiteSpace(part.Script))
+        {
+            if (_dispatcher.DispatchMessage("mouseUp", part.Script, _interpreter))
+                return;
+        }
+
+        // Card script
+        if (!string.IsNullOrWhiteSpace(card.Script))
+        {
+            if (_dispatcher.DispatchMessage("mouseUp", card.Script, _interpreter))
+                return;
+        }
+
+        // Background script
+        if (bg != null && !string.IsNullOrWhiteSpace(bg.Script))
+        {
+            if (_dispatcher.DispatchMessage("mouseUp", bg.Script, _interpreter))
+                return;
+        }
+    }
+
+    /// <summary>
+    /// Returns true if the given card coordinates are over a clickable button.
+    /// In HyperCard, the browse tool always shows a hand cursor over any visible button.
+    /// </summary>
+    public bool IsOverClickableButton(float cardX, float cardY)
+    {
+        var card = CurrentCard();
+        if (card == null) return false;
+        var bg = CurrentBackground(card);
+
+        var part = HitTest(cardX, cardY, card, bg);
+        return part is { IsButton: true };
     }
 
     /// <summary>The file name of the currently opened file (e.g., "neuroblast.img").</summary>
