@@ -74,23 +74,30 @@ public class System7TitleBar : Control
 
         bool color = ColorMode;
         var bg     = BgWhite;               // System 7: background is always white
-        var stripe = color ? Sys7Blue : BgBlack;  // color → deep blue stripes; B&W → black
+        var stripe = color ? Sys7Blue : BgBlack;  // color → blue stripes; B&W → black
 
         // ── Background ────────────────────────────────────────────────────────
         ctx.DrawRectangle(bg, null, new Rect(0, 0, w, h));
 
-        // ── Horizontal stripes ────────────────────────────────────────────────
-        // 6 stripes × 1px + 5 gaps × 1px = 11px pattern, centred vertically.
-        const int    stripeCount = 6;
-        const double stripeH    = 1;
-        const double gapH       = 1;
-        const double insetX     = 1;
-        double patternH = stripeCount * stripeH + (stripeCount - 1) * gapH;
-        double startY   = Math.Floor((h - patternH) / 2);
+        // ── Top and bottom border lines ───────────────────────────────────────
+        // The real System 7 title bar has a solid 1px black line at the very top
+        // and very bottom edge, framing the stripe pattern.
+        ctx.FillRectangle(BgBlack, new Rect(0, 0, w, 1));       // top border
+        ctx.FillRectangle(BgBlack, new Rect(0, h - 1, w, 1));   // bottom border
 
-        for (int i = 0; i < stripeCount; i++)
+        // ── Horizontal stripes ────────────────────────────────────────────────
+        // Fill the interior (between top and bottom border) with alternating
+        // 1px stripe / 1px gap.  Interior runs from y=1 to y=h-2 inclusive.
+        // Start first stripe at the top of the interior; stop when we'd
+        // overlap the bottom border.
+        const double stripeH = 1;
+        const double gapH    = 1;
+        const double insetX  = 1;
+        double interiorTop    = 1;
+        double interiorBottom = h - 1;
+
+        for (double y = interiorTop; y + stripeH <= interiorBottom; y += stripeH + gapH)
         {
-            double y = startY + i * (stripeH + gapH);
             ctx.FillRectangle(stripe, new Rect(insetX, y, w - insetX * 2, stripeH));
         }
 
