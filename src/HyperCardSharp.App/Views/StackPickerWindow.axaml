@@ -22,9 +22,6 @@
                                       Title="Select a Stack"
                                       CloseRequested="OnTitleBarClose"/>
 
-            <!-- Hairline rule under title bar -->
-            <Border DockPanel.Dock="Top" Height="1" Background="#000000"/>
-
             <!-- Content area -->
             <DockPanel Margin="6,4,6,6">
 

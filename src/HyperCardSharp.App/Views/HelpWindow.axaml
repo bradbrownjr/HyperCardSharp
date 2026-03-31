@@ -21,9 +21,6 @@
                                       Title="HyperCardSharp Help"
                                       CloseRequested="OnTitleBarClose"/>
 
-            <!-- Hairline rule under title bar -->
-            <Border DockPanel.Dock="Top" Height="1" Background="#000000"/>
-
             <!-- Content area -->
             <DockPanel Margin="14">
 

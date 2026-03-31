@@ -21,9 +21,6 @@
                                       Title="About HyperCard#"
                                       CloseRequested="OnTitleBarClose"/>
 
-            <!-- Hairline rule under title bar -->
-            <Border DockPanel.Dock="Top" Height="1" Background="#000000"/>
-
             <!-- OK button pinned to bottom -->
             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
                         HorizontalAlignment="Center" Margin="0,0,0,14">
