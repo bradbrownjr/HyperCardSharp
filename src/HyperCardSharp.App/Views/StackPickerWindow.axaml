@@ -57,68 +57,68 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- Data area: column headers + list + scrollbar in a grid.
-                     Column 0 holds headers and list (same width for alignment).
-                     Column 1 holds the 16px System 7 scrollbar. The scrollbar
-                     draws its own left border (separator from content) so
-                     headers and list omit their right border. -->
-                <Grid ColumnDefinitions="*,16">
-
-                    <DockPanel Grid.Column="0">
-                        <!-- Column headers (Finder-style) -->
-                        <Border DockPanel.Dock="Top"
-                                Background="#FFFFFF"
-                                BorderBrush="#000000" BorderThickness="1,1,0,1"
-                                Padding="0" Height="16">
-                            <Grid ColumnDefinitions="*,52,60,76">
-                                <TextBlock Grid.Column="0" Text="Name"
-                                           FontSize="10"
-                                           Foreground="#000000"
-                                           FontFamily="Geneva, Helvetica, Arial, sans-serif"
-                                           VerticalAlignment="Center"
-                                           Margin="4,0,0,0"/>
-                                <Border Grid.Column="1" BorderBrush="#000000" BorderThickness="1,0,0,0">
-                                    <TextBlock Text="Cards"
-                                               FontSize="10"
-                                               Foreground="#000000"
-                                               FontFamily="Geneva, Helvetica, Arial, sans-serif"
-                                               HorizontalAlignment="Right"
-                                               VerticalAlignment="Center"
-                                               Margin="0,0,4,0"/>
-                                </Border>
-                                <Border Grid.Column="2" BorderBrush="#000000" BorderThickness="1,0,0,0">
-                                    <TextBlock Text="Size"
-                                               FontSize="10"
-                                               Foreground="#000000"
-                                               FontFamily="Geneva, Helvetica, Arial, sans-serif"
-                                               HorizontalAlignment="Right"
-                                               VerticalAlignment="Center"
-                                               Margin="0,0,4,0"/>
-                                </Border>
-                                <Border Grid.Column="3" BorderBrush="#000000" BorderThickness="1,0,0,0">
-                                    <TextBlock Text="Resolution"
-                                               FontSize="10"
-                                               Foreground="#000000"
-                                               FontFamily="Geneva, Helvetica, Arial, sans-serif"
-                                               HorizontalAlignment="Right"
-                                               VerticalAlignment="Center"
-                                               Margin="0,0,4,0"/>
-                                </Border>
-                            </Grid>
+                <!-- Column headers (Finder-style) — span full width
+                     including the 16px scrollbar column, matching real Finder. -->
+                <Border DockPanel.Dock="Top"
+                        Background="#FFFFFF"
+                        BorderBrush="#000000" BorderThickness="1,1,1,1"
+                        Padding="0" Height="16">
+                    <Grid ColumnDefinitions="*,52,60,76">
+                        <TextBlock Grid.Column="0" Text="Name"
+                                   FontSize="10"
+                                   Foreground="#000000"
+                                   FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                   VerticalAlignment="Center"
+                                   Margin="4,0,0,0"/>
+                        <Border Grid.Column="1" BorderBrush="#000000" BorderThickness="1,0,0,0">
+                            <TextBlock Text="Cards"
+                                       FontSize="10"
+                                       Foreground="#000000"
+                                       FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,4,0"/>
                         </Border>
+                        <Border Grid.Column="2" BorderBrush="#000000" BorderThickness="1,0,0,0">
+                            <TextBlock Text="Size"
+                                       FontSize="10"
+                                       Foreground="#000000"
+                                       FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,4,0"/>
+                        </Border>
+                        <Border Grid.Column="3" BorderBrush="#000000" BorderThickness="1,0,0,0">
+                            <TextBlock Text="Resolution"
+                                       FontSize="10"
+                                       Foreground="#000000"
+                                       FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,4,0"/>
+                        </Border>
+                    </Grid>
+                </Border>
 
-                        <!-- List area — no right border (scrollbar provides separator) -->
-                        <Border BorderBrush="#000000" BorderThickness="1,0,0,1" Background="#FFFFFF">
-                            <ListBox x:Name="StackList"
-                                     Classes="sys7"
-                                     Background="#FFFFFF"
-                                     Foreground="#000000"
-                                     SelectionMode="Single"
-                                     BorderThickness="0"
-                                     Padding="0"
-                                     FontFamily="Geneva, Helvetica, Arial, sans-serif"
-                                     FontSize="11"
-                                     ScrollViewer.VerticalScrollBarVisibility="Hidden">
+                <!-- List + scrollbar + grow-box assembly.
+                     Row 0: list content + scrollbar.
+                     Row 1: bottom border strip + grow box (16×16 blank square). -->
+                <Grid ColumnDefinitions="*,16" RowDefinitions="*,16">
+
+                    <!-- List area — no right border (scrollbar provides it),
+                         no bottom border (grow-box row provides it). -->
+                    <Border Grid.Column="0" Grid.Row="0"
+                            BorderBrush="#000000" BorderThickness="1,0,0,0" Background="#FFFFFF">
+                        <ListBox x:Name="StackList"
+                                 Classes="sys7"
+                                 Background="#FFFFFF"
+                                 Foreground="#000000"
+                                 SelectionMode="Single"
+                                 BorderThickness="0"
+                                 Padding="0"
+                                 FontFamily="Geneva, Helvetica, Arial, sans-serif"
+                                 FontSize="11"
+                                 ScrollViewer.VerticalScrollBarVisibility="Hidden">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Grid ColumnDefinitions="*,52,60,76" Height="16">
@@ -177,11 +177,22 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
-                        </Border>
-                    </DockPanel>
+                    </Border>
 
-                    <!-- Authentic System 7 scrollbar -->
-                    <controls:System7ScrollBar Grid.Column="1" x:Name="ListScrollBar"/>
+                    <!-- Authentic System 7 scrollbar — beside list only (below headers) -->
+                    <controls:System7ScrollBar Grid.Column="1" Grid.Row="0" x:Name="ListScrollBar"/>
+
+                    <!-- Bottom border under list (left of grow box) -->
+                    <Border Grid.Column="0" Grid.Row="1"
+                            BorderBrush="#000000" BorderThickness="1,1,0,1"
+                            Background="#FFFFFF"/>
+
+                    <!-- Grow box: 16×16 blank square at the intersection of
+                         scrollbar bottom and list-area bottom-right corner.
+                         System 7 always showed this even in non-resizable lists. -->
+                    <Border Grid.Column="1" Grid.Row="1"
+                            BorderBrush="#000000" BorderThickness="1"
+                            Background="#FFFFFF"/>
                 </Grid>
 
             </DockPanel>

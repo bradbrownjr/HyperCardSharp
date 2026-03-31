@@ -142,9 +142,9 @@ public class System7ScrollBar : Control
             DrawArrowTriangle(ctx, BottomArrowRect, isUp: false,
                 _pressedPart == HitPart.DownArrow);
 
-            // ── Arrow–track separator lines ────────────────────────────
-            ctx.FillRectangle(Black, new Rect(1, ArrowHeight - 1, w - 2, 1));
-            ctx.FillRectangle(Black, new Rect(1, h - ArrowHeight, w - 2, 1));
+            // ── Arrow–track separator lines (full-width, edge-to-edge) ──
+            ctx.FillRectangle(Black, new Rect(0, ArrowHeight, w, 1));
+            ctx.FillRectangle(Black, new Rect(0, h - ArrowHeight - 1, w, 1));
 
             // ── Thumb ──────────────────────────────────────────────────
             var thumb = ThumbRect();
