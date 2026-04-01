@@ -119,7 +119,8 @@ public class CardRenderer
             var bmp = new SKBitmap(32, 32, SKColorType.Bgra8888, SKAlphaType.Premul);
             for (int row = 0; row < 32; row++)
                 for (int col = 0; col < 32; col++)
-                    bmp.SetPixel(col, row, pixels[row * 32 + col] ? SKColors.Black : SKColors.White);
+                    // 1-bits = black ink; 0-bits = transparent so the white button background shows through
+                    bmp.SetPixel(col, row, pixels[row * 32 + col] ? SKColors.Black : SKColors.Transparent);
 
             _iconCache[id] = bmp;
         }

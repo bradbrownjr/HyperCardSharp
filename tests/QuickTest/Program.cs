@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using HyperCardSharp.Core.Containers;
 using HyperCardSharp.Core.Resources;
+using HyperCardSharp.Core.Stack;
 
 void RunDiagnostic(string path)
 {
@@ -14,6 +15,21 @@ void RunDiagnostic(string path)
     foreach (var e in entries)
         Console.WriteLine($"  '{e.Name}': rsrc={(e.ResourceFork != null ? e.ResourceFork.Length + " bytes" : "null")}");
 
+    // Print card dimensions for each stack
+    var parser = new StackParser();
+    foreach (var e in entries)
+    {
+        try
+        {
+            var stack = parser.Parse(e.Data, e.ResourceFork);
+            Console.WriteLine($"  '{e.Name}': CardWidth={stack.StackHeader.CardWidth}, CardHeight={stack.StackHeader.CardHeight}, Cards={stack.Cards.Count}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  '{e.Name}': parse error: {ex.Message}");
+        }
+    }
+
     foreach (var e in entries.Where(x => x.ResourceFork != null))
     {
         var icons = MacResourceForkReader.GetResources(e.ResourceFork!, "ICON");
@@ -23,10 +39,13 @@ void RunDiagnostic(string path)
         {
             var px = MacResourceForkReader.DecodeIcon(data);
             if (px == null) continue;
-            string row4  = string.Concat(Enumerable.Range(0, 32).Select(c => px[4  * 32 + c] ? "X" : "."));
-            string row12 = string.Concat(Enumerable.Range(0, 32).Select(c => px[12 * 32 + c] ? "X" : "."));
-            Console.WriteLine($"  ICON {id} row4:  {row4}");
-            Console.WriteLine($"  ICON {id} row12: {row12}");
+            // Print full icon as ASCII art
+            Console.WriteLine($"  ICON {id} (32x32):");
+            for (int row = 0; row < 32; row++)
+            {
+                string line = string.Concat(Enumerable.Range(0, 32).Select(c => px[row * 32 + c] ? "X" : "."));
+                Console.WriteLine($"    {row,2}: {line}");
+            }
         }
     }
 }

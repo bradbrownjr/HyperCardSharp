@@ -59,8 +59,10 @@ public partial class StackViewModel : ObservableObject
 
     public bool IsLoaded => _stack != null;
 
-    public int CardWidth => _stack?.StackHeader.CardWidth ?? 640;
-    public int CardHeight => _stack?.StackHeader.CardHeight ?? 400;
+    // Use the same fallbacks as CardRenderer: 512×342 (classic Mac screen).
+    // A stored zero means the stack omitted the field; fall back to the standard size.
+    public int CardWidth  { get { var w = _stack?.StackHeader.CardWidth  ?? 0; return w > 0 ? w : 512; } }
+    public int CardHeight { get { var h = _stack?.StackHeader.CardHeight ?? 0; return h > 0 ? h : 342; } }
 
     public StackViewModel()
     {

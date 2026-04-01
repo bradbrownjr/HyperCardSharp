@@ -183,7 +183,10 @@ public static class PartRenderer
             if (icons != null && icons.TryGetValue(part.IconId, out var iconBitmap))
             {
                 var destRect = new SKRect(iconX, iconY, iconX + iconSize, iconY + iconSize);
-                canvas.DrawBitmap(iconBitmap, destRect);
+                // SkiaSharp 3.x: use SKImage + DrawImage for nearest-neighbor sampling on a rect dest
+                using var iconImage = SKImage.FromBitmap(iconBitmap);
+                canvas.DrawImage(iconImage, destRect,
+                    new SKSamplingOptions(SKFilterMode.Nearest, SKMipmapMode.None));
             }
             else
             {
@@ -260,7 +263,16 @@ public static class PartRenderer
         path.LineTo(bx - headH,   by + headH);
         path.Close();
 
-        using var iconPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = SKColors.Black, IsAntialias = true };
-        canvas.DrawPath(path, iconPaint);
+        // Hollow outline arrow — matches HyperCard's icon style (1-bit outline, white interior)
+        using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = SKColors.White, IsAntialias = false };
+        canvas.DrawPath(path, fillPaint);
+        using var strokePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = SKColors.Black,
+            StrokeWidth = Math.Max(1f, size * 0.04f),
+            IsAntialias = false
+        };
+        canvas.DrawPath(path, strokePaint);
     }
 }
