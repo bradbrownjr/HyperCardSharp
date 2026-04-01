@@ -31,6 +31,8 @@ public class Part
     public bool IsButton => Type == PartType.Button;
     public bool IsField => Type == PartType.Field;
     public bool Visible => (Flags & 0x80) == 0; // bit 7 inverted = ~visible
+    /// <summary>For buttons: bit 7 of MoreFlags = showName (display the button label).</summary>
+    public bool ShowName => IsButton && (MoreFlags & 0x80) != 0;
     public int Width => Right - Left;
     public int Height => Bottom - Top;
 

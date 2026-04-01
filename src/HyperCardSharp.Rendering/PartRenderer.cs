@@ -18,14 +18,15 @@ namespace HyperCardSharp.Rendering;
 public static class PartRenderer
 {
     /// <summary>
-    /// Renders background-field text for the current card.
+    /// Renders background-field text and non-Transparent button chrome for the current card.
     /// Background part content that differs per card lives in card.PartContents (negative IDs);
     /// shared background text lives in bg.PartContents (positive IDs).
     /// </summary>
     public static void RenderBackgroundParts(
         SKCanvas canvas,
         BackgroundBlock bg,
-        CardBlock card)
+        CardBlock card,
+        (int Left, int Top, int Right, int Bottom)? wobaImgRect = null)
     {
         // Build a lookup of card-specific content for background parts.
         // Per the HC format: background part IDs in card.PartContents are stored as negative values.
@@ -39,24 +40,37 @@ public static class PartRenderer
 
         foreach (var part in bg.Parts)
         {
-            if (!part.Visible || !part.IsField) continue;
+            if (!part.Visible) continue;
 
-            // Card-specific content takes priority over shared background content.
-            string text = cardBgContent.TryGetValue(part.PartId, out var cardText)
-                ? cardText
-                : sharedBgContent.TryGetValue(part.PartId, out var sharedText)
-                    ? sharedText
-                    : "";
+            if (part.IsField)
+            {
+                // Card-specific content takes priority over shared background content.
+                string text = cardBgContent.TryGetValue(part.PartId, out var cardText)
+                    ? cardText
+                    : sharedBgContent.TryGetValue(part.PartId, out var sharedText)
+                        ? sharedText
+                        : "";
 
-            if (!string.IsNullOrEmpty(text))
-                TextRenderer.DrawFieldText(canvas, part, text);
+                if (!string.IsNullOrEmpty(text))
+                    TextRenderer.DrawFieldText(canvas, part, text);
+            }
+            else if (part.IsButton)
+            {
+                RenderButtonChrome(canvas, part, wobaImgRect);
+            }
         }
     }
 
     /// <summary>
-    /// Renders card-local part content (field text for parts on this specific card).
+    /// Renders card-local part content (field text) and non-Transparent button chrome.
+    /// Button chrome is always drawn to guarantee visibility even for buttons that are
+    /// outside the card WOBA's imgRect (i.e. never baked into the bitmap).
     /// </summary>
-    public static void RenderCardParts(SKCanvas canvas, CardBlock card)
+    /// <param name="wobaImgRect">The WOBA image rect for this card, or null if unknown.
+    /// Buttons that fall fully inside the WOBA imgRect already have their outline baked
+    /// in; we skip re-rendering their name text to avoid double-drawing.</param>
+    public static void RenderCardParts(SKCanvas canvas, CardBlock card,
+        (int Left, int Top, int Right, int Bottom)? wobaImgRect = null)
     {
         // Card part content entries have positive IDs matching card.Parts
         var contentLookup = card.PartContents
@@ -65,34 +79,117 @@ public static class PartRenderer
 
         foreach (var part in card.Parts)
         {
-            if (!part.Visible || !part.IsField) continue;
+            if (!part.Visible) continue;
 
-            if (contentLookup.TryGetValue(part.PartId, out var text) && !string.IsNullOrEmpty(text))
-                TextRenderer.DrawFieldText(canvas, part, text);
+            if (part.IsField)
+            {
+                if (contentLookup.TryGetValue(part.PartId, out var text) && !string.IsNullOrEmpty(text))
+                    TextRenderer.DrawFieldText(canvas, part, text);
+            }
+            else if (part.IsButton)
+            {
+                RenderButtonChrome(canvas, part, wobaImgRect);
+            }
         }
     }
 
+    // ── Button chrome rendering ───────────────────────────────────────────────
+
+    private static readonly SKColor ButtonBorderColor = SKColors.Black;
+    private const float ButtonCornerRadius = 8f;
+
     /// <summary>
-    /// Draws a visible outline for Transparent or Opaque buttons that have no WOBA visual.
-    /// Rectangle buttons are already in the WOBA bitmap; skip those to avoid double-rendering.
+    /// Draws the outline and optional name label of a non-Transparent button.
+    /// Uses stroke-only rendering so it overlays cleanly on top of the WOBA bitmap
+    /// without erasing any baked-in pixels.
     /// </summary>
-    public static void RenderInvisibleButtons(SKCanvas canvas, IEnumerable<Part> parts)
+    /// <param name="wobaImgRect">When provided, name text is only rendered for
+    /// buttons that fall (even partially) outside the WOBA image rect — those
+    /// buttons were never baked into the WOBA so their label would otherwise be
+    /// invisible.</param>
+    private static void RenderButtonChrome(
+        SKCanvas canvas, Part part,
+        (int Left, int Top, int Right, int Bottom)? wobaImgRect)
     {
+        if (part.Style == PartStyle.Transparent) return;  // intentionally invisible
+        if (part.Width <= 0 || part.Height <= 0) return;
+
+        var rect = new SKRect(part.Left, part.Top, part.Right, part.Bottom);
+
         using var borderPaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
-            Color = new SKColor(0, 0, 0, 64), // semi-transparent, not to clash with WOBA
+            Color = ButtonBorderColor,
             StrokeWidth = 1,
+            IsAntialias = false
         };
 
-        foreach (var part in parts)
+        if (part.Style == PartStyle.Opaque)
         {
-            if (!part.Visible || !part.IsButton) continue;
-            if (part.Style != PartStyle.Transparent && part.Style != PartStyle.Opaque) continue;
-            if (string.IsNullOrWhiteSpace(part.Script)) continue;  // invisible hotspot with no script
-
-            var rect = new SKRect(part.Left, part.Top, part.Right, part.Bottom);
-            canvas.DrawRect(rect, borderPaint);
+            // Opaque: white fill, no border
+            using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = SKColors.White };
+            canvas.DrawRect(rect, fillPaint);
+            return;
         }
+
+        // Draw outline based on style
+        switch (part.Style)
+        {
+            case PartStyle.RoundRect:
+            case PartStyle.Standard:
+            case PartStyle.Default:
+            case PartStyle.Oval:
+                canvas.DrawRoundRect(rect, ButtonCornerRadius, ButtonCornerRadius, borderPaint);
+                break;
+            case PartStyle.Shadow:
+                canvas.DrawRect(rect, borderPaint);
+                using (var shadowPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = ButtonBorderColor })
+                {
+                    // Simple 3px drop-shadow on right and bottom
+                    canvas.DrawRect(new SKRect(rect.Left + 3, rect.Bottom, rect.Right + 3, rect.Bottom + 3), shadowPaint);
+                    canvas.DrawRect(new SKRect(rect.Right, rect.Top + 3, rect.Right + 3, rect.Bottom + 3), shadowPaint);
+                }
+                break;
+            default:  // Rectangle, CheckBox, RadioButton, etc.
+                canvas.DrawRect(rect, borderPaint);
+                break;
+        }
+
+        // Draw button name if the button's label is not already baked into the WOBA.
+        // A button's label is considered "in the WOBA" when its full rect is contained
+        // within the WOBA image rect.  If any part falls outside, we render the label
+        // ourselves to ensure visibility.
+        if (!part.ShowName || string.IsNullOrEmpty(part.Name)) return;
+
+        bool outsideWoba = wobaImgRect is null ||
+            part.Left  < wobaImgRect.Value.Left  ||
+            part.Top   < wobaImgRect.Value.Top   ||
+            part.Right > wobaImgRect.Value.Right  ||
+            part.Bottom > wobaImgRect.Value.Bottom;
+
+        if (!outsideWoba) return;  // label already baked in WOBA
+
+        // Draw the label centred in the button rect (white backdrop first so it's legible)
+        float cx = rect.MidX;
+        float cy = rect.MidY;
+        float textSize = part.TextSize > 0 ? part.TextSize : 12f;
+
+        using var typeface = FontMapper.GetTypeface(part.TextFontId, part.TextStyle);
+        using var labelFont = new SKFont(typeface, textSize);
+        using var textPaint = new SKPaint { Color = SKColors.Black, IsAntialias = false };
+
+        float tw = labelFont.MeasureText(part.Name);
+        float th = textSize;
+        float tx = cx - tw / 2f;
+        float ty = cy + th / 2f - 1f;
+
+        // White backdrop behind text so it pops against any WOBA content
+        using var backdropPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = SKColors.White };
+        canvas.DrawRect(new SKRect(tx - 1, ty - th, tx + tw + 1, ty + 2), backdropPaint);
+        canvas.DrawText(part.Name, tx, ty, labelFont, textPaint);
     }
+
+    // Kept for backwards compatibility with any callers.
+    [System.Obsolete("Use RenderCardParts / RenderBackgroundParts — button chrome is now included there.")]
+    public static void RenderInvisibleButtons(SKCanvas canvas, IEnumerable<Part> parts) { }
 }
