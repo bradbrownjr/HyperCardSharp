@@ -22,6 +22,13 @@ public class StackFile
     public Dictionary<int, BitmapBlock> Bitmaps { get; init; } = new();
 
     /// <summary>
+    /// ICON resources keyed by resource ID (short).
+    /// Each value is the raw 128-byte 1-bit 32×32 bitmap data as stored in the Mac resource fork.
+    /// Populated when the stack was opened from a container that provided a resource fork.
+    /// </summary>
+    public Dictionary<short, byte[]> Icons { get; init; } = new();
+
+    /// <summary>
     /// Get the ordered list of card IDs from PAGE blocks.
     /// </summary>
     public IEnumerable<int> GetCardOrder()

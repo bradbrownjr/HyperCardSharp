@@ -66,14 +66,57 @@ public static class ContainerPipeline
     /// <summary>
     /// Like UnwrapMultiple, but returns fully enriched StackEntry records
     /// with card count, size, and resolution metadata read from the STAK header.
+    /// Resource forks are attached when the container is an HFS image (possibly
+    /// wrapped in DiskCopy), enabling ICON resource extraction.
     /// </summary>
     public static List<StackEntry> UnwrapEntries(byte[] data, Action<string>? log = null)
     {
         var tuples = UnwrapMultiple(data, log);
+
+        // Try to attach resource forks from the original container.
+        var resourceForks = TryExtractHfsResourceForks(data);
+
         var entries = new List<StackEntry>(tuples.Count);
         foreach (var (name, stackData) in tuples)
-            entries.Add(StackEntry.FromRaw(name, stackData));
+        {
+            resourceForks.TryGetValue(name, out var rsrcFork);
+            entries.Add(StackEntry.FromRaw(name, stackData, rsrcFork));
+        }
         return entries;
+    }
+
+    /// <summary>
+    /// Attempt to extract resource forks for all STAK files in an HFS image
+    /// (which may be wrapped in a DiskCopy container).  Returns an empty
+    /// dictionary if the data is not HFS-based.
+    /// </summary>
+    private static Dictionary<string, byte[]> TryExtractHfsResourceForks(byte[] data)
+    {
+        try
+        {
+            // Unwrap DiskCopy → HFS if needed
+            var dc = new DiskCopyExtractor();
+            byte[]? hfsData = dc.CanHandle(data) ? dc.Extract(data) : null;
+            if (hfsData == null)
+            {
+                // Maybe data is a raw HFS volume
+                var probe = new HfsReader(data);
+                if (probe.IsHfs()) hfsData = data;
+            }
+
+            if (hfsData != null)
+            {
+                var reader = new HfsReader(hfsData);
+                if (reader.IsHfs())
+                    return reader.EnumerateResourceForks();
+            }
+        }
+        catch
+        {
+            // Gracefully degrade — icons just won't be available.
+        }
+
+        return new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>

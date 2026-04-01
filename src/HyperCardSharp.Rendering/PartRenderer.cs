@@ -24,6 +24,7 @@ public static class PartRenderer
         SKCanvas canvas,
         BackgroundBlock bg,
         CardBlock card,
+        IReadOnlyDictionary<short, SKBitmap>? icons = null,
         (int Left, int Top, int Right, int Bottom)? wobaImgRect = null)
     {
         // Build a lookup of card-specific content for background parts.
@@ -54,7 +55,7 @@ public static class PartRenderer
             }
             else if (part.IsButton)
             {
-                RenderButtonChrome(canvas, part, wobaImgRect);
+                RenderButtonChrome(canvas, part, icons, wobaImgRect);
             }
         }
     }
@@ -64,6 +65,7 @@ public static class PartRenderer
     /// Button chrome is always drawn since HyperCard renders it dynamically over the WOBA.
     /// </summary>
     public static void RenderCardParts(SKCanvas canvas, CardBlock card,
+        IReadOnlyDictionary<short, SKBitmap>? icons = null,
         (int Left, int Top, int Right, int Bottom)? wobaImgRect = null)
     {
         // Card part content entries have positive IDs matching card.Parts
@@ -82,7 +84,7 @@ public static class PartRenderer
             }
             else if (part.IsButton)
             {
-                RenderButtonChrome(canvas, part, wobaImgRect);
+                RenderButtonChrome(canvas, part, icons, wobaImgRect);
             }
         }
     }
@@ -100,6 +102,7 @@ public static class PartRenderer
     /// always draw the full chrome regardless of the WOBA imgRect.
     /// </summary>
     private static void RenderButtonChrome(SKCanvas canvas, Part part,
+        IReadOnlyDictionary<short, SKBitmap>? icons,
         (int Left, int Top, int Right, int Bottom)? wobaImgRect)
     {
         if (part.Style == PartStyle.Transparent) return;  // click zone only, no visual
@@ -158,8 +161,6 @@ public static class PartRenderer
         }
 
         // ─ Icon ────────────────────────────────────────────────────────────────
-        // TODO: render actual icon bitmap from ICON resources once we parse them.
-        // For now, use a placeholder so icon-style buttons are visually identifiable.
         bool hasIcon = part.IconId != 0;
         float textSize = part.TextSize > 0 ? part.TextSize : 12f;
 
@@ -177,7 +178,15 @@ public static class PartRenderer
             float iconX = rect.MidX - iconSize / 2f;
             float iconY = rect.Top + iconPad;
 
-            DrawPlaceholderIcon(canvas, iconX, iconY, iconSize);
+            if (icons != null && icons.TryGetValue(part.IconId, out var iconBitmap))
+            {
+                var destRect = new SKRect(iconX, iconY, iconX + iconSize, iconY + iconSize);
+                canvas.DrawBitmap(iconBitmap, destRect);
+            }
+            else
+            {
+                DrawPlaceholderIcon(canvas, iconX, iconY, iconSize);
+            }
 
             textAreaTop = iconY + iconSize;
         }

@@ -11,6 +11,8 @@ public sealed class StackEntry
 {
     public string Name { get; init; } = "";
     public byte[] Data { get; init; } = [];
+    /// <summary>Raw Mac resource fork bytes for this stack file, if available.</summary>
+    public byte[]? ResourceFork { get; init; }
     public long SizeBytes => Data.Length;
     public int CardCount { get; init; }
     public short CardWidth { get; init; }
@@ -66,6 +68,40 @@ public sealed class StackEntry
         {
             Name = name,
             Data = data,
+            CardCount = cardCount,
+            CardWidth = cardWidth,
+            CardHeight = cardHeight,
+        };
+    }
+
+    /// <summary>
+    /// Like <see cref="FromRaw(string, byte[])"/>, but also attaches a resource fork.
+    /// </summary>
+    public static StackEntry FromRaw(string name, byte[] data, byte[]? resourceFork)
+    {
+        int cardCount = 0;
+        short cardWidth = 512;
+        short cardHeight = 342;
+
+        if (data.Length > 0x1BC)
+        {
+            try
+            {
+                cardCount = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(0x28, 4));
+                cardHeight = BinaryPrimitives.ReadInt16BigEndian(data.AsSpan(0x1B8, 2));
+                cardWidth = BinaryPrimitives.ReadInt16BigEndian(data.AsSpan(0x1BA, 2));
+                if (cardCount < 0 || cardCount > 100_000) cardCount = 0;
+                if (cardWidth <= 0 || cardWidth > 4096) cardWidth = 512;
+                if (cardHeight <= 0 || cardHeight > 4096) cardHeight = 342;
+            }
+            catch { }
+        }
+
+        return new StackEntry
+        {
+            Name = name,
+            Data = data,
+            ResourceFork = resourceFork,
             CardCount = cardCount,
             CardWidth = cardWidth,
             CardHeight = cardHeight,

@@ -1,5 +1,6 @@
 using HyperCardSharp.Core.Binary;
 using HyperCardSharp.Core.Bitmap;
+using HyperCardSharp.Core.Resources;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -58,7 +59,12 @@ public class StackParser
     /// <summary>
     /// Parse a complete stack file into a StackFile model.
     /// </summary>
-    public StackFile Parse(ReadOnlyMemory<byte> fileData)
+    /// <param name="fileData">Raw stack (data fork) bytes.</param>
+    /// <param name="resourceFork">
+    /// Optional Mac resource fork for the stack file.  When provided, ICON resources
+    /// are extracted and stored in <see cref="StackFile.Icons"/>.
+    /// </param>
+    public StackFile Parse(ReadOnlyMemory<byte> fileData, byte[]? resourceFork = null)
     {
         var data = fileData.Span;
         var blocks = EnumerateBlocks(fileData);
@@ -169,8 +175,17 @@ public class StackParser
             Pages = pages,
             Bitmaps = bitmaps,
             Blocks = blocks,
-            RawData = fileData
+            RawData = fileData,
+            Icons = ParseIconResources(resourceFork),
         };
+    }
+
+    private Dictionary<short, byte[]> ParseIconResources(byte[]? resourceFork)
+    {
+        var icons = MacResourceForkReader.GetResources(resourceFork, "ICON");
+        if (icons.Count > 0)
+            _logger.LogInformation("Resource fork: {Count} ICON resource(s) loaded.", icons.Count);
+        return icons;
     }
 
     /// <summary>

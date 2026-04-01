@@ -12,6 +12,7 @@ public class CardRenderer
 {
     private readonly StackFile _stack;
     private readonly Dictionary<int, SKBitmap> _bitmapCache = new();
+    private readonly Dictionary<short, SKBitmap> _iconCache  = new();
 
     public CardRenderer(StackFile stack)
     {
@@ -64,9 +65,10 @@ public class CardRenderer
         }
 
         // Overlay field text and non-Transparent button chrome
+        var icons = GetIconCache();
         if (bg != null)
-            PartRenderer.RenderBackgroundParts(canvas, bg, card, cardImgRect);
-        PartRenderer.RenderCardParts(canvas, card, cardImgRect);
+            PartRenderer.RenderBackgroundParts(canvas, bg, card, icons, cardImgRect);
+        PartRenderer.RenderCardParts(canvas, card, icons, cardImgRect);
 
         // TODO: Phase 8 Color — apply AddColor overlays when mode == RenderMode.Color
         // and AddColor resource data is available for this card/background.
@@ -102,10 +104,36 @@ public class CardRenderer
         return skBitmap;
     }
 
+    internal IReadOnlyDictionary<short, SKBitmap> GetIconCache()
+    {
+        // Populate any icons not yet decoded
+        foreach (var (id, raw) in _stack.Icons)
+        {
+            if (_iconCache.ContainsKey(id))
+                continue;
+
+            var pixels = Core.Resources.MacResourceForkReader.DecodeIcon(raw);
+            if (pixels == null)
+                continue;
+
+            var bmp = new SKBitmap(32, 32, SKColorType.Bgra8888, SKAlphaType.Premul);
+            for (int row = 0; row < 32; row++)
+                for (int col = 0; col < 32; col++)
+                    bmp.SetPixel(col, row, pixels[row * 32 + col] ? SKColors.Black : SKColors.White);
+
+            _iconCache[id] = bmp;
+        }
+
+        return _iconCache;
+    }
+
     public void ClearCache()
     {
         foreach (var bmp in _bitmapCache.Values)
             bmp.Dispose();
         _bitmapCache.Clear();
+        foreach (var bmp in _iconCache.Values)
+            bmp.Dispose();
+        _iconCache.Clear();
     }
 }

@@ -34,6 +34,12 @@ public class HfsReader
     // Catalog record types
     private const short CatalogFileRecord = 2;
 
+    // CdrFilRec offsets from start of data record (verified against working stack extraction)
+    private const int FilDataLogEofOffset = 0x18;   // data fork logical EOF (LongInt)
+    private const int FilRsrcLogEofOffset = 0x22;   // rsrc fork logical EOF (LongInt)
+    private const int FilDataExtOffset    = 0x46;   // data fork extent record (3 × 4 bytes)
+    private const int FilRsrcExtOffset    = 0x52;   // rsrc fork extent record (3 × 4 bytes)
+
     private readonly byte[] _disk;
 
     public HfsReader(byte[] diskImage)
@@ -223,7 +229,7 @@ public class HfsReader
                 continue;
 
             // Data fork: dataLogEOF at data offset 0x18
-            int dataLogEofOff = dataStart + 0x18;
+            int dataLogEofOff = dataStart + FilDataLogEofOffset;
             if (dataLogEofOff + 4 > BtNodeSize)
                 continue;
 
@@ -232,7 +238,7 @@ public class HfsReader
                 continue;
 
             // Data fork extents at data offset 0x46 (3 extents × 4 bytes)
-            int dataExtOff = dataStart + 0x46;
+            int dataExtOff = dataStart + FilDataExtOffset;
             if (dataExtOff + 12 > BtNodeSize)
                 continue;
 
@@ -388,4 +394,109 @@ public class HfsReader
         }
         return result;
     }
+
+    /// <summary>
+    /// Scan the catalog for all STAK files and return their resource fork bytes,
+    /// keyed by file name.  Files with no resource fork data are omitted.
+    /// </summary>
+    public Dictionary<string, byte[]> EnumerateResourceForks()
+    {
+        var result = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+        if (!IsHfs())
+            return result;
+
+        try
+        {
+            var mdb = _disk.AsSpan(MdbOffset);
+            int alBlkSiz = (int)BinaryPrimitives.ReadUInt32BigEndian(mdb.Slice(MdbAlBlkSiz, 4));
+            int alBlSt   = BinaryPrimitives.ReadUInt16BigEndian(mdb.Slice(MdbAlBlSt, 2));
+
+            var ctExtRec    = mdb.Slice(MdbCtExtRec, 12);
+            var catalogData = ReadExtents(ctExtRec, alBlSt, alBlkSiz);
+            if (catalogData == null || catalogData.Length < BtNodeSize)
+                return result;
+
+            int firstLeaf = GetFirstLeafNode(catalogData);
+            if (firstLeaf < 0)
+                return result;
+
+            int nodeNum = firstLeaf;
+            while (nodeNum > 0)
+            {
+                int nodeOffset = nodeNum * BtNodeSize;
+                if (nodeOffset + BtNodeSize > catalogData.Length)
+                    break;
+
+                var node = catalogData.AsSpan(nodeOffset, BtNodeSize);
+                if (node[BtNodeKindOffset] == 0xFF) // leaf node
+                    ScanLeafNodeForResourceForks(node, BinaryPrimitives.ReadUInt16BigEndian(node.Slice(BtNumRecordsOffset, 2)), alBlSt, alBlkSiz, result);
+
+                int nextNode = (int)BinaryPrimitives.ReadUInt32BigEndian(node.Slice(0, 4));
+                nodeNum = nextNode;
+            }
+        }
+        catch
+        {
+            // Return whatever was collected before the fault.
+        }
+
+        return result;
+    }
+
+    private void ScanLeafNodeForResourceForks(ReadOnlySpan<byte> node, ushort numRecords, int alBlSt, int alBlkSiz, Dictionary<string, byte[]> results)
+    {
+        for (int r = 0; r < numRecords; r++)
+        {
+            int tablePos = BtNodeSize - 2 * (r + 1);
+            if (tablePos < 14) break;
+
+            ushort recOffset = BinaryPrimitives.ReadUInt16BigEndian(node.Slice(tablePos, 2));
+            if (recOffset < 14 || recOffset >= BtNodeSize) continue;
+
+            var rec = node.Slice(recOffset);
+            int keyLen = rec[0];
+            if (keyLen < 6 || recOffset + 1 + keyLen > BtNodeSize) continue;
+
+            int nameLen = rec[6];
+            string fileName = nameLen > 0 && 7 + nameLen <= 1 + keyLen
+                ? Encoding.ASCII.GetString(node.Slice(recOffset + 7, nameLen))
+                : "";
+
+            int dataStart = recOffset + 1 + keyLen;
+            if ((dataStart & 1) != 0) dataStart++;
+            if (dataStart + 2 > BtNodeSize) continue;
+
+            short recType = BinaryPrimitives.ReadInt16BigEndian(node.Slice(dataStart, 2));
+            if (recType != CatalogFileRecord) continue;
+
+            int finderInfoOff = dataStart + 4;
+            if (finderInfoOff + 4 > BtNodeSize) continue;
+
+            string fileType = Encoding.ASCII.GetString(node.Slice(finderInfoOff, 4));
+            if (fileType != "STAK") continue;
+
+            int rsrcLogEofOff = dataStart + FilRsrcLogEofOffset;
+            if (rsrcLogEofOff + 4 > BtNodeSize) continue;
+
+            int rsrcLogEof = (int)BinaryPrimitives.ReadUInt32BigEndian(node.Slice(rsrcLogEofOff, 4));
+            if (rsrcLogEof <= 0) continue;  // no resource fork
+
+            int rsrcExtOff = dataStart + FilRsrcExtOffset;
+            if (rsrcExtOff + 12 > BtNodeSize) continue;
+
+            var rsrcExtRec = node.Slice(rsrcExtOff, 12);
+            var rsrcData = ReadExtents(rsrcExtRec, alBlSt, alBlkSiz);
+            if (rsrcData == null || rsrcData.Length < rsrcLogEof) continue;
+
+            if (rsrcData.Length > rsrcLogEof)
+            {
+                var trimmed = new byte[rsrcLogEof];
+                Array.Copy(rsrcData, trimmed, rsrcLogEof);
+                rsrcData = trimmed;
+            }
+
+            results[fileName] = rsrcData;
+        }
+    }
 }
+

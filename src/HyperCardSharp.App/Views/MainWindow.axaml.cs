@@ -338,8 +338,7 @@ public partial class MainWindow : Window
     private async System.Threading.Tasks.Task PickAndLoadStack(
         string fileName, List<StackEntry> stacks)
     {
-        byte[] data;
-        string? stackName = null;
+        StackEntry selected;
 
         if (stacks.Count > 1)
         {
@@ -354,15 +353,16 @@ public partial class MainWindow : Window
                 return;
             }
 
-            data = stacks[selectedIndex].Data;
-            stackName = stacks[selectedIndex].Name;
+            selected = stacks[selectedIndex];
         }
         else
         {
-            data = stacks[0].Data;
+            selected = stacks[0];
         }
 
-        _viewModel.LoadStack(data, fileName, stackName);
+        _viewModel.LoadStack(selected.Data, fileName,
+            stacks.Count > 1 ? selected.Name : null,
+            selected.ResourceFork);
     }
 
     // ── Menu event handlers ────────────────────────────────────────────────────

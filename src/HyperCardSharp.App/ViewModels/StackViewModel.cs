@@ -180,7 +180,7 @@ public partial class StackViewModel : ObservableObject
     /// <summary>The display name of the current stack within the file.</summary>
     public string? CurrentStackName { get; private set; }
 
-    public void LoadStack(byte[] fileData, string fileName, string? stackName = null)
+    public void LoadStack(byte[] fileData, string fileName, string? stackName = null, byte[]? resourceFork = null)
     {
         // Quick STAK magic check: type field is at offset 4-7 in the first block header
         if (fileData.Length < 8 ||
@@ -193,7 +193,7 @@ public partial class StackViewModel : ObservableObject
         try
         {
             var parser = new StackParser();
-            _stack = parser.Parse(fileData);
+            _stack = parser.Parse(fileData, resourceFork);
             _renderer?.ClearCache();
             _renderer = new CardRenderer(_stack);
 
