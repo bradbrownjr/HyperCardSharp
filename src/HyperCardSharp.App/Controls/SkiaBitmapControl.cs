@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using HyperCardSharp.Rendering;
 using SkiaSharp;
 
 namespace HyperCardSharp.App.Controls;
@@ -30,6 +31,16 @@ public class SkiaBitmapControl : Control
     private int _placeholderW, _placeholderH;
     private bool _questionMarkVisible = true;
     private DispatcherTimer? _blinkTimer;
+
+    // ── Transition state ──────────────────────────────────────────────────────
+    private SKBitmap?        _transitionFrom;         // old card (owned by us — must dispose)
+    private SKBitmap?        _transitionTo;           // new card (alias for Source — do not dispose)
+    private SKBitmap?        _transitionFrameBitmap;  // reusable composite buffer
+    private string?          _transitionEffect;
+    private string?          _transitionSpeed;
+    private float            _transitionT;            // 0 → 1
+    private float            _transitionStep;         // added to _transitionT each tick
+    private DispatcherTimer? _transitionTimer;
 
     // Cached render transform — updated each Render() call, used for pointer hit-testing.
     private double _renderOffsetX, _renderOffsetY, _renderScale = 1.0;
@@ -151,6 +162,12 @@ public class SkiaBitmapControl : Control
     {
         _blinkTimer?.Stop();
         _blinkTimer = null;
+        _transitionTimer?.Stop();
+        _transitionTimer = null;
+        _transitionFrom?.Dispose();
+        _transitionFrom = null;
+        _transitionFrameBitmap?.Dispose();
+        _transitionFrameBitmap = null;
         base.OnDetachedFromVisualTree(e);
     }
 
@@ -184,9 +201,9 @@ public class SkiaBitmapControl : Control
         return availableSize;
     }
 
-    private void UpdateBitmap()
+    private void UpdateBitmap(SKBitmap? overrideSource = null)
     {
-        var source = Source;
+        var source = overrideSource ?? Source;
         if (source == null || source.Width <= 0 || source.Height <= 0)
         {
             _writeableBitmap = null;
@@ -293,6 +310,8 @@ public class SkiaBitmapControl : Control
 
     public override void Render(DrawingContext context)
     {
+        // During a transition, _writeableBitmap already holds the composited frame
+        // (updated by the timer tick), so normal rendering code is used unchanged.
         var bitmapToRender = _writeableBitmap;
 
         if (bitmapToRender == null)
@@ -342,6 +361,8 @@ public class SkiaBitmapControl : Control
     protected override void OnPointerReleased(Avalonia.Input.PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+        // Suppress clicks while a transition is playing.
+        if (_transitionTimer != null) return;
         if (_writeableBitmap == null || _renderScale <= 0) return;
 
         var pt = e.GetPosition(this);
@@ -376,5 +397,94 @@ public class SkiaBitmapControl : Control
     {
         base.OnPointerExited(e);
         CardPointerExited?.Invoke();
+    }
+
+    // ── Transition playback ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Begins an animated visual-effect transition between two card bitmaps.
+    /// Takes ownership of <paramref name="from"/> and disposes it when the transition ends.
+    /// </summary>
+    public void PlayTransition(
+        SKBitmap from, SKBitmap to,
+        string effect, string? speed, string? direction)
+    {
+        // Cancel any in-progress transition.
+        _transitionTimer?.Stop();
+        _transitionTimer = null;
+        _transitionFrom?.Dispose();
+
+        int durationMs = speed?.Trim().ToLowerInvariant() switch
+        {
+            "very fast" => 150,
+            "fast"      => 250,
+            "slow"      => 600,
+            "slowly"    => 600,
+            _           => 400
+        };
+
+        // Allocate (or reuse) the composite frame buffer.
+        if (_transitionFrameBitmap == null
+            || _transitionFrameBitmap.Width  != from.Width
+            || _transitionFrameBitmap.Height != from.Height)
+        {
+            _transitionFrameBitmap?.Dispose();
+            _transitionFrameBitmap = new SKBitmap(
+                from.Width, from.Height,
+                SKColorType.Bgra8888, SKAlphaType.Opaque);
+        }
+
+        _transitionFrom   = from;
+        _transitionTo     = to;
+        _transitionEffect = effect;
+        _transitionSpeed  = speed;
+        _transitionT      = 0f;
+
+        const double intervalMs = 33.3; // ~30 fps
+        _transitionStep = (float)(intervalMs / durationMs);
+
+        _transitionTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(intervalMs) };
+        _transitionTimer.Tick += OnTransitionTick;
+        _transitionTimer.Start();
+
+        // Render frame 0 immediately (shows "from" card while timer fires).
+        AdvanceTransitionFrame();
+    }
+
+    private void OnTransitionTick(object? sender, EventArgs e)
+    {
+        _transitionT += _transitionStep;
+        if (_transitionT >= 1f)
+        {
+            FinalizeTransition();
+            return;
+        }
+        AdvanceTransitionFrame();
+    }
+
+    private void AdvanceTransitionFrame()
+    {
+        if (_transitionFrom == null || _transitionTo == null || _transitionFrameBitmap == null)
+            return;
+
+        TransitionRenderer.CompositeFrame(
+            _transitionFrom, _transitionTo, _transitionFrameBitmap,
+            _transitionEffect ?? "dissolve", _transitionT);
+
+        UpdateBitmap(_transitionFrameBitmap);
+        InvalidateVisual();
+    }
+
+    private void FinalizeTransition()
+    {
+        _transitionTimer!.Stop();
+        _transitionTimer = null;
+        _transitionFrom?.Dispose();
+        _transitionFrom = null;
+        _transitionTo   = null;
+
+        // Let the normal Source pipeline take over for the final frame.
+        UpdateBitmap();
+        InvalidateVisual();
     }
 }

@@ -27,6 +27,14 @@ public class HyperTalkInterpreter
     public Func<string, string, string?> ShowAskDialog { get; set; } = (_, _) => null;
     public Action<string>            LogMessage       { get; set; } = _ => {};
 
+    /// <summary>
+    /// Called when a <c>visual effect</c> statement is encountered.
+    /// The effect fires immediately before the next <c>go</c> command is processed,
+    /// which means the callback must queue the effect; StackViewModel drains it on
+    /// the next navigation call.
+    /// </summary>
+    public Action<string, string?, string?> QueueVisualEffect { get; set; } = (_, _, _) => {};
+
     // Return value from the most-recently executed handler/function
     public HyperTalkValue ReturnValue { get; private set; } = HyperTalkValue.Empty;
 
@@ -444,7 +452,7 @@ public class HyperTalkInterpreter
 
     private ExecutionResult ExecVisualEffect(VisualEffectStatement s)
     {
-        LogMessage($"HyperTalk: visual effect '{s.Effect}' (not implemented)");
+        QueueVisualEffect(s.Effect, s.Speed, s.Direction);
         return ExecutionResult.Normal;
     }
 

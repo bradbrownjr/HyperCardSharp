@@ -128,6 +128,11 @@ public partial class MainWindow : Window
             {
                 cardDisplay.Cursor = Cursor.Default;
             };
+
+            // Visual effect transitions: StackViewModel captures from/to bitmaps and
+            // passes them here so SkiaBitmapControl can animate the switch.
+            _viewModel.TransitionRequested += (from, to, effect, speed, dir) =>
+                cardDisplay.PlayTransition(from, to, effect, speed, dir);
         }
     }
 

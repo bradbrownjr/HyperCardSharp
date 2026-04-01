@@ -48,6 +48,15 @@ public partial class StackViewModel : ObservableObject
     /// <summary>Raised when a HyperTalk script wants to show an answer dialog.</summary>
     public event Action<string>? ShowAnswerDialog;
 
+    /// <summary>
+    /// Raised when a HyperTalk <c>visual effect</c> / <c>go</c> pair fires a named transition.
+    /// from: old card bitmap (caller must dispose); to: new card bitmap (same as CurrentBitmap).
+    /// </summary>
+    public event Action<SKBitmap, SKBitmap, string, string?, string?>? TransitionRequested;
+
+    // Pending visual effect queued by the HyperTalk interpreter (cleared on next navigation).
+    private (string Effect, string? Speed, string? Direction)? _pendingEffect;
+
     public bool IsLoaded => _stack != null;
 
     public int CardWidth => _stack?.StackHeader.CardWidth ?? 640;
@@ -62,17 +71,14 @@ public partial class StackViewModel : ObservableObject
 
     private void WireInterpreterCallbacks()
     {
-        _interpreter.GoNext     = () => NextCard();
-        _interpreter.GoPrev     = () => PreviousCard();
-        _interpreter.GoFirst    = () => FirstCard();
-        _interpreter.GoLast     = () => LastCard();
+        _interpreter.GoNext     = () => NavigateTo((CurrentCardIndex + 1) % Math.Max(1, _cardOrder.Count));
+        _interpreter.GoPrev     = () => NavigateTo((CurrentCardIndex - 1 + Math.Max(1, _cardOrder.Count)) % Math.Max(1, _cardOrder.Count));
+        _interpreter.GoFirst    = () => NavigateTo(0);
+        _interpreter.GoLast     = () => NavigateTo(Math.Max(0, _cardOrder.Count - 1));
         _interpreter.GoToCardByIndex = idx =>
         {
             if (_stack == null || _cardOrder.Count == 0) return;
-            // idx is 1-based card number or direct card order index
-            int zeroIdx = Math.Clamp(idx - 1, 0, _cardOrder.Count - 1);
-            CurrentCardIndex = zeroIdx;
-            RenderCurrentCard();
+            NavigateTo(Math.Clamp(idx - 1, 0, _cardOrder.Count - 1));
         };
         _interpreter.GoToCardByName = name =>
         {
@@ -82,8 +88,7 @@ public partial class StackViewModel : ObservableObject
                 var card = _stack.Cards.FirstOrDefault(c => c.Header.Id == _cardOrder[i]);
                 if (card != null && string.Equals(card.Name, name, StringComparison.OrdinalIgnoreCase))
                 {
-                    CurrentCardIndex = i;
-                    RenderCurrentCard();
+                    NavigateTo(i);
                     return;
                 }
             }
@@ -94,10 +99,7 @@ public partial class StackViewModel : ObservableObject
             if (_stack == null || _cardOrder.Count == 0) return;
             int idx = _cardOrder.IndexOf(blockId);
             if (idx >= 0)
-            {
-                CurrentCardIndex = idx;
-                RenderCurrentCard();
-            }
+                NavigateTo(idx);
             else
                 _interpreter.LogMessage($"HyperTalk: card id {blockId} not found");
         };
@@ -115,6 +117,8 @@ public partial class StackViewModel : ObservableObject
         };
         _interpreter.GetButtonHilite = _ => null;   // read-only for now
         _interpreter.SetButtonHilite = (_, _) => { };
+        _interpreter.QueueVisualEffect = (effect, speed, dir)
+            => _pendingEffect = (effect, speed, dir);
         _interpreter.ShowDialog = msg => ShowAnswerDialog?.Invoke(msg);
         _interpreter.ShowAskDialog = (prompt, def) => null;  // non-interactive for now
         _interpreter.LogMessage = msg =>
@@ -221,32 +225,62 @@ public partial class StackViewModel : ObservableObject
     public void NextCard()
     {
         if (_stack == null || _cardOrder.Count == 0) return;
-        CurrentCardIndex = (CurrentCardIndex + 1) % _cardOrder.Count;
-        RenderCurrentCard();
+        NavigateTo((CurrentCardIndex + 1) % _cardOrder.Count);
     }
 
     [RelayCommand]
     public void PreviousCard()
     {
         if (_stack == null || _cardOrder.Count == 0) return;
-        CurrentCardIndex = (CurrentCardIndex - 1 + _cardOrder.Count) % _cardOrder.Count;
-        RenderCurrentCard();
+        NavigateTo((CurrentCardIndex - 1 + _cardOrder.Count) % _cardOrder.Count);
     }
 
     [RelayCommand]
     public void FirstCard()
     {
         if (_stack == null || _cardOrder.Count == 0) return;
-        CurrentCardIndex = 0;
-        RenderCurrentCard();
+        NavigateTo(0);
     }
 
     [RelayCommand]
     public void LastCard()
     {
         if (_stack == null || _cardOrder.Count == 0) return;
-        CurrentCardIndex = _cardOrder.Count - 1;
-        RenderCurrentCard();
+        NavigateTo(_cardOrder.Count - 1);
+    }
+
+    /// <summary>
+    /// Core navigation primitive.  Captures any pending visual effect and fires
+    /// <see cref="TransitionRequested"/> after switching cards so the UI can animate.
+    /// </summary>
+    private void NavigateTo(int newIndex)
+    {
+        if (_stack == null || _cardOrder.Count == 0) return;
+        newIndex = Math.Clamp(newIndex, 0, _cardOrder.Count - 1);
+
+        var effect = _pendingEffect;
+        _pendingEffect = null;
+
+        if (effect != null && CurrentBitmap != null && TransitionRequested != null)
+        {
+            // Clone the old bitmap — the renderer will dispose the original on the next render.
+            var fromBitmap = CurrentBitmap.Copy();
+            CurrentCardIndex = newIndex;
+            RenderCurrentCard();
+            var toBitmap = CurrentBitmap;
+            if (fromBitmap != null && toBitmap != null)
+                TransitionRequested.Invoke(
+                    fromBitmap, toBitmap,
+                    effect.Value.Effect, effect.Value.Speed, effect.Value.Direction);
+            else
+                fromBitmap?.Dispose();
+        }
+        else
+        {
+            _pendingEffect = null; // discard any stale effect if no subscriber
+            CurrentCardIndex = newIndex;
+            RenderCurrentCard();
+        }
     }
 
 
