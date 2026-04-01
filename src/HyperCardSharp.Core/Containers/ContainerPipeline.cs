@@ -66,47 +66,91 @@ public static class ContainerPipeline
     /// <summary>
     /// Like UnwrapMultiple, but returns fully enriched StackEntry records
     /// with card count, size, and resolution metadata read from the STAK header.
-    /// Resource forks are attached when the container is an HFS image (possibly
-    /// wrapped in DiskCopy), enabling ICON resource extraction.
+    /// Resource forks are attached from StuffIt archives or HFS images, enabling
+    /// ICON resource extraction.
     /// </summary>
     public static List<StackEntry> UnwrapEntries(byte[] data, Action<string>? log = null)
     {
         var tuples = UnwrapMultiple(data, log);
 
-        // Try to attach resource forks from the original container.
-        var resourceForks = TryExtractHfsResourceForks(data);
+        // ── Attach resource forks ─────────────────────────────────────────────
+        // StuffIt: a single archive entry may contain multiple stacks. Its one
+        // resource fork is shared across all extracted stacks. Attach it to all
+        // entries that don't already have an individually-named match.
+        // HFS: each stack file has its own resource fork keyed by filename.
+        var sit = new StuffItExtractor();
+        byte[]? commonRsrcFork = null;
+        Dictionary<string, byte[]>? namedRsrcForks = null;
+
+        if (sit.CanHandle(data))
+        {
+            var sitForks = sit.ExtractAllResourceForks(data);
+            if (sitForks.Count == 1)
+            {
+                // Single archive entry → share its resource fork with every extracted stack.
+                commonRsrcFork = sitForks.Values.First();
+            }
+            else if (sitForks.Count > 1)
+            {
+                namedRsrcForks = sitForks;
+            }
+        }
+        else
+        {
+            namedRsrcForks = TryExtractHfsResourceForks(data);
+        }
 
         var entries = new List<StackEntry>(tuples.Count);
         foreach (var (name, stackData) in tuples)
         {
-            resourceForks.TryGetValue(name, out var rsrcFork);
+            byte[]? rsrcFork = commonRsrcFork;
+            if (rsrcFork == null)
+                namedRsrcForks?.TryGetValue(name, out rsrcFork);
             entries.Add(StackEntry.FromRaw(name, stackData, rsrcFork));
         }
         return entries;
     }
 
     /// <summary>
-    /// Attempt to extract resource forks for all STAK files in an HFS image
-    /// (which may be wrapped in a DiskCopy container).  Returns an empty
-    /// dictionary if the data is not HFS-based.
+    /// Attempt to extract resource forks for all STAK files in an HFS image.
+    /// Handles:
+    ///   - DiskCopy 4.2 → raw HFS volume
+    ///   - Raw HFS volume at offset 0
+    ///   - Partitioned disk images where the HFS volume starts at a non-zero
+    ///     sector-aligned offset (e.g., Apple SCSI hard-disk images)
     /// </summary>
     private static Dictionary<string, byte[]> TryExtractHfsResourceForks(byte[] data)
     {
         try
         {
-            // Unwrap DiskCopy → HFS if needed
+            // 1. DiskCopy → HFS
             var dc = new DiskCopyExtractor();
-            byte[]? hfsData = dc.CanHandle(data) ? dc.Extract(data) : null;
-            if (hfsData == null)
+            if (dc.CanHandle(data))
             {
-                // Maybe data is a raw HFS volume
-                var probe = new HfsReader(data);
-                if (probe.IsHfs()) hfsData = data;
+                var hfsData = dc.Extract(data);
+                if (hfsData != null)
+                {
+                    var r = new HfsReader(hfsData);
+                    if (r.IsHfs()) return r.EnumerateResourceForks();
+                }
             }
 
-            if (hfsData != null)
+            // 2. Scan for classic HFS at any 512-byte-aligned partition offset.
+            //    The HFS Master Directory Block (MDB) signature 0xD2D7 lives at
+            //    offset +1024 from the start of the HFS volume.
+            const int sector = 512;
+            const int mdbRelOffset = 2 * sector; // = 1024
+            const ushort hfsSig = 0xD2D7;
+            var span = data.AsSpan();
+
+            for (int vStart = 0; vStart + mdbRelOffset + 2 <= data.Length; vStart += sector)
             {
-                var reader = new HfsReader(hfsData);
+                if (System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(span.Slice(vStart + mdbRelOffset, 2)) != hfsSig)
+                    continue;
+
+                // Slice from the volume start so HfsReader sees MDB at offset 1024.
+                byte[] hfsSlice = vStart == 0 ? data : data.AsSpan(vStart).ToArray();
+                var reader = new HfsReader(hfsSlice);
                 if (reader.IsHfs())
                     return reader.EnumerateResourceForks();
             }

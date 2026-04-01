@@ -28,6 +28,14 @@ public class StuffItExtractor : IContainerExtractor
     private const byte MethodHuffman = 3;
     private const byte MethodLzssHuffman = 13;
 
+    /// <summary>
+    /// Decode a Mac OS Pascal string (length-prefixed, bytes) to a .NET string.
+    /// Uses Latin-1 (ISO 8859-1) as a safe subset of Mac Roman for non-ASCII characters.
+    /// This avoids the need for System.Text.Encoding.CodePages.
+    /// </summary>
+    private static string DecodeMacName(ReadOnlySpan<byte> nameBytes)
+        => Encoding.Latin1.GetString(nameBytes);
+
     public bool CanHandle(ReadOnlySpan<byte> data)
     {
         if (data.Length < ArchiveHeaderSize)
@@ -41,6 +49,63 @@ public class StuffItExtractor : IContainerExtractor
     {
         var all = ExtractAll(data);
         return all.Count > 0 ? all[0].Data : null;
+    }
+
+    /// <summary>
+    /// Extracts resource forks for all entries in the archive.
+    /// Returns a dictionary mapping file name → decompressed resource fork bytes.
+    /// Entries with no resource fork (rsrcLen == 0) are omitted.
+    /// </summary>
+    public Dictionary<string, byte[]> ExtractAllResourceForks(byte[] data)
+    {
+        var results = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+
+        if (!CanHandle(data))
+            return results;
+
+        var span = data.AsSpan();
+        ushort numFiles = BinaryPrimitives.ReadUInt16BigEndian(span.Slice(4, 2));
+        if (numFiles == 0)
+            return results;
+
+        int pos = ArchiveHeaderSize;
+
+        for (int fileIdx = 0; fileIdx < numFiles; fileIdx++)
+        {
+            if (pos + EntryHeaderSize > span.Length)
+                break;
+
+            var entry = span.Slice(pos, EntryHeaderSize);
+
+            byte rsrcMethod = entry[0];
+
+            int nameLen = entry[2] > 63 ? 63 : entry[2];
+            string fileName = nameLen > 0
+                ? DecodeMacName(entry.Slice(3, nameLen))
+                : $"file_{fileIdx}";
+
+            int rsrcLen     = (int)BinaryPrimitives.ReadUInt32BigEndian(entry.Slice(0x54, 4));
+            int rsrcCompLen = (int)BinaryPrimitives.ReadUInt32BigEndian(entry.Slice(0x5C, 4));
+            int dataCompLen = (int)BinaryPrimitives.ReadUInt32BigEndian(entry.Slice(0x60, 4));
+
+            pos += EntryHeaderSize;
+
+            if (pos + rsrcCompLen + dataCompLen > span.Length)
+                break;
+
+            var rsrcCompData = span.Slice(pos, rsrcCompLen).ToArray();
+            pos += rsrcCompLen;
+            pos += dataCompLen;  // skip data fork
+
+            if (rsrcLen <= 0)
+                continue;
+
+            var rsrc = Decompress(rsrcMethod, rsrcCompData, rsrcLen);
+            if (rsrc != null)
+                results[fileName] = rsrc;
+        }
+
+        return results;
     }
 
     /// <summary>
@@ -77,7 +142,7 @@ public class StuffItExtractor : IContainerExtractor
                 int nameLen = entry[2];
                 if (nameLen > 63) nameLen = 63;
                 string fileName = nameLen > 0
-                    ? Encoding.GetEncoding("macintosh").GetString(entry.Slice(3, nameLen))
+                    ? DecodeMacName(entry.Slice(3, nameLen))
                     : $"stack_{fileIdx}";
 
                 string fileType = Encoding.ASCII.GetString(entry.Slice(0x42, 4));

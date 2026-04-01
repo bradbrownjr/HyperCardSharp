@@ -129,6 +129,8 @@ public static class PartRenderer
             case PartStyle.RoundRect:
             case PartStyle.Standard:
             case PartStyle.Default:
+                // Classic Mac RoundRect buttons always have a 3-px drop shadow
+                DrawRoundRectShadow(canvas, rect, ButtonCornerRadius);
                 canvas.DrawRoundRect(rect, ButtonCornerRadius, ButtonCornerRadius, fillPaint);
                 canvas.DrawRoundRect(rect, ButtonCornerRadius, ButtonCornerRadius, borderPaint);
                 // Default style gets an extra thick border (double border)
@@ -195,7 +197,19 @@ public static class PartRenderer
         if (!part.ShowName || string.IsNullOrEmpty(part.Name)) return;
 
         using var typeface  = FontMapper.GetTypeface(part.TextFontId, part.TextStyle);
-        using var labelFont = new SKFont(typeface, textSize);
+
+        // Auto-shrink font size if label is wider than the button (minimum 9pt)
+        float labelMaxWidth = rect.Width - 4f;
+        float effectiveSize = textSize;
+        while (effectiveSize > 9f)
+        {
+            using var probe = new SKFont(typeface, effectiveSize);
+            if (probe.MeasureText(part.Name) <= labelMaxWidth)
+                break;
+            effectiveSize -= 1f;
+        }
+
+        using var labelFont = new SKFont(typeface, effectiveSize);
         using var textPaint = new SKPaint { Color = SKColors.Black, IsAntialias = false };
 
         float tw = labelFont.MeasureText(part.Name);
@@ -203,15 +217,26 @@ public static class PartRenderer
 
         // Vertical position: centre in remaining text area
         float remainH = rect.Bottom - textAreaTop;
-        float ty = textAreaTop + remainH / 2f + textSize / 2f - 1f;
+        float ty = textAreaTop + remainH / 2f + effectiveSize / 2f - 1f;
 
         canvas.DrawText(part.Name, tx, ty, labelFont, textPaint);
     }
 
     /// <summary>
+    /// Draws the classic Mac 3-px bottom-and-right drop shadow for a rounded-rect button.
+    /// The shadow is drawn FIRST so the button fill paints over the top-left overlap.
+    /// </summary>
+    private static void DrawRoundRectShadow(SKCanvas canvas, SKRect rect, float radius)
+    {
+        const float sh = 3f;
+        using var shadowPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = ButtonBorderColor, IsAntialias = false };
+        var shadowRect = new SKRect(rect.Left + sh, rect.Top + sh, rect.Right + sh, rect.Bottom + sh);
+        canvas.DrawRoundRect(shadowRect, radius, radius, shadowPaint);
+    }
+
+    /// <summary>
     /// Draws a placeholder right-pointing arrow icon centred in the given square area.
-    /// Replaces a real ICON resource until icon parsing is implemented.
-    /// The arrow matches the HyperCard default "navigate-forward" icon appearance.
+    /// Used only when the ICON resource is not available in the loaded resource fork.
     /// </summary>
     private static void DrawPlaceholderIcon(SKCanvas canvas, float x, float y, float size)
     {
