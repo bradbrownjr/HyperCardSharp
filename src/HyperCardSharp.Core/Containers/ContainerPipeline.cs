@@ -97,7 +97,12 @@ public static class ContainerPipeline
         }
         else
         {
-            namedRsrcForks = TryExtractHfsResourceForks(data);
+            var hfsForks = TryExtractHfsResourceForks(data);
+            // "*" is the sentinel key for the volume-wide fallback — promote to commonRsrcFork.
+            if (hfsForks.TryGetValue("*", out var volumeFork))
+                commonRsrcFork = volumeFork;
+            else if (hfsForks.Count > 0)
+                namedRsrcForks = hfsForks;
         }
 
         var entries = new List<StackEntry>(tuples.Count);
@@ -118,6 +123,11 @@ public static class ContainerPipeline
     ///   - Raw HFS volume at offset 0
     ///   - Partitioned disk images where the HFS volume starts at a non-zero
     ///     sector-aligned offset (e.g., Apple SCSI hard-disk images)
+    ///
+    /// If the STAK files themselves carry no resource fork (rsrcLogEof == 0), falls back
+    /// to scanning ALL files on the volume looking for one that contains ICON resources.
+    /// This handles disc releases where icons are stored in a companion file rather than
+    /// embedded in the stack file's resource fork.
     /// </summary>
     private static Dictionary<string, byte[]> TryExtractHfsResourceForks(byte[] data)
     {
@@ -131,28 +141,57 @@ public static class ContainerPipeline
                 if (hfsData != null)
                 {
                     var r = new HfsReader(hfsData);
-                    if (r.IsHfs()) return r.EnumerateResourceForks();
+                    if (r.IsHfs())
+                    {
+                        var forks = r.EnumerateResourceForks();
+                        if (forks.Count > 0) return forks;
+                        return TryVolumeWideForkFallback(r);
+                    }
                 }
             }
 
-            // 2. Scan for classic HFS at any 512-byte-aligned partition offset.
-            //    The HFS Master Directory Block (MDB) signature 0xD2D7 lives at
-            //    offset +1024 from the start of the HFS volume.
+            // 2. Try the data as a raw HFS volume at offset 0 (handles images where the
+            //    HFS volume starts at the very beginning of the file).
+            {
+                var reader = new HfsReader(data);
+                if (reader.IsHfs())
+                {
+                    var forks = reader.EnumerateResourceForks();
+                    if (forks.Count > 0) return forks;
+                    return TryVolumeWideForkFallback(reader);
+                }
+            }
+
+            // 3. Scan for a partitioned disk image where the HFS volume starts at a
+            //    non-zero 512-byte-aligned sector offset (e.g., Apple SCSI hard-disk).
+            //    Pre-filter with a cheap span read before allocating a slice array.
             const int sector = 512;
-            const int mdbRelOffset = 2 * sector; // = 1024
+            const int mdbRelOffset = 2 * sector; // HFS MDB is at volume-relative offset 1024
             const ushort hfsSig = 0xD2D7;
+            const uint tsMin = 0xA8000000u;
+            const uint tsMax = 0xF8000000u;
             var span = data.AsSpan();
 
-            for (int vStart = 0; vStart + mdbRelOffset + 2 <= data.Length; vStart += sector)
+            for (int vStart = sector; vStart + mdbRelOffset + 10 <= data.Length; vStart += sector)
             {
-                if (System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(span.Slice(vStart + mdbRelOffset, 2)) != hfsSig)
-                    continue;
+                // Cheap pre-check on the candidate MDB offset before allocating.
+                ushort sig = System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(span.Slice(vStart + mdbRelOffset, 2));
+                if (sig != hfsSig)
+                {
+                    uint crDate = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(span.Slice(vStart + mdbRelOffset + 2, 4));
+                    if (crDate < tsMin || crDate > tsMax) continue;
+                }
 
-                // Slice from the volume start so HfsReader sees MDB at offset 1024.
-                byte[] hfsSlice = vStart == 0 ? data : data.AsSpan(vStart).ToArray();
+                byte[] hfsSlice = data.AsSpan(vStart).ToArray();
                 var reader = new HfsReader(hfsSlice);
-                if (reader.IsHfs())
-                    return reader.EnumerateResourceForks();
+                if (!reader.IsHfs()) continue;
+
+                var forks = reader.EnumerateResourceForks();
+                if (forks.Count > 0) return forks;
+
+                // STAK files have empty resource forks — scan all other files on the
+                // volume for ICON-bearing resource forks to use as a shared pool.
+                return TryVolumeWideForkFallback(reader);
             }
         }
         catch
@@ -160,6 +199,23 @@ public static class ContainerPipeline
             // Gracefully degrade — icons just won't be available.
         }
 
+        return new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Scans every file on the HFS volume for a resource fork that contains ICON resources.
+    /// Returns the first such fork keyed under the special entry "*" so that
+    /// <see cref="UnwrapEntries"/> can distribute it to all extracted stacks.
+    /// </summary>
+    private static Dictionary<string, byte[]> TryVolumeWideForkFallback(HfsReader reader)
+    {
+        var allForks = reader.EnumerateAllResourceForks();
+        foreach (var (_, fork) in allForks)
+        {
+            var icons = HyperCardSharp.Core.Resources.MacResourceForkReader.GetResources(fork, "ICON");
+            if (icons.Count > 0)
+                return new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase) { ["*"] = fork };
+        }
         return new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
     }
 
@@ -204,6 +260,24 @@ public static class ContainerPipeline
                     sitResults.Add((name, unwrapped));
                 }
                 return sitResults;
+            }
+
+            // HfsExtractor: enumerate all STAK files in the volume.
+            if (extractor is HfsExtractor hfsExt)
+            {
+                var hfsReader = new HfsReader(data);
+                if (hfsReader.IsHfs())
+                {
+                    var hfsStacks = hfsReader.EnumerateStacks();
+                    if (hfsStacks.Count > 0)
+                    {
+                        log?.Invoke($"HFS volume found with {hfsStacks.Count} stack(s).");
+                        return hfsStacks;
+                    }
+                    log?.Invoke("HFS volume detected but no STAK files found.");
+                }
+                // If HFS but no stacks found, fall through to next extractor
+                continue;
             }
 
             // Before RawStackScanner, try HFS+ enumeration for multi-stack support

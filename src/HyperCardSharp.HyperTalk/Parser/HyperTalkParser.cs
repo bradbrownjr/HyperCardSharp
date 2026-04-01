@@ -510,6 +510,10 @@ public class HyperTalkParser
             string? stackName = (stackNameExpr as StringLiteralExpr)?.Value;
             return new GoStatement { StackName = stackName ?? "<dynamic>" };
         }
+
+        // go [to] card [id] <expr>
+        if (Current.Type == TokenType.Card)
+        {
             Advance();
             // go to card id <expr>
             if (Current.Type == TokenType.Id)

@@ -11,14 +11,21 @@ public class HfsExtractor : IContainerExtractor
     private const ushort HfsMdbSignature = 0xD2D7;
     private const ushort HfsPlusSignature = 0x482B; // "H+"
     private const int MdbOffset = 1024; // Block 2 * 512 bytes
+    private const uint HfsMdbTimestampMin = 0xA8000000u;
+    private const uint HfsMdbTimestampMax = 0xF8000000u;
 
     public bool CanHandle(ReadOnlySpan<byte> data)
     {
-        if (data.Length < MdbOffset + 2)
+        if (data.Length < MdbOffset + 10)
             return false;
 
         ushort sig = BinaryPrimitives.ReadUInt16BigEndian(data.Slice(MdbOffset, 2));
-        return sig == HfsMdbSignature || sig == HfsPlusSignature;
+        if (sig == HfsMdbSignature || sig == HfsPlusSignature)
+            return true;
+        // Heuristic: imaging tools sometimes write non-standard sigwords.
+        // Accept if the creation-date field at MDB+2 looks like a real Mac timestamp.
+        uint crDate = BinaryPrimitives.ReadUInt32BigEndian(data.Slice(MdbOffset + 2, 4));
+        return crDate >= HfsMdbTimestampMin && crDate <= HfsMdbTimestampMax;
     }
 
     public byte[]? Extract(byte[] data)

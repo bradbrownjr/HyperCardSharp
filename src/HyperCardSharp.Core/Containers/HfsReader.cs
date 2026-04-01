@@ -15,6 +15,14 @@ public class HfsReader
     private const ushort HfsMdbSignature = 0xD2D7;
     private const int MdbOffset = SectorSize * 2; // block 2
 
+    // Some disk-image tools produce an MDB with a non-standard signature word while
+    // keeping all other MDB fields intact.  Rather than hard-coding every variant we
+    // fall back to a heuristic check: the creation-date field (at MDB+2) must look
+    // like a plausible Mac timestamp (seconds since 1904-01-01; valid range covers
+    // roughly 1980–2040 which maps to ≈0xAB8F7380–0x1040B3800 in 32-bit unsigned).
+    private const uint HfsMdbTimestampMin = 0xA8000000u;  // ≈ 1981
+    private const uint HfsMdbTimestampMax = 0xF8000000u;  // ≈ 2049
+
     // MDB field offsets (from start of MDB)
     private const int MdbSigWord = 0x00;
     private const int MdbNmAlBlks = 0x12;
@@ -49,13 +57,22 @@ public class HfsReader
 
     /// <summary>
     /// Returns true if this looks like an HFS volume.
+    /// Accepts the canonical D2D7 signature and also tries a heuristic check
+    /// (plausible creation-date timestamp) for disk images produced by tools
+    /// that write non-standard signature words.
     /// </summary>
     public bool IsHfs()
     {
-        if (_disk.Length < MdbOffset + 2)
+        if (_disk.Length < MdbOffset + 10)
             return false;
         ushort sig = BinaryPrimitives.ReadUInt16BigEndian(_disk.AsSpan(MdbOffset, 2));
-        return sig == HfsMdbSignature;
+        if (sig == HfsMdbSignature)
+            return true;
+        // Heuristic: the standard D2D7 sigword is sometimes replaced by imaging
+        // tools.  If the creation-date field at MDB+2 contains a plausible Mac
+        // timestamp, treat the volume as HFS anyway.
+        uint crDate = BinaryPrimitives.ReadUInt32BigEndian(_disk.AsSpan(MdbOffset + 2, 4));
+        return crDate >= HfsMdbTimestampMin && crDate <= HfsMdbTimestampMax;
     }
 
     /// <summary>
@@ -400,6 +417,18 @@ public class HfsReader
     /// keyed by file name.  Files with no resource fork data are omitted.
     /// </summary>
     public Dictionary<string, byte[]> EnumerateResourceForks()
+        => EnumerateResourceForksCore("STAK");
+
+    /// <summary>
+    /// Scan the catalog for ALL files (any type) and return every non-empty resource fork,
+    /// keyed by file name.  Useful for finding ICON resources in companion files when the
+    /// STAK file itself carries no resource fork.
+    /// </summary>
+    public Dictionary<string, byte[]> EnumerateAllResourceForks()
+        => EnumerateResourceForksCore(null);
+
+    // Core implementation; fileTypeFilter == null means accept any file type.
+    private Dictionary<string, byte[]> EnumerateResourceForksCore(string? fileTypeFilter)
     {
         var result = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
         if (!IsHfs())
@@ -429,7 +458,7 @@ public class HfsReader
 
                 var node = catalogData.AsSpan(nodeOffset, BtNodeSize);
                 if (node[BtNodeKindOffset] == 0xFF) // leaf node
-                    ScanLeafNodeForResourceForks(node, BinaryPrimitives.ReadUInt16BigEndian(node.Slice(BtNumRecordsOffset, 2)), alBlSt, alBlkSiz, result);
+                    ScanLeafNodeForResourceForks(node, BinaryPrimitives.ReadUInt16BigEndian(node.Slice(BtNumRecordsOffset, 2)), alBlSt, alBlkSiz, result, fileTypeFilter);
 
                 int nextNode = (int)BinaryPrimitives.ReadUInt32BigEndian(node.Slice(0, 4));
                 nodeNum = nextNode;
@@ -443,7 +472,8 @@ public class HfsReader
         return result;
     }
 
-    private void ScanLeafNodeForResourceForks(ReadOnlySpan<byte> node, ushort numRecords, int alBlSt, int alBlkSiz, Dictionary<string, byte[]> results)
+    // fileTypeFilter == null → accept any file type.
+    private void ScanLeafNodeForResourceForks(ReadOnlySpan<byte> node, ushort numRecords, int alBlSt, int alBlkSiz, Dictionary<string, byte[]> results, string? fileTypeFilter)
     {
         for (int r = 0; r < numRecords; r++)
         {
@@ -473,7 +503,7 @@ public class HfsReader
             if (finderInfoOff + 4 > BtNodeSize) continue;
 
             string fileType = Encoding.ASCII.GetString(node.Slice(finderInfoOff, 4));
-            if (fileType != "STAK") continue;
+            if (fileTypeFilter != null && fileType != fileTypeFilter) continue;
 
             int rsrcLogEofOff = dataStart + FilRsrcLogEofOffset;
             if (rsrcLogEofOff + 4 > BtNodeSize) continue;
@@ -495,7 +525,8 @@ public class HfsReader
                 rsrcData = trimmed;
             }
 
-            results[fileName] = rsrcData;
+            if (!string.IsNullOrEmpty(fileName))
+                results[fileName] = rsrcData;
         }
     }
 }

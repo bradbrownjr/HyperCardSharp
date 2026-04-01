@@ -73,6 +73,46 @@ void RunButtonDiag(string path)
     }
 }
 
+void RunHfsDiag(string path)
+{
+    var raw = File.ReadAllBytes(path);
+    Console.WriteLine($"\n=== HFS VOLUME SCAN: {System.IO.Path.GetFileName(path)} ({raw.Length} bytes) ===");
+    Console.WriteLine($"  Bytes 0-7: {string.Join(" ", raw.Take(8).Select(b => b.ToString("X2")))}");
+
+    // Check for HFS MDB signature at standard offset
+    if (raw.Length >= 1026)
+    {
+        ushort sig = System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(raw.AsSpan(1024, 2));
+        Console.WriteLine($"  Signature at offset 1024: 0x{sig:X4} ({(sig == 0xD2D7 ? "HFS MDB ✓" : "not D2D7")})");
+    }
+
+    var reader = new HyperCardSharp.Core.Containers.HfsReader(raw);
+    Console.WriteLine($"  IsHfs(): {reader.IsHfs()}");
+
+    if (reader.IsHfs())
+    {
+        Console.WriteLine("  --- STAK resource forks (per-file): ---");
+        var stakForks = reader.EnumerateResourceForks();
+        if (stakForks.Count == 0)
+            Console.WriteLine("    (none — STAK files have no resource fork)");
+        foreach (var (name, fork) in stakForks)
+        {
+            var icons = HyperCardSharp.Core.Resources.MacResourceForkReader.GetResources(fork, "ICON");
+            Console.WriteLine($"    '{name}': {fork.Length} bytes, {icons.Count} ICON(s): [{string.Join(", ", icons.Keys)}]");
+        }
+
+        Console.WriteLine("  --- ALL file resource forks on volume: ---");
+        var allForks = reader.EnumerateAllResourceForks();
+        if (allForks.Count == 0)
+            Console.WriteLine("    (no files on volume have any resource fork data)");
+        foreach (var (name, fork) in allForks.OrderByDescending(kv => kv.Value.Length))
+        {
+            var icons = HyperCardSharp.Core.Resources.MacResourceForkReader.GetResources(fork, "ICON");
+            Console.WriteLine($"    '{name}': {fork.Length} bytes rsrc fork, {icons.Count} ICON(s): [{string.Join(", ", icons.Keys)}]");
+        }
+    }
+}
+
 var paths = args.Length > 0 ? args : new[]
 {
     @"C:\Users\bradb\Nextcloud\Documents\GitHub\HyperCardSharp\samples\NEUROBLAST_Cyberdelia.sit",
@@ -81,6 +121,9 @@ var paths = args.Length > 0 ? args : new[]
 
 foreach (var p in paths)
 {
-    if (File.Exists(p)) RunButtonDiag(p);
-    else Console.WriteLine($"NOT FOUND: {p}");
+    if (!File.Exists(p)) { Console.WriteLine($"NOT FOUND: {p}"); continue; }
+    RunButtonDiag(p);
+    // For .img files also show the raw HFS volume contents
+    if (p.EndsWith(".img", StringComparison.OrdinalIgnoreCase))
+        RunHfsDiag(p);
 }
