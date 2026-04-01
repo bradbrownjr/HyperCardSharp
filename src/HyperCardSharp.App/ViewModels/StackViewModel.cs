@@ -20,6 +20,10 @@ public partial class StackViewModel : ObservableObject
     private readonly HyperTalkInterpreter _interpreter;
     private readonly MessageDispatcher _dispatcher;
 
+    // Tracks the background ID of the currently displayed card so we can detect
+    // background changes during navigation and fire openBackground / closeBackground.
+    private int _currentBackgroundId = -1;
+
     [ObservableProperty]
     private int _currentCardIndex;
 
@@ -129,6 +133,30 @@ public partial class StackViewModel : ObservableObject
             if (msg.StartsWith("HyperTalk runtime error:"))
                 StatusText = msg;
         };
+
+        // Card/stack context callbacks
+        _interpreter.GetCurrentCardNumber = () => CurrentCardIndex + 1;
+        _interpreter.GetTotalCards        = () => _cardOrder.Count;
+        _interpreter.GetCurrentCardId     = () => CurrentCard()?.Header.Id ?? 0;
+        _interpreter.GetCurrentCardName   = () => CurrentCard()?.Name ?? "";
+
+        _interpreter.LockScreen   = () => { }; // no visual lock yet
+        _interpreter.UnlockScreen = () => { };
+
+        _interpreter.SetPartVisible = (partSpec, visible) =>
+            _interpreter.LogMessage($"[HyperTalk] set visible of '{partSpec}' to {visible} — deferred");
+
+        _interpreter.GetScriptForTarget = (msg, targetStr) =>
+        {
+            var lower = targetStr.ToLowerInvariant().Trim();
+            var card = CurrentCard();
+            var bg   = card != null ? CurrentBackground(card) : null;
+            if (lower == "this card" || lower == "card")
+                return card?.Script;
+            if (lower is "this background" or "this bkgd" or "background" or "bkgd")
+                return bg?.Script;
+            return null; // button/field by name not resolved yet
+        };
     }
 
     public void HandleCardClick(float cardX, float cardY)
@@ -139,26 +167,23 @@ public partial class StackViewModel : ObservableObject
 
         var part = HitTest(cardX, cardY, card, bg);
 
-        // HyperCard message hierarchy: button → card → background → stack
-        // If the button has a mouseUp handler, run it. Otherwise, climb the hierarchy.
+        // HyperCard message hierarchy: button → card → background
+        // Stop on Handled; continue climbing on NotFound or Passed.
         if (part != null && !string.IsNullOrWhiteSpace(part.Script))
         {
-            if (_dispatcher.DispatchMessage("mouseUp", part.Script, _interpreter))
-                return;
+            var r = _dispatcher.DispatchMessage("mouseUp", part.Script, _interpreter);
+            if (r == DispatchResult.Handled) return;
         }
 
-        // Card script
         if (!string.IsNullOrWhiteSpace(card.Script))
         {
-            if (_dispatcher.DispatchMessage("mouseUp", card.Script, _interpreter))
-                return;
+            var r = _dispatcher.DispatchMessage("mouseUp", card.Script, _interpreter);
+            if (r == DispatchResult.Handled) return;
         }
 
-        // Background script
         if (bg != null && !string.IsNullOrWhiteSpace(bg.Script))
         {
-            if (_dispatcher.DispatchMessage("mouseUp", bg.Script, _interpreter))
-                return;
+            _dispatcher.DispatchMessage("mouseUp", bg.Script, _interpreter);
         }
     }
 
@@ -216,6 +241,13 @@ public partial class StackViewModel : ObservableObject
                 : $"HyperCard# — {fileName}";
             CurrentCardIndex = 0;
             RenderCurrentCard();
+
+            // Fire initial lifecycle events
+            var firstCard = CurrentCard();
+            var firstBg   = firstCard != null ? CurrentBackground(firstCard) : null;
+            _currentBackgroundId = firstCard?.BackgroundId ?? -1;
+            DispatchLifecycle("openStack", firstCard, firstBg);
+            DispatchLifecycle("openCard",  firstCard, firstBg);
         }
         catch (Exception ex)
         {
@@ -252,20 +284,38 @@ public partial class StackViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Core navigation primitive.  Captures any pending visual effect and fires
-    /// <see cref="TransitionRequested"/> after switching cards so the UI can animate.
+    /// Core navigation primitive.  Fires lifecycle events (closeCard / openCard / openBackground)
+    /// then captures any pending visual effect and raises <see cref="TransitionRequested"/>.
     /// </summary>
     private void NavigateTo(int newIndex)
     {
         if (_stack == null || _cardOrder.Count == 0) return;
         newIndex = Math.Clamp(newIndex, 0, _cardOrder.Count - 1);
 
+        // Determine old/new backgrounds before we change anything
+        var oldCard = CurrentCard();
+        var oldBg   = oldCard != null ? CurrentBackground(oldCard) : null;
+        int oldBgId = oldCard?.BackgroundId ?? -1;
+
+        int newCardBlockId = _cardOrder[newIndex];
+        var newCardObj = _stack.Cards.FirstOrDefault(c => c.Header.Id == newCardBlockId);
+        int newBgId    = newCardObj?.BackgroundId ?? -1;
+        var newBgObj   = newCardObj != null ? CurrentBackground(newCardObj) : null;
+
+        bool bgChanged = newBgId != oldBgId;
+
+        // ── 1. Close lifecycle ───────────────────────────────────────────────────
+        DispatchLifecycle("closeCard", oldCard, oldBg);
+        if (bgChanged)
+            DispatchLifecycle("closeBackground", oldCard, oldBg);
+
+        // ── 2. Capture pending effect (may have been queued by a closeCard handler)
         var effect = _pendingEffect;
         _pendingEffect = null;
 
+        // ── 3. Switch card & render ──────────────────────────────────────────────
         if (effect != null && CurrentBitmap != null && TransitionRequested != null)
         {
-            // Clone the old bitmap — the renderer will dispose the original on the next render.
             var fromBitmap = CurrentBitmap.Copy();
             CurrentCardIndex = newIndex;
             RenderCurrentCard();
@@ -279,10 +329,31 @@ public partial class StackViewModel : ObservableObject
         }
         else
         {
-            _pendingEffect = null; // discard any stale effect if no subscriber
             CurrentCardIndex = newIndex;
             RenderCurrentCard();
         }
+
+        _currentBackgroundId = newBgId;
+
+        // ── 4. Open lifecycle ────────────────────────────────────────────────────
+        if (bgChanged)
+            DispatchLifecycle("openBackground", newCardObj, newBgObj);
+        DispatchLifecycle("openCard", newCardObj, newBgObj);
+    }
+
+    /// <summary>
+    /// Dispatches a lifecycle message (e.g. openCard, closeCard) to the card script,
+    /// then to the background script if the card script returned Passed or NotFound.
+    /// </summary>
+    private void DispatchLifecycle(string handlerName, CardBlock? card, BackgroundBlock? bg)
+    {
+        if (card != null && !string.IsNullOrWhiteSpace(card.Script))
+        {
+            var r = _dispatcher.DispatchMessage(handlerName, card.Script, _interpreter);
+            if (r == DispatchResult.Handled) return;
+        }
+        if (bg != null && !string.IsNullOrWhiteSpace(bg.Script))
+            _dispatcher.DispatchMessage(handlerName, bg.Script, _interpreter);
     }
 
 

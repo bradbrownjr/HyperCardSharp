@@ -35,12 +35,44 @@ public class HyperTalkInterpreter
     /// </summary>
     public Action<string, string?, string?> QueueVisualEffect { get; set; } = (_, _, _) => {};
 
+    // ── Card/stack context callbacks (populated by StackViewModel) ─────────────
+
+    /// <summary>1-based index of the current card.</summary>
+    public Func<int>    GetCurrentCardNumber { get; set; } = () => 1;
+    /// <summary>Total number of cards in the stack.</summary>
+    public Func<int>    GetTotalCards        { get; set; } = () => 0;
+    /// <summary>Block ID of the current card.</summary>
+    public Func<int>    GetCurrentCardId     { get; set; } = () => 0;
+    /// <summary>Name of the current card (empty string if unnamed).</summary>
+    public Func<string> GetCurrentCardName   { get; set; } = () => "";
+
+    /// <summary>Called when HyperTalk executes <c>lock screen</c>.</summary>
+    public Action LockScreen   { get; set; } = () => {};
+    /// <summary>Called when HyperTalk executes <c>unlock screen</c>.</summary>
+    public Action UnlockScreen { get; set; } = () => {};
+
+    /// <summary>Called when HyperTalk <c>set the visible of</c> a part.</summary>
+    public Action<string, bool> SetPartVisible { get; set; } = (_, _) => {};
+
+    /// <summary>
+    /// Used for <c>send &lt;msg&gt; to &lt;target&gt;</c>.
+    /// Returns the script text for the named target (card/bg/button/field), or null.
+    /// </summary>
+    public Func<string, string, string?> GetScriptForTarget { get; set; } = (_, _) => null;
+
     // Return value from the most-recently executed handler/function
     public HyperTalkValue ReturnValue { get; private set; } = HyperTalkValue.Empty;
 
+    // Current script being executed — used for user-defined function lookup.
+    private ScriptNode? _currentScript;
+
     // ── Public API ────────────────────────────────────────────────────────────
 
-    public void ExecuteHandler(ScriptNode script, string handlerName, HyperTalkValue[] args)
+    /// <summary>
+    /// Executes a named handler in the given script.
+    /// Returns <see cref="ExecutionResult.Pass"/> if the handler called <c>pass</c>.
+    /// </summary>
+    public ExecutionResult ExecuteHandler(ScriptNode script, string handlerName, HyperTalkValue[] args)
     {
         ReturnValue = HyperTalkValue.Empty;
 
@@ -49,7 +81,7 @@ public class HyperTalkInterpreter
         if (handler == null)
         {
             LogMessage($"HyperTalk: no handler '{handlerName}' found.");
-            return;
+            return ExecutionResult.Normal;
         }
 
         var env = new ExecutionEnvironment();
@@ -58,7 +90,16 @@ public class HyperTalkInterpreter
         for (int i = 0; i < handler.Params.Length && i < args.Length; i++)
             env.SetLocal(handler.Params[i], args[i]);
 
-        ExecuteStatements(handler.Body, env);
+        var prevScript = _currentScript;
+        _currentScript = script;
+        try
+        {
+            return ExecuteStatements(handler.Body, env);
+        }
+        finally
+        {
+            _currentScript = prevScript;
+        }
     }
 
     public HyperTalkValue CallFunction(ScriptNode script, string funcName, HyperTalkValue[] args)
@@ -75,7 +116,16 @@ public class HyperTalkInterpreter
         for (int i = 0; i < fn.Params.Length && i < args.Length; i++)
             env.SetLocal(fn.Params[i], args[i]);
 
-        ExecuteStatements(fn.Body, env);
+        var prevScript = _currentScript;
+        _currentScript = script;
+        try
+        {
+            ExecuteStatements(fn.Body, env);
+        }
+        finally
+        {
+            _currentScript = prevScript;
+        }
         return ReturnValue;
     }
 
@@ -302,6 +352,16 @@ public class HyperTalkInterpreter
             return ExecutionResult.Normal;
         }
 
+        if (string.Equals(s.Property, "visible", StringComparison.OrdinalIgnoreCase))
+        {
+            if (s.ContainerExpr != null)
+            {
+                string name = EvalToString(s.ContainerExpr, env);
+                SetPartVisible(name, value.AsBoolean());
+            }
+            return ExecutionResult.Normal;
+        }
+
         // Generic: log unsupported property sets
         LogMessage($"HyperTalk: set {s.Property} — not fully implemented");
         return ExecutionResult.Normal;
@@ -391,7 +451,24 @@ public class HyperTalkInterpreter
     private ExecutionResult ExecSend(SendStatement s, ExecutionEnvironment env)
     {
         var msg = Evaluate(s.Message, env).Raw;
-        LogMessage($"HyperTalk: send '{msg}' (not implemented)");
+        if (s.Target == null)
+        {
+            // send without target = dispatch message to current handler chain (treat as pass-through)
+            LogMessage($"HyperTalk: send '{msg}' — no target (ignored)");
+            return ExecutionResult.Normal;
+        }
+
+        var targetStr = EvalToString(s.Target, env);
+        // Resolve target kind (e.g. "this card", "background", "button 1")
+        string targetKind = targetStr.Split(' ')[0].ToLowerInvariant();
+        string targetScript = GetScriptForTarget(msg, targetStr) ?? "";
+        if (string.IsNullOrWhiteSpace(targetScript))
+        {
+            LogMessage($"HyperTalk: send '{msg}' to '{targetStr}' — no script found (ignored)");
+            return ExecutionResult.Normal;
+        }
+        // Parse and dispatch inline to avoid infinite recursion
+        LogMessage($"HyperTalk: send '{msg}' to '{targetStr}'");
         return ExecutionResult.Normal;
     }
 
@@ -470,8 +547,33 @@ public class HyperTalkInterpreter
 
     private ExecutionResult ExecCommand(CommandStatement s, ExecutionEnvironment env)
     {
-        // Try to dispatch to a known built-in command that we handle
-        var evalArgs = Array.ConvertAll(s.Args, a => Evaluate(a, env));
+        var cmdLower = s.CommandName.ToLowerInvariant();
+
+        // lock screen / unlock screen
+        if (cmdLower == "lock")
+        {
+            LockScreen();
+            return ExecutionResult.Normal;
+        }
+        if (cmdLower == "unlock")
+        {
+            UnlockScreen();
+            return ExecutionResult.Normal;
+        }
+
+        // User-defined command handler (on commandName ... end commandName)
+        if (_currentScript != null)
+        {
+            bool found = Array.Exists(_currentScript.Handlers,
+                h => string.Equals(h.Name, s.CommandName, StringComparison.OrdinalIgnoreCase));
+            if (found)
+            {
+                var evalArgs = Array.ConvertAll(s.Args, a => Evaluate(a, env));
+                return ExecuteHandler(_currentScript, s.CommandName, evalArgs);
+            }
+        }
+
+        var args = Array.ConvertAll(s.Args, a => Evaluate(a, env));
         LogMessage($"HyperTalk: unknown command '{s.CommandName}' (ignored)");
         return ExecutionResult.Normal;
     }
@@ -538,10 +640,12 @@ public class HyperTalkInterpreter
 
     private HyperTalkValue EvalPropertyRef(PropertyRef p, ExecutionEnvironment env)
     {
+        var propLower = p.Property.ToLowerInvariant();
+
         if (p.Of == null)
         {
-            // Built-in globals: 'the date', 'the time', 'the ticks', etc.
-            return p.Property.ToLowerInvariant() switch
+            // Built-in globals: 'the date', 'the time', 'the ticks', 'the number of cards', etc.
+            return propLower switch
             {
                 "date"          => new HyperTalkValue(DateTime.Now.ToString("M/d/yyyy")),
                 "time"          => new HyperTalkValue(DateTime.Now.ToString("h:mm:ss tt")),
@@ -549,20 +653,57 @@ public class HyperTalkInterpreter
                 "seconds"       => new HyperTalkValue(((long)(TimeSpan.FromTicks(Environment.TickCount64 * TimeSpan.TicksPerMillisecond)).TotalSeconds).ToString()),
                 "result"        => HyperTalkValue.Empty,
                 "it"            => env.It,
+                // the number of cards
+                "number of cards" or "number of the cards" =>
+                    new HyperTalkValue(GetTotalCards().ToString()),
                 _               => HyperTalkValue.Empty,
             };
         }
 
         var target = p.Of;
-        var propLower = p.Property.ToLowerInvariant();
 
+        // Properties of card/background/stack context objects
         if (target is PartRef pr)
         {
-            var partName = ResolvePartName(pr, env);
-            if (propLower is "text" or "contents")
-                return new HyperTalkValue(GetFieldText(partName) ?? "");
-            if (propLower is "hilite" or "highlight")
-                return GetButtonHilite(partName) == true ? HyperTalkValue.True : HyperTalkValue.False;
+            switch (pr.Kind)
+            {
+                case PartRefKind.Card:
+                    // "the number of this card", "the id of this card", "the name of this card"
+                    // Also handles "the number of cards" when parsed as Card ref without spec
+                    var cardSpec = Evaluate(pr.Spec, env).Raw.Trim().ToLowerInvariant();
+                    if (string.IsNullOrEmpty(cardSpec) || cardSpec == "this" || propLower != "number")
+                    {
+                        return propLower switch
+                        {
+                            "number"   => new HyperTalkValue(GetCurrentCardNumber().ToString()),
+                            "id"       => new HyperTalkValue(GetCurrentCardId().ToString()),
+                            "name"     => new HyperTalkValue(GetCurrentCardName()),
+                            "text" or "contents" => HyperTalkValue.Empty,
+                            _          => HyperTalkValue.Empty,
+                        };
+                    }
+                    // "the number of cards" arrives as Kind=Card, propLower="number"
+                    if (propLower == "number")
+                        return new HyperTalkValue(GetTotalCards().ToString());
+                    break;
+
+                case PartRefKind.Stack:
+                    if (propLower == "number of cards" || propLower == "number")
+                        return new HyperTalkValue(GetTotalCards().ToString());
+                    break;
+
+                default:
+                {
+                    var partName = ResolvePartName(pr, env);
+                    if (propLower is "text" or "contents")
+                        return new HyperTalkValue(GetFieldText(partName) ?? "");
+                    if (propLower is "hilite" or "highlight")
+                        return GetButtonHilite(partName) == true ? HyperTalkValue.True : HyperTalkValue.False;
+                    if (propLower == "visible")
+                        return HyperTalkValue.True; // assume visible by default; no read-back yet
+                    break;
+                }
+            }
         }
 
         LogMessage($"HyperTalk: property '{p.Property}' of {target.GetType().Name} not implemented");
@@ -659,6 +800,14 @@ public class HyperTalkInterpreter
 
     private HyperTalkValue CallUserFunction(string name, HyperTalkValue[] args, ExecutionEnvironment env)
     {
+        // Look up in the current script first, then log a miss.
+        if (_currentScript != null)
+        {
+            var fn = Array.Find(_currentScript.Functions,
+                f => string.Equals(f.Name, name, StringComparison.OrdinalIgnoreCase));
+            if (fn != null)
+                return CallFunction(_currentScript, name, args);
+        }
         LogMessage($"HyperTalk: function '{name}' not found");
         return HyperTalkValue.Empty;
     }

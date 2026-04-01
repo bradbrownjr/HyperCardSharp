@@ -6,6 +6,19 @@ using HyperCardSharp.HyperTalk.Parser;
 namespace HyperCardSharp.HyperTalk.MessagePassing;
 
 /// <summary>
+/// Result returned by <see cref="MessageDispatcher.DispatchMessage"/>.
+/// </summary>
+public enum DispatchResult
+{
+    /// <summary>No matching handler was found.</summary>
+    NotFound,
+    /// <summary>A handler was found and ran to completion without calling <c>pass</c>.</summary>
+    Handled,
+    /// <summary>A handler was found but it ended with <c>pass</c>, signalling the caller to continue up the hierarchy.</summary>
+    Passed,
+}
+
+/// <summary>
 /// Parses HyperTalk scripts, caches the resulting ASTs, and dispatches messages (handler calls).
 /// </summary>
 public class MessageDispatcher
@@ -23,17 +36,20 @@ public class MessageDispatcher
     }
 
     /// <summary>
-    /// Dispatches a message to a script. Returns true if a matching handler was found and executed.
+    /// Dispatches a message to a script.
+    /// Returns <see cref="DispatchResult.Handled"/> if a handler ran to completion,
+    /// <see cref="DispatchResult.Passed"/> if the handler called <c>pass</c>,
+    /// or <see cref="DispatchResult.NotFound"/> if no matching handler exists.
     /// The script text is lexed and parsed once, then cached by content hash.
     /// </summary>
-    public bool DispatchMessage(
+    public DispatchResult DispatchMessage(
         string handlerName,
         string scriptText,
         HyperTalkInterpreter interpreter,
         HyperTalkValue[]? args = null)
     {
         if (string.IsNullOrWhiteSpace(scriptText))
-            return false;
+            return DispatchResult.NotFound;
 
         ScriptNode script;
         try
@@ -43,7 +59,7 @@ public class MessageDispatcher
         catch (Exception ex)
         {
             Log($"[HyperTalk] Parse error in script: {ex.Message}");
-            return false;
+            return DispatchResult.NotFound;
         }
 
         // Check whether the handler exists
@@ -51,18 +67,20 @@ public class MessageDispatcher
             h => string.Equals(h.Name, handlerName, StringComparison.OrdinalIgnoreCase));
 
         if (!found)
-            return false;
+            return DispatchResult.NotFound;
 
+        ExecutionResult execResult;
         try
         {
-            interpreter.ExecuteHandler(script, handlerName, args ?? []);
+            execResult = interpreter.ExecuteHandler(script, handlerName, args ?? []);
         }
         catch (Exception ex)
         {
             Log($"[HyperTalk] Runtime error in '{handlerName}': {ex.Message}");
+            return DispatchResult.Handled;
         }
 
-        return true;
+        return execResult == ExecutionResult.Pass ? DispatchResult.Passed : DispatchResult.Handled;
     }
 
     private ScriptNode GetOrParseScript(string scriptText)
