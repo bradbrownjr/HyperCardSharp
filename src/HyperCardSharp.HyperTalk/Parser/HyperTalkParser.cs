@@ -496,6 +496,14 @@ public class HyperTalkParser
         if (Current.Type == TokenType.Card)
         {
             Advance();
+            // go to card id <expr>
+            if (Current.Type == TokenType.Id)
+            {
+                Advance();
+                var idExpr = ParseExpr();
+                SkipToNextNewline();
+                return new GoStatement { CardExpr = idExpr, CardById = true };
+            }
             var cardExpr = ParseExpr();
             SkipToNextNewline();
             return new GoStatement { CardExpr = cardExpr };

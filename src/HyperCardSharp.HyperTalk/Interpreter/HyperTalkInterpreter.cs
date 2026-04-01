@@ -14,6 +14,7 @@ public class HyperTalkInterpreter
 
     public Action<int>          GoToCardByIndex  { get; set; } = _ => {};
     public Action<string>       GoToCardByName   { get; set; } = _ => {};
+    public Action<int>          GoToCardById     { get; set; } = _ => {};
     public Action               GoNext           { get; set; } = () => {};
     public Action               GoPrev           { get; set; } = () => {};
     public Action               GoFirst          { get; set; } = () => {};
@@ -321,7 +322,14 @@ public class HyperTalkInterpreter
         else if (s.CardExpr != null)
         {
             var val = Evaluate(s.CardExpr, env);
-            if (val.TryAsNumber(out double n))
+            if (s.CardById)
+            {
+                if (val.TryAsNumber(out double id))
+                    GoToCardById((int)id);
+                else
+                    LogMessage($"HyperTalk: go to card id '{val.Raw}' — expected numeric id");
+            }
+            else if (val.TryAsNumber(out double n))
                 GoToCardByIndex((int)n); // pass 1-based; callback converts to 0-based index
             else
                 GoToCardByName(val.Raw);

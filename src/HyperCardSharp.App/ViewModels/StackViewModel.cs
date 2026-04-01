@@ -89,6 +89,18 @@ public partial class StackViewModel : ObservableObject
             }
             _interpreter.LogMessage($"HyperTalk: card \"{name}\" not found");
         };
+        _interpreter.GoToCardById = blockId =>
+        {
+            if (_stack == null || _cardOrder.Count == 0) return;
+            int idx = _cardOrder.IndexOf(blockId);
+            if (idx >= 0)
+            {
+                CurrentCardIndex = idx;
+                RenderCurrentCard();
+            }
+            else
+                _interpreter.LogMessage($"HyperTalk: card id {blockId} not found");
+        };
         _interpreter.GetFieldText = fieldSpec =>
         {
             var card = CurrentCard();
