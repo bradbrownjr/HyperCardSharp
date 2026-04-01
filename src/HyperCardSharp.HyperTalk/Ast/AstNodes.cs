@@ -101,6 +101,9 @@ public sealed class GoStatement : StatementNode
     public ExprNode? CardExpr { get; init; }
     public bool CardById { get; init; }
     public bool CardByNumber { get; init; }
+    // Cross-stack navigation (go [to] stack "name" / go home)
+    public string? StackName { get; init; }   // null = not a stack-level go
+    public bool IsHome { get; init; }         // go home
 }
 
 public sealed class VisualEffectStatement : StatementNode

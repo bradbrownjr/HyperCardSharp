@@ -315,6 +315,18 @@ public class HyperTalkInterpreter
 
     private ExecutionResult ExecGo(GoStatement s, ExecutionEnvironment env)
     {
+        // Cross-stack navigation: go home / go to stack "name" — not supported in single-stack player
+        if (s.IsHome)
+        {
+            LogMessage("HyperTalk: go home — Home stack not available (graceful no-op)");
+            return ExecutionResult.Normal;
+        }
+        if (s.StackName != null)
+        {
+            LogMessage($"HyperTalk: go to stack \"{s.StackName}\" — cross-stack navigation not supported (graceful no-op)");
+            return ExecutionResult.Normal;
+        }
+
         if (s.NamedTarget.HasValue)
         {
             switch (s.NamedTarget.Value)

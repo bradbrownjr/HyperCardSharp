@@ -493,8 +493,23 @@ public class HyperTalkParser
             SkipToNextNewline();
             return new GoStatement { NamedTarget = GoTarget.Forth };
         }
-        if (Current.Type == TokenType.Card)
+        // go home — navigate to HyperCard Home stack (unsupported in single-stack player, graceful no-op)
+        if (Current.Type is TokenType.Identifier && Current.Text.Equals("home", StringComparison.OrdinalIgnoreCase))
         {
+            Advance();
+            SkipToNextNewline();
+            return new GoStatement { IsHome = true };
+        }
+        // go [to] stack "name" [in new window] — cross-stack navigation (graceful no-op)
+        if (Current.Type == TokenType.Stack)
+        {
+            Advance(); // consume 'stack'
+            var stackNameExpr = ParseExpr(); // stack name expression
+            SkipToNextNewline();
+            // Evaluate statically if it's a string literal; otherwise leave null
+            string? stackName = (stackNameExpr as StringLiteralExpr)?.Value;
+            return new GoStatement { StackName = stackName ?? "<dynamic>" };
+        }
             Advance();
             // go to card id <expr>
             if (Current.Type == TokenType.Id)

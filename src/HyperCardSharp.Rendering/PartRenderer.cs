@@ -171,12 +171,13 @@ public static class PartRenderer
 
         if (hasIcon)
         {
-            // Scale the icon to fit inside the button with 2px padding.
+            // HyperCard renders ICON resources at their native 32×32 size — never upscaled.
+            // We only scale DOWN when the button is smaller than 32px in either dimension.
             const float iconPad = 2f;
             float iconAreaH = part.ShowName && !string.IsNullOrEmpty(part.Name)
                 ? rect.Height * 0.65f
                 : rect.Height - iconPad * 2;
-            float iconSize = Math.Min(rect.Width - iconPad * 2, iconAreaH);
+            float iconSize = Math.Min(Math.Min(rect.Width - iconPad * 2, iconAreaH), 32f);
             float iconX = rect.MidX - iconSize / 2f;
             float iconY = rect.Top + iconPad;
 
@@ -201,8 +202,9 @@ public static class PartRenderer
 
         using var typeface  = FontMapper.GetTypeface(part.TextFontId, part.TextStyle);
 
-        // Auto-shrink font size if label is wider than the button (minimum 9pt)
-        float labelMaxWidth = rect.Width - 4f;
+        // Auto-shrink font size if label is wider than the button (minimum 9pt).
+        // 6px total horizontal margin (3px each side) matches HyperCard's Chicago font metrics.
+        float labelMaxWidth = rect.Width - 6f;
         float effectiveSize = textSize;
         while (effectiveSize > 9f)
         {
