@@ -7,13 +7,11 @@ namespace HyperCardSharp.Rendering;
 /// <summary>
 /// Overlays part visuals (field text, button chrome) onto a rendered card.
 ///
-/// Architecture note: HyperCard stores button and field border graphics baked into
-/// the WOBA bitmap. The bitmap already includes the visual appearance of most parts.
-/// PartRenderer's primary job is therefore to render field TEXT CONTENT, which is
-/// stored separately in PartContent records and is not in the WOBA bitmap.
-///
-/// Button outlines are drawn only for styles that are not painted into the WOBA
-/// (Transparent and Opaque), so they appear as visible interactive regions.
+/// Rendering model:
+/// 1. The WOBA bitmap is drawn first — this is purely the painted artwork layer.
+/// 2. PartRenderer then draws all visible parts ON TOP of the WOBA, exactly as
+///    HyperCard's runtime does.  Button chrome (white fill, border, icon, label)
+///    is always rendered dynamically; it is never baked into the WOBA.
 /// </summary>
 public static class PartRenderer
 {
@@ -63,12 +61,8 @@ public static class PartRenderer
 
     /// <summary>
     /// Renders card-local part content (field text) and non-Transparent button chrome.
-    /// Button chrome is always drawn to guarantee visibility even for buttons that are
-    /// outside the card WOBA's imgRect (i.e. never baked into the bitmap).
+    /// Button chrome is always drawn since HyperCard renders it dynamically over the WOBA.
     /// </summary>
-    /// <param name="wobaImgRect">The WOBA image rect for this card, or null if unknown.
-    /// Buttons that fall fully inside the WOBA imgRect already have their outline baked
-    /// in; we skip re-rendering their name text to avoid double-drawing.</param>
     public static void RenderCardParts(SKCanvas canvas, CardBlock card,
         (int Left, int Top, int Right, int Bottom)? wobaImgRect = null)
     {
@@ -99,23 +93,21 @@ public static class PartRenderer
     private const float ButtonCornerRadius = 8f;
 
     /// <summary>
-    /// Draws the outline and optional name label of a non-Transparent button.
-    /// Uses stroke-only rendering so it overlays cleanly on top of the WOBA bitmap
-    /// without erasing any baked-in pixels.
+    /// Draws full HyperCard button chrome: white fill, outline, icon (if any), and label.
+    ///
+    /// HyperCard always renders button chrome OVER the WOBA bitmap at runtime —
+    /// the WOBA only stores the painted artwork, never button visuals.  So we
+    /// always draw the full chrome regardless of the WOBA imgRect.
     /// </summary>
-    /// <param name="wobaImgRect">When provided, name text is only rendered for
-    /// buttons that fall (even partially) outside the WOBA image rect — those
-    /// buttons were never baked into the WOBA so their label would otherwise be
-    /// invisible.</param>
-    private static void RenderButtonChrome(
-        SKCanvas canvas, Part part,
+    private static void RenderButtonChrome(SKCanvas canvas, Part part,
         (int Left, int Top, int Right, int Bottom)? wobaImgRect)
     {
-        if (part.Style == PartStyle.Transparent) return;  // intentionally invisible
+        if (part.Style == PartStyle.Transparent) return;  // click zone only, no visual
         if (part.Width <= 0 || part.Height <= 0) return;
 
         var rect = new SKRect(part.Left, part.Top, part.Right, part.Bottom);
 
+        using var fillPaint  = new SKPaint { Style = SKPaintStyle.Fill,   Color = SKColors.White };
         using var borderPaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
@@ -124,72 +116,117 @@ public static class PartRenderer
             IsAntialias = false
         };
 
-        if (part.Style == PartStyle.Opaque)
-        {
-            // Opaque: white fill, no border
-            using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = SKColors.White };
-            canvas.DrawRect(rect, fillPaint);
-            return;
-        }
-
-        // Draw outline based on style
         switch (part.Style)
         {
+            case PartStyle.Opaque:
+                // White fill, no border
+                canvas.DrawRect(rect, fillPaint);
+                return;
+
             case PartStyle.RoundRect:
             case PartStyle.Standard:
             case PartStyle.Default:
-            case PartStyle.Oval:
+                canvas.DrawRoundRect(rect, ButtonCornerRadius, ButtonCornerRadius, fillPaint);
                 canvas.DrawRoundRect(rect, ButtonCornerRadius, ButtonCornerRadius, borderPaint);
+                // Default style gets an extra thick border (double border)
+                if (part.Style == PartStyle.Default)
+                {
+                    var innerRect = new SKRect(rect.Left + 3, rect.Top + 3, rect.Right - 3, rect.Bottom - 3);
+                    canvas.DrawRoundRect(innerRect, ButtonCornerRadius - 2, ButtonCornerRadius - 2, borderPaint);
+                }
                 break;
+
+            case PartStyle.Oval:
+                canvas.DrawOval(rect, fillPaint);
+                canvas.DrawOval(rect, borderPaint);
+                break;
+
             case PartStyle.Shadow:
+                canvas.DrawRect(rect, fillPaint);
                 canvas.DrawRect(rect, borderPaint);
                 using (var shadowPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = ButtonBorderColor })
                 {
-                    // Simple 3px drop-shadow on right and bottom
-                    canvas.DrawRect(new SKRect(rect.Left + 3, rect.Bottom, rect.Right + 3, rect.Bottom + 3), shadowPaint);
-                    canvas.DrawRect(new SKRect(rect.Right, rect.Top + 3, rect.Right + 3, rect.Bottom + 3), shadowPaint);
+                    canvas.DrawRect(new SKRect(rect.Left + 3, rect.Bottom,     rect.Right + 3, rect.Bottom + 3), shadowPaint);
+                    canvas.DrawRect(new SKRect(rect.Right,    rect.Top   + 3,  rect.Right + 3, rect.Bottom + 3), shadowPaint);
                 }
                 break;
-            default:  // Rectangle, CheckBox, RadioButton, etc.
+
+            default:  // Rectangle, CheckBox, RadioButton
+                canvas.DrawRect(rect, fillPaint);
                 canvas.DrawRect(rect, borderPaint);
                 break;
         }
 
-        // Draw button name if the button's label is not already baked into the WOBA.
-        // A button's label is considered "in the WOBA" when its full rect is contained
-        // within the WOBA image rect.  If any part falls outside, we render the label
-        // ourselves to ensure visibility.
-        if (!part.ShowName || string.IsNullOrEmpty(part.Name)) return;
-
-        bool outsideWoba = wobaImgRect is null ||
-            part.Left  < wobaImgRect.Value.Left  ||
-            part.Top   < wobaImgRect.Value.Top   ||
-            part.Right > wobaImgRect.Value.Right  ||
-            part.Bottom > wobaImgRect.Value.Bottom;
-
-        if (!outsideWoba) return;  // label already baked in WOBA
-
-        // Draw the label centred in the button rect (white backdrop first so it's legible)
-        float cx = rect.MidX;
-        float cy = rect.MidY;
+        // ─ Icon ────────────────────────────────────────────────────────────────
+        // TODO: render actual icon bitmap from ICON resources once we parse them.
+        // For now, use a placeholder so icon-style buttons are visually identifiable.
+        bool hasIcon = part.IconId != 0;
         float textSize = part.TextSize > 0 ? part.TextSize : 12f;
 
-        using var typeface = FontMapper.GetTypeface(part.TextFontId, part.TextStyle);
+        // Area available for text
+        float textAreaTop = rect.Top;
+
+        if (hasIcon)
+        {
+            // Scale the icon to fit inside the button with 2px padding.
+            const float iconPad = 2f;
+            float iconAreaH = part.ShowName && !string.IsNullOrEmpty(part.Name)
+                ? rect.Height * 0.65f
+                : rect.Height - iconPad * 2;
+            float iconSize = Math.Min(rect.Width - iconPad * 2, iconAreaH);
+            float iconX = rect.MidX - iconSize / 2f;
+            float iconY = rect.Top + iconPad;
+
+            DrawPlaceholderIcon(canvas, iconX, iconY, iconSize);
+
+            textAreaTop = iconY + iconSize;
+        }
+
+        // ─ Label ────────────────────────────────────────────────────────────────
+        if (!part.ShowName || string.IsNullOrEmpty(part.Name)) return;
+
+        using var typeface  = FontMapper.GetTypeface(part.TextFontId, part.TextStyle);
         using var labelFont = new SKFont(typeface, textSize);
         using var textPaint = new SKPaint { Color = SKColors.Black, IsAntialias = false };
 
         float tw = labelFont.MeasureText(part.Name);
-        float th = textSize;
-        float tx = cx - tw / 2f;
-        float ty = cy + th / 2f - 1f;
+        float tx = rect.MidX - tw / 2f;
 
-        // White backdrop behind text so it pops against any WOBA content
-        using var backdropPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = SKColors.White };
-        canvas.DrawRect(new SKRect(tx - 1, ty - th, tx + tw + 1, ty + 2), backdropPaint);
+        // Vertical position: centre in remaining text area
+        float remainH = rect.Bottom - textAreaTop;
+        float ty = textAreaTop + remainH / 2f + textSize / 2f - 1f;
+
         canvas.DrawText(part.Name, tx, ty, labelFont, textPaint);
     }
 
-    // Kept for backwards compatibility with any callers.
-    [System.Obsolete("Use RenderCardParts / RenderBackgroundParts — button chrome is now included there.")]
-    public static void RenderInvisibleButtons(SKCanvas canvas, IEnumerable<Part> parts) { }
+    /// <summary>
+    /// Draws a placeholder right-pointing arrow icon centred in the given square area.
+    /// Replaces a real ICON resource until icon parsing is implemented.
+    /// The arrow matches the HyperCard default "navigate-forward" icon appearance.
+    /// </summary>
+    private static void DrawPlaceholderIcon(SKCanvas canvas, float x, float y, float size)
+    {
+        // Arrow: a right-facing triangle occupying roughly the inner 60% of the icon square.
+        float pad = size * 0.2f;
+        float ax = x + pad;
+        float ay = y + size / 2f;       // tip left-center
+        float bx = x + size - pad;
+        float by = y + size / 2f;       // tip right (arrowhead point)
+        float headH = size * 0.35f;     // half-height of arrowhead
+
+        using var path = new SKPath();
+        // Arrowhead triangle
+        path.MoveTo(bx,           by);
+        path.LineTo(bx - headH,   by - headH);
+        path.LineTo(bx - headH,   by - headH * 0.4f);
+        // Shaft
+        path.LineTo(ax,           by - headH * 0.4f);
+        path.LineTo(ax,           by + headH * 0.4f);
+        path.LineTo(bx - headH,   by + headH * 0.4f);
+        path.LineTo(bx - headH,   by + headH);
+        path.Close();
+
+        using var iconPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = SKColors.Black, IsAntialias = true };
+        canvas.DrawPath(path, iconPaint);
+    }
 }
