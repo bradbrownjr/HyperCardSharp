@@ -30,10 +30,10 @@ public static class PartRenderer
         HyperCardSharp.Core.Stack.FontTableBlock? fontTable = null)
     {
         // Build a lookup of card-specific content for background parts.
-        // Per the HC format: background part IDs in card.PartContents are stored as negative values.
+        // Per the HC format: in card.PartContents, POSITIVE IDs = background parts (per-card override).
         var cardBgContentFull = card.PartContents
-            .Where(pc => pc.PartId < 0)
-            .ToDictionary(pc => (short)(-pc.PartId), pc => pc);
+            .Where(pc => pc.PartId > 0)
+            .ToDictionary(pc => pc.PartId, pc => pc);
 
         // Shared background content (same on every card that uses this background)
         var sharedBgContentFull = bg.PartContents
@@ -75,10 +75,10 @@ public static class PartRenderer
         HyperCardSharp.Core.Stack.StyleTableBlock? styleTable = null,
         HyperCardSharp.Core.Stack.FontTableBlock? fontTable = null)
     {
-        // Card part content entries have positive IDs matching card.Parts
+        // Per the HC format: in card.PartContents, NEGATIVE IDs = card-local parts (key = -partId).
         var contentLookup = card.PartContents
-            .Where(pc => pc.PartId > 0)
-            .ToDictionary(pc => pc.PartId, pc => pc);
+            .Where(pc => pc.PartId < 0)
+            .ToDictionary(pc => (short)(-pc.PartId), pc => pc);
 
         foreach (var part in card.Parts)
         {
