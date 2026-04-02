@@ -1,5 +1,7 @@
 # HyperCard#
 
+[![Build and Test](https://github.com/bradbrownjr/HyperCardSharp/actions/workflows/build.yml/badge.svg)](https://github.com/bradbrownjr/HyperCardSharp/actions/workflows/build.yml)
+
 **Open your old HyperCard stacks again — on Windows, Mac, or Linux.**
 
 Remember HyperCard? The creative tool that shipped with every Macintosh, where anyone could build interactive stacks of cards with buttons, fields, graphics, sounds, and scripts — no programming degree required. Bill Atkinson's vision of "programming for the rest of us" inspired a generation of teachers, artists, students, and tinkerers.

@@ -46,7 +46,8 @@
                            Foreground="#000000"
                            HorizontalAlignment="Center"/>
 
-                <TextBlock Text="Version 0.1 (alpha)"
+                <TextBlock x:Name="VersionText"
+                           Text="Version 0.2 (alpha)"
                            FontSize="12" Foreground="#000000"
                            HorizontalAlignment="Center"/>
 

@@ -12,12 +12,17 @@ public class Part
     public short PartId { get; init; }
     public PartType Type { get; init; }
     public byte Flags { get; init; }
-    public ushort Top { get; init; }
-    public ushort Left { get; init; }
-    public ushort Bottom { get; init; }
-    public ushort Right { get; init; }
+    /// <summary>Top coordinate of the part rect. Settable by HyperTalk.</summary>
+    public ushort Top { get; set; }
+    /// <summary>Left coordinate of the part rect. Settable by HyperTalk.</summary>
+    public ushort Left { get; set; }
+    /// <summary>Bottom coordinate of the part rect. Settable by HyperTalk.</summary>
+    public ushort Bottom { get; set; }
+    /// <summary>Right coordinate of the part rect. Settable by HyperTalk.</summary>
+    public ushort Right { get; set; }
     public byte MoreFlags { get; init; }
-    public PartStyle Style { get; init; }
+    /// <summary>Part style (transparent, opaque, shadow, etc.). Settable by HyperTalk.</summary>
+    public PartStyle Style { get; set; }
     public short TitleWidthOrLastSelectedLine { get; init; }
     public short IconIdOrFirstSelectedLine { get; init; }
     public short TextAlign { get; init; }

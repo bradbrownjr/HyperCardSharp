@@ -223,6 +223,7 @@ public static class PictDecoder
         if (bmpWidth <= 0 || bmpHeight <= 0) return null;
 
         int pixelSize = 1; // default for BitMap
+        SKColor[]? colorTable = null;
 
         if (isPixMap)
         {
@@ -252,8 +253,24 @@ public static class PictDecoder
             short ctSizeMinus1 = BinaryPrimitives.ReadInt16BigEndian(span.Slice(pos, 2));
             pos += 2;
             int ctSize = ctSizeMinus1 + 1;
-            // Each color table entry: value(2) + RGBColor(6) = 8 bytes
-            pos += ctSize * 8;
+            // Each color table entry: value(2) + RGBColor(6 bytes = R16, G16, B16) = 8 bytes
+            colorTable = new SKColor[ctSize];
+            for (int ci = 0; ci < ctSize; ci++)
+            {
+                if (pos + 8 > data.Length) break;
+                // value field (index for indexed PixMaps, ignored for direct)
+                ushort ctIndex = BinaryPrimitives.ReadUInt16BigEndian(span.Slice(pos, 2));
+                pos += 2;
+                byte r = span[pos];     // high byte of 16-bit component
+                pos += 2;
+                byte g = span[pos];
+                pos += 2;
+                byte b = span[pos];
+                pos += 2;
+                int idx = (pixelSize <= 8 && ctIndex < ctSize) ? ctIndex : ci;
+                if (idx < colorTable.Length)
+                    colorTable[idx] = new SKColor(r, g, b);
+            }
         }
 
         // srcRect, dstRect, mode = 8+8+2 = 18 bytes
@@ -289,7 +306,7 @@ public static class PictDecoder
             var rowData = UnpackBits(span.Slice(pos, rowByteCount), rowBytes);
             pos += rowByteCount;
 
-            // Draw the row — only 1-bit mode is decoded here (simple B&W)
+            // Draw the row
             if (pixelSize == 1 && rowData.Length >= rowBytes)
             {
                 for (int x = 0; x < bmpWidth; x++)
@@ -300,7 +317,35 @@ public static class PictDecoder
                     bitmap.SetPixel(x, row, isBlack ? SKColors.Black : SKColors.White);
                 }
             }
-            // Other pixel depths: leave as white for now
+            else if (pixelSize == 2 && colorTable != null)
+            {
+                for (int x = 0; x < bmpWidth; x++)
+                {
+                    int bi = x / 4;
+                    int shift = 6 - (x % 4) * 2;
+                    int idx = bi < rowData.Length ? (rowData[bi] >> shift) & 0x03 : 0;
+                    bitmap.SetPixel(x, row, idx < colorTable.Length ? colorTable[idx] : SKColors.White);
+                }
+            }
+            else if (pixelSize == 4 && colorTable != null)
+            {
+                for (int x = 0; x < bmpWidth; x++)
+                {
+                    int bi = x / 2;
+                    int shift = (x % 2 == 0) ? 4 : 0;
+                    int idx = bi < rowData.Length ? (rowData[bi] >> shift) & 0x0F : 0;
+                    bitmap.SetPixel(x, row, idx < colorTable.Length ? colorTable[idx] : SKColors.White);
+                }
+            }
+            else if (pixelSize == 8 && colorTable != null)
+            {
+                for (int x = 0; x < bmpWidth && x < rowData.Length; x++)
+                {
+                    int idx = rowData[x];
+                    bitmap.SetPixel(x, row, idx < colorTable.Length ? colorTable[idx] : SKColors.White);
+                }
+            }
+            // Other pixel depths: leave as white
         }
 
         return bitmap;

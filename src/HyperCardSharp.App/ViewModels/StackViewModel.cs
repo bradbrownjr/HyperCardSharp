@@ -266,6 +266,54 @@ public partial class StackViewModel : ObservableObject
                     // "bold", "italic", "plain" etc. — map to style-flag byte
                     part.TextStyle = ParseTextStyleFlags(value);
                     break;
+                case "style":
+                    if (Enum.TryParse<HyperCardSharp.Core.Parts.PartStyle>(value, true, out var ps))
+                        part.Style = ps;
+                    break;
+                case "rect":
+                case "rectangle":
+                {
+                    // "left,top,right,bottom" or "left, top, right, bottom"
+                    var coords = value.Split(',');
+                    if (coords.Length == 4 &&
+                        ushort.TryParse(coords[0].Trim(), out ushort rl) &&
+                        ushort.TryParse(coords[1].Trim(), out ushort rt) &&
+                        ushort.TryParse(coords[2].Trim(), out ushort rr) &&
+                        ushort.TryParse(coords[3].Trim(), out ushort rb))
+                    {
+                        part.Left = rl; part.Top = rt;
+                        part.Right = rr; part.Bottom = rb;
+                    }
+                    break;
+                }
+                case "loc":
+                case "location":
+                {
+                    // "h,v" — center point; adjust rect preserving size
+                    var coords = value.Split(',');
+                    if (coords.Length == 2 &&
+                        int.TryParse(coords[0].Trim(), out int lh) &&
+                        int.TryParse(coords[1].Trim(), out int lv))
+                    {
+                        int hw = part.Width / 2, hh = part.Height / 2;
+                        part.Left   = (ushort)Math.Max(0, lh - hw);
+                        part.Top    = (ushort)Math.Max(0, lv - hh);
+                        part.Right  = (ushort)(part.Left + part.Width);
+                        part.Bottom = (ushort)(part.Top  + part.Height);
+                    }
+                    break;
+                }
+                case "width":
+                    if (ushort.TryParse(value, out ushort w))
+                        part.Right = (ushort)(part.Left + w);
+                    break;
+                case "height":
+                    if (ushort.TryParse(value, out ushort h))
+                        part.Bottom = (ushort)(part.Top + h);
+                    break;
+                case "textcolor":
+                    // Ignore for now — color rendering is AddColor-based; log silently
+                    break;
             }
             RenderCurrentCard();
         };
