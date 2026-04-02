@@ -840,6 +840,12 @@ public class HyperTalkInterpreter
             "offset"    => args.Length >= 2
                             ? new HyperTalkValue(OffsetOf(args[0].Raw, args[1].Raw).ToString())
                             : HyperTalkValue.Empty,
+            // String case and trim functions
+            "upper" or "uppercase" or "upcase" or "touppercase"
+                        => new HyperTalkValue(args[0].Raw.ToUpperInvariant()),
+            "lower" or "lowercase" or "lowcase" or "tolowercase"
+                        => new HyperTalkValue(args[0].Raw.ToLowerInvariant()),
+            "trim"      => new HyperTalkValue(args[0].Raw.Trim()),
             "number of words" or "numwords" => new HyperTalkValue(GetWords(args[0].Raw).Length.ToString()),
             "number of chars" or "numchars" => new HyperTalkValue(args[0].Raw.Length.ToString()),
             "number of lines" or "numlines" => new HyperTalkValue(GetLines(args[0].Raw).Length.ToString()),
