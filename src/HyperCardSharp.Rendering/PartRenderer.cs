@@ -25,17 +25,19 @@ public static class PartRenderer
         BackgroundBlock bg,
         CardBlock card,
         IReadOnlyDictionary<short, SKBitmap>? icons = null,
-        (int Left, int Top, int Right, int Bottom)? wobaImgRect = null)
+        (int Left, int Top, int Right, int Bottom)? wobaImgRect = null,
+        HyperCardSharp.Core.Stack.StyleTableBlock? styleTable = null,
+        HyperCardSharp.Core.Stack.FontTableBlock? fontTable = null)
     {
         // Build a lookup of card-specific content for background parts.
         // Per the HC format: background part IDs in card.PartContents are stored as negative values.
-        var cardBgContent = card.PartContents
+        var cardBgContentFull = card.PartContents
             .Where(pc => pc.PartId < 0)
-            .ToDictionary(pc => (short)(-pc.PartId), pc => pc.Text);
+            .ToDictionary(pc => (short)(-pc.PartId), pc => pc);
 
         // Shared background content (same on every card that uses this background)
-        var sharedBgContent = bg.PartContents
-            .ToDictionary(pc => pc.PartId, pc => pc.Text);
+        var sharedBgContentFull = bg.PartContents
+            .ToDictionary(pc => pc.PartId, pc => pc);
 
         foreach (var part in bg.Parts)
         {
@@ -44,14 +46,12 @@ public static class PartRenderer
             if (part.IsField)
             {
                 // Card-specific content takes priority over shared background content.
-                string text = cardBgContent.TryGetValue(part.PartId, out var cardText)
-                    ? cardText
-                    : sharedBgContent.TryGetValue(part.PartId, out var sharedText)
-                        ? sharedText
-                        : "";
+                HyperCardSharp.Core.Parts.PartContent? content =
+                    cardBgContentFull.TryGetValue(part.PartId, out var cc) ? cc :
+                    sharedBgContentFull.TryGetValue(part.PartId, out var sc) ? sc : null;
 
-                if (!string.IsNullOrEmpty(text))
-                    TextRenderer.DrawFieldText(canvas, part, text);
+                if (content != null && !string.IsNullOrEmpty(content.Text))
+                    TextRenderer.DrawFieldText(canvas, part, content, styleTable, fontTable);
 
                 if (part.Style == PartStyle.Scrolling)
                     RenderScrollbarChrome(canvas, part);
@@ -69,12 +69,14 @@ public static class PartRenderer
     /// </summary>
     public static void RenderCardParts(SKCanvas canvas, CardBlock card,
         IReadOnlyDictionary<short, SKBitmap>? icons = null,
-        (int Left, int Top, int Right, int Bottom)? wobaImgRect = null)
+        (int Left, int Top, int Right, int Bottom)? wobaImgRect = null,
+        HyperCardSharp.Core.Stack.StyleTableBlock? styleTable = null,
+        HyperCardSharp.Core.Stack.FontTableBlock? fontTable = null)
     {
         // Card part content entries have positive IDs matching card.Parts
         var contentLookup = card.PartContents
             .Where(pc => pc.PartId > 0)
-            .ToDictionary(pc => pc.PartId, pc => pc.Text);
+            .ToDictionary(pc => pc.PartId, pc => pc);
 
         foreach (var part in card.Parts)
         {
@@ -82,8 +84,8 @@ public static class PartRenderer
 
             if (part.IsField)
             {
-                if (contentLookup.TryGetValue(part.PartId, out var text) && !string.IsNullOrEmpty(text))
-                    TextRenderer.DrawFieldText(canvas, part, text);
+                if (contentLookup.TryGetValue(part.PartId, out var content) && !string.IsNullOrEmpty(content.Text))
+                    TextRenderer.DrawFieldText(canvas, part, content, styleTable, fontTable);
 
                 if (part.Style == PartStyle.Scrolling)
                     RenderScrollbarChrome(canvas, part);

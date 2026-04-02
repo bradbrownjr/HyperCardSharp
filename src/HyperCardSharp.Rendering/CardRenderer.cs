@@ -67,8 +67,10 @@ public class CardRenderer
         // Overlay field text and non-Transparent button chrome
         var icons = GetIconCache();
         if (bg != null)
-            PartRenderer.RenderBackgroundParts(canvas, bg, card, icons, cardImgRect);
-        PartRenderer.RenderCardParts(canvas, card, icons, cardImgRect);
+            PartRenderer.RenderBackgroundParts(canvas, bg, card, icons, cardImgRect,
+                _stack.StyleTable, _stack.FontTable);
+        PartRenderer.RenderCardParts(canvas, card, icons, cardImgRect,
+            _stack.StyleTable, _stack.FontTable);
 
         // TODO: Phase 8 Color — apply AddColor overlays when mode == RenderMode.Color
         // and AddColor resource data is available for this card/background.
