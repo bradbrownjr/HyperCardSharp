@@ -8,6 +8,7 @@ using HyperCardSharp.Core.Resources;
 using HyperCardSharp.Core.Stack;
 using HyperCardSharp.HyperTalk.Interpreter;
 using HyperCardSharp.HyperTalk.MessagePassing;
+using HyperCardSharp.HyperTalk.Xcmd;
 using HyperCardSharp.Rendering;
 using SkiaSharp;
 
@@ -429,6 +430,16 @@ public partial class StackViewModel : ObservableObject
             CrossStackNavigationRequested?.Invoke(stackName, cardName, cardNum);
 
         _interpreter.GoHome = () => GoHomeRequested?.Invoke();
+
+        // XCMD/XFCN registry — register built-in emulations
+        var xcmds = new XcmdRegistry(_interpreter.LogMessage);
+        // AddColor is handled by the rendering layer; register as a no-op so scripts calling it
+        // don't get a noisy "unknown command" log entry.
+        xcmds.Register(new NopXcmd("AddColor"));
+        xcmds.Register(new NopXcmd("Flash"));
+        xcmds.Register(new NopXcmd("Palette"));
+        xcmds.Register(new NopXcmd("AnimationMgr"));
+        _interpreter.Xcmds = xcmds;
     }
 
     public void HandleCardClick(float cardX, float cardY)
@@ -948,4 +959,18 @@ public partial class StackViewModel : ObservableObject
             }
         }
     }
+}
+
+/// <summary>
+/// A no-operation XCMD stub. Silently accepts any arguments and returns empty.
+/// Used to suppress "unknown command" warnings for XCMDs handled by the rendering
+/// layer or not supported in player mode.
+/// </summary>
+file sealed class NopXcmd(string name) : IXcmdHandler
+{
+    public string Name => name;
+    public HyperCardSharp.HyperTalk.Interpreter.HyperTalkValue Execute(
+        HyperCardSharp.HyperTalk.Interpreter.HyperTalkValue[] args,
+        HyperCardSharp.HyperTalk.Interpreter.HyperTalkInterpreter interpreter)
+        => HyperCardSharp.HyperTalk.Interpreter.HyperTalkValue.Empty;
 }

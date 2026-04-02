@@ -1098,6 +1098,7 @@ public class HyperTalkParser
             TokenType.Tenth   => 10,
             TokenType.Last    => -1,
             TokenType.Middle  => 0,
+            TokenType.Any     => -2, // -2 = pick random element at eval time
             _ => int.MinValue,
         };
         return ordinal != int.MinValue;

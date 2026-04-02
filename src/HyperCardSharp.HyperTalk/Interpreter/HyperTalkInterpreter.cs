@@ -1,4 +1,5 @@
 using HyperCardSharp.HyperTalk.Ast;
+using HyperCardSharp.HyperTalk.Xcmd;
 
 namespace HyperCardSharp.HyperTalk.Interpreter;
 
@@ -119,6 +120,12 @@ public class HyperTalkInterpreter
     /// Defaults to a simple log message; the App layer should override this to open the file picker.
     /// </summary>
     public Action GoHome { get; set; } = () => {};
+
+    /// <summary>
+    /// Optional XCMD/XFCN registry. When set, unknown commands and functions
+    /// fall through to registered handlers before logging an error.
+    /// </summary>
+    public XcmdRegistry? Xcmds { get; set; }
 
     /// <summary>
     /// Called when HyperTalk reads <c>the visible of button/field X</c>.
@@ -383,47 +390,55 @@ public class HyperTalkInterpreter
             return ExecutionResult.Normal;
         }
 
-        var container = s.Target.Container;
-        string prep = s.Target.Preposition;
+        WriteToTarget(s.Target.Container, s.Target.Preposition, value.Raw, env);
+        return ExecutionResult.Normal;
+    }
 
-        if (container is FunctionCall varRef && varRef.Args.Length == 0)
+    /// <summary>
+    /// Unified container write: handles variables, <c>it</c>, fields, and
+    /// nested chunk expressions (e.g. <c>word 2 of line 3 of myVar</c>).
+    /// </summary>
+    private void WriteToTarget(ExprNode target, string preposition, string newValue, ExecutionEnvironment env)
+    {
+        if (target is FunctionCall varRef && varRef.Args.Length == 0)
         {
-            // Variable assignment
-            if (prep == "into")
-            {
-                env.SetLocal(varRef.Name, value);
-            }
-            else
-            {
-                var existing = env.Get(varRef.Name);
-                var newVal = prep == "before"
-                    ? HyperTalkValue.Concat(value, existing)
-                    : HyperTalkValue.Concat(existing, value);
-                env.SetLocal(varRef.Name, newVal);
-            }
+            var existing = env.Get(varRef.Name).Raw;
+            string result = preposition == "before" ? newValue + existing
+                          : preposition == "after"  ? existing + newValue
+                          : newValue;
+            env.SetLocal(varRef.Name, new HyperTalkValue(result));
         }
-        else if (container is ItReference)
+        else if (target is ItReference)
         {
-            env.It = value;
+            var existing = env.It.Raw;
+            string result = preposition == "before" ? newValue + existing
+                          : preposition == "after"  ? existing + newValue
+                          : newValue;
+            env.It = new HyperTalkValue(result);
         }
-        else if (container is PartRef pr && pr.Kind == PartRefKind.Field)
+        else if (target is PartRef pr && pr.Kind == PartRefKind.Field)
         {
             var fieldName = ResolvePartName(pr, env);
             var existing = GetFieldText(fieldName) ?? "";
-            var newText = prep switch
-            {
-                "before" => value.Raw + existing,
-                "after"  => existing + value.Raw,
-                _        => value.Raw,
-            };
-            SetFieldText(fieldName, newText);
+            string result = preposition == "before" ? newValue + existing
+                          : preposition == "after"  ? existing + newValue
+                          : newValue;
+            SetFieldText(fieldName, result);
+        }
+        else if (target is ChunkExpression chunk)
+        {
+            // Read the outer container's current value, modify the chunk, write back.
+            var outerCurrent = Evaluate(chunk.Container, env).Raw;
+            int idx    = (int)Evaluate(chunk.Index, env).AsNumber();
+            int? endIdx = chunk.EndIndex != null ? (int?)((int)Evaluate(chunk.EndIndex, env).AsNumber()) : null;
+            var modified = ReplaceChunkInString(outerCurrent, chunk.Kind, idx, endIdx, newValue, preposition);
+            // Always write "into" the inner container (preposition was applied at this level)
+            WriteToTarget(chunk.Container, "into", modified, env);
         }
         else
         {
-            LogMessage($"HyperTalk: put — unsupported container type {container.GetType().Name}");
+            LogMessage($"HyperTalk: put — unsupported container type {target.GetType().Name}");
         }
-
-        return ExecutionResult.Normal;
     }
 
     private ExecutionResult ExecSet(SetStatement s, ExecutionEnvironment env)
@@ -774,6 +789,14 @@ public class HyperTalkInterpreter
         }
 
         var args = Array.ConvertAll(s.Args, a => Evaluate(a, env));
+
+        // Fall through to XCMD registry before giving up
+        if (Xcmds != null)
+        {
+            var result = Xcmds.TryExecute(s.CommandName, args, this);
+            if (result != null) return ExecutionResult.Normal;
+        }
+
         LogMessage($"HyperTalk: unknown command '{s.CommandName}' (ignored)");
         return ExecutionResult.Normal;
     }
@@ -956,12 +979,12 @@ public class HyperTalkInterpreter
         Func<string, string[]> splitter)
     {
         var parts = splitter(text);
-        int i = index < 0 ? parts.Length + index : index - 1; // convert 1-based to 0-based
+        int i = ResolveChunkOrdinal(index, parts.Length);
         if (i < 0 || i >= parts.Length) return HyperTalkValue.Empty;
 
         if (endIndex.HasValue)
         {
-            int j = endIndex.Value < 0 ? parts.Length + endIndex.Value : endIndex.Value - 1;
+            int j = ResolveChunkOrdinal(endIndex.Value, parts.Length);
             j = Math.Min(j, parts.Length - 1);
             if (j < i) return HyperTalkValue.Empty;
             return new HyperTalkValue(string.Join("", parts[i..(j + 1)]));
@@ -969,10 +992,133 @@ public class HyperTalkInterpreter
         return new HyperTalkValue(parts[i]);
     }
 
+    /// <summary>
+    /// Convert a HyperTalk chunk ordinal to a 0-based array index.
+    /// Ordinals: 1-N = 1-based, -1 = last, 0 = middle, -2 = any (random).
+    /// </summary>
+    private static int ResolveChunkOrdinal(int ordinal, int count)
+    {
+        if (count <= 0) return -1;
+        return ordinal switch
+        {
+            -2 => new Random().Next(0, count),   // any
+            -1 => count - 1,                      // last
+             0 => (count - 1) / 2,               // middle
+             _  => ordinal - 1,                   // 1-based → 0-based (may be negative for 0)
+        };
+    }
+
     private static string[] GetChars(string s) => s.Select(c => c.ToString()).ToArray();
     private static string[] GetWords(string s) => s.Split([' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
     private static string[] GetItems(string s) => s.Split(',');
     private static string[] GetLines(string s) => s.Split(['\r', '\n'], StringSplitOptions.None);
+
+    /// <summary>
+    /// Replaces (or prepends/appends to) a chunk within <paramref name="source"/> and returns the result.
+    /// <paramref name="index"/> and <paramref name="endIndex"/> use HyperTalk ordinals
+    /// (1-based, -1=last, 0=middle, -2=any).
+    /// </summary>
+    private static string ReplaceChunkInString(
+        string source, ChunkKind kind, int index, int? endIndex,
+        string newValue, string preposition)
+    {
+        switch (kind)
+        {
+            case ChunkKind.Char:
+            {
+                int len = source.Length;
+                int i = ResolveChunkOrdinal(index, len);
+                int e = endIndex.HasValue ? ResolveChunkOrdinal(endIndex.Value, len) : i;
+                i = Math.Clamp(i, 0, len);
+                e = Math.Clamp(e, i, Math.Max(len - 1, 0));
+                int endExcl = Math.Min(e + 1, len); // convert inclusive to exclusive
+                string before   = source[..i];
+                string existing = source[i..endExcl];
+                string after    = source[endExcl..];
+                return preposition == "before" ? before + newValue + existing + after
+                     : preposition == "after"  ? before + existing + newValue + after
+                     : before + newValue + after;
+            }
+
+            case ChunkKind.Item:
+            {
+                var parts = new List<string>(source.Split(','));
+                int i = ResolveChunkOrdinal(index, parts.Count);
+                int e = endIndex.HasValue ? ResolveChunkOrdinal(endIndex.Value, parts.Count) : i;
+                i = Math.Clamp(i, 0, parts.Count);
+                e = Math.Clamp(e, i, Math.Max(parts.Count - 1, 0));
+                // Extend list if index is beyond current size
+                while (parts.Count <= e) parts.Add("");
+                return preposition switch
+                {
+                    "before" => ReplaceRange(parts, i, e, newValue + parts[i], ","),
+                    "after"  => ReplaceRange(parts, i, e, parts[e] + newValue, ","),
+                    _        => ReplaceRange(parts, i, e, newValue, ","),
+                };
+            }
+
+            case ChunkKind.Line:
+            {
+                var lines = new List<string>(source.Split('\n'));
+                // Normalize \r\n → \n already done by split; keep \r stripped entries
+                int i = ResolveChunkOrdinal(index, lines.Count);
+                int e = endIndex.HasValue ? ResolveChunkOrdinal(endIndex.Value, lines.Count) : i;
+                i = Math.Clamp(i, 0, lines.Count);
+                e = Math.Clamp(e, i, Math.Max(lines.Count - 1, 0));
+                while (lines.Count <= e) lines.Add("");
+                return preposition switch
+                {
+                    "before" => ReplaceRange(lines, i, e, newValue + "\n" + lines[i], "\n"),
+                    "after"  => ReplaceRange(lines, i, e, lines[e] + "\n" + newValue, "\n"),
+                    _        => ReplaceRange(lines, i, e, newValue, "\n"),
+                };
+            }
+
+            case ChunkKind.Word:
+            {
+                var ranges = GetWordRanges(source);
+                if (ranges.Count == 0)
+                    return preposition == "before" ? newValue + source : source + newValue;
+                int i = Math.Clamp(ResolveChunkOrdinal(index, ranges.Count), 0, ranges.Count - 1);
+                int e = endIndex.HasValue
+                    ? Math.Clamp(ResolveChunkOrdinal(endIndex.Value, ranges.Count), i, ranges.Count - 1)
+                    : i;
+                int startPos = ranges[i].start;
+                int endPos   = ranges[e].end;
+                string before   = source[..startPos];
+                string existing = source[startPos..endPos];
+                string after    = source[endPos..];
+                return preposition == "before" ? before + newValue + " " + existing + after
+                     : preposition == "after"  ? before + existing + " " + newValue + after
+                     : before + newValue + after;
+            }
+        }
+        return source;
+    }
+
+    /// <summary>Replace elements i..e inclusive in <paramref name="parts"/> with <paramref name="replacement"/>, then join.</summary>
+    private static string ReplaceRange(List<string> parts, int i, int e, string replacement, string sep)
+    {
+        parts.RemoveRange(i, e - i + 1);
+        parts.Insert(i, replacement);
+        return string.Join(sep, parts);
+    }
+
+    /// <summary>Returns start/end byte offsets (end is exclusive) for each whitespace-delimited word in <paramref name="s"/>.</summary>
+    private static List<(int start, int end)> GetWordRanges(string s)
+    {
+        var ranges = new List<(int, int)>();
+        int i = 0;
+        while (i < s.Length)
+        {
+            while (i < s.Length && (s[i] is ' ' or '\t' or '\r' or '\n')) i++;
+            if (i >= s.Length) break;
+            int start = i;
+            while (i < s.Length && s[i] is not (' ' or '\t' or '\r' or '\n')) i++;
+            ranges.Add((start, i));
+        }
+        return ranges;
+    }
 
     private HyperTalkValue EvalFunctionCall(FunctionCall f, ExecutionEnvironment env)
     {
@@ -1026,13 +1172,19 @@ public class HyperTalkInterpreter
 
     private HyperTalkValue CallUserFunction(string name, HyperTalkValue[] args, ExecutionEnvironment env)
     {
-        // Look up in the current script first, then log a miss.
+        // Look up in the current script first.
         if (_currentScript != null)
         {
             var fn = Array.Find(_currentScript.Functions,
                 f => string.Equals(f.Name, name, StringComparison.OrdinalIgnoreCase));
             if (fn != null)
                 return CallFunction(_currentScript, name, args);
+        }
+        // Fall through to XCMD registry (XFCNs registered as handlers)
+        if (Xcmds != null)
+        {
+            var xcmdResult = Xcmds.TryExecute(name, args, this);
+            if (xcmdResult != null) return xcmdResult;
         }
         LogMessage($"HyperTalk: function '{name}' not found");
         return HyperTalkValue.Empty;
