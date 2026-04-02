@@ -40,12 +40,29 @@ public class StuffItExtractor : IContainerExtractor
         if (data.Length < ArchiveHeaderSize)
             return false;
 
-        // "SIT!" at bytes 0-3
-        return data[0] == 'S' && data[1] == 'I' && data[2] == 'T' && data[3] == '!';
+        // "SIT!" at bytes 0-3 = StuffIt Classic
+        if (data[0] == 'S' && data[1] == 'I' && data[2] == 'T' && data[3] == '!')
+            return true;
+
+        // "StuffIt " (7 bytes) = StuffIt 5.x / Aladdin format — detected but not extracted
+        if (data.Length >= 7 &&
+            data[0] == 'S' && data[1] == 't' && data[2] == 'u' && data[3] == 'f' &&
+            data[4] == 'f' && data[5] == 'I' && data[6] == 't')
+            return true;
+
+        return false;
     }
+
+    /// <summary>Returns true when the data is a StuffIt 5.x archive (not StuffIt Classic).</summary>
+    private static bool IsStuffIt5(ReadOnlySpan<byte> data)
+        => data.Length >= 7 &&
+           data[0] == 'S' && data[1] == 't' && data[2] == 'u' && data[3] == 'f' &&
+           data[4] == 'f' && data[5] == 'I' && data[6] == 't';
 
     public byte[]? Extract(byte[] data)
     {
+        if (IsStuffIt5(data))
+            return null;  // StuffIt 5.x format: recognised but not yet supported
         var all = ExtractAll(data);
         return all.Count > 0 ? all[0].Data : null;
     }
@@ -59,7 +76,7 @@ public class StuffItExtractor : IContainerExtractor
     {
         var results = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
 
-        if (!CanHandle(data))
+        if (!CanHandle(data) || IsStuffIt5(data))
             return results;
 
         var span = data.AsSpan();
@@ -115,7 +132,7 @@ public class StuffItExtractor : IContainerExtractor
     {
         var results = new List<(string Name, byte[] Data)>();
 
-        if (!CanHandle(data))
+        if (!CanHandle(data) || IsStuffIt5(data))
             return results;
 
         try
