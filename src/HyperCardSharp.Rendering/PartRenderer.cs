@@ -45,6 +45,8 @@ public static class PartRenderer
 
             if (part.IsField)
             {
+                DrawFieldBackground(canvas, part);
+
                 // Card-specific content takes priority over shared background content.
                 HyperCardSharp.Core.Parts.PartContent? content =
                     cardBgContentFull.TryGetValue(part.PartId, out var cc) ? cc :
@@ -84,6 +86,8 @@ public static class PartRenderer
 
             if (part.IsField)
             {
+                DrawFieldBackground(canvas, part);
+
                 if (contentLookup.TryGetValue(part.PartId, out var content) && !string.IsNullOrEmpty(content.Text))
                     TextRenderer.DrawFieldText(canvas, part, content, styleTable, fontTable);
 
@@ -94,6 +98,48 @@ public static class PartRenderer
             {
                 RenderButtonChrome(canvas, part, icons, wobaImgRect);
             }
+        }
+    }
+
+    // ── Field background rendering ────────────────────────────────────────────
+
+    /// <summary>
+    /// Fills the field rectangle with white and draws the appropriate border.
+    /// HyperCard renders field backgrounds dynamically — they are NOT encoded in
+    /// the WOBA bitmap. Transparent fields are skipped (no fill, no border).
+    /// </summary>
+    private static void DrawFieldBackground(SKCanvas canvas, Part part)
+    {
+        if (part.Style == PartStyle.Transparent) return;
+        if (part.Width <= 0 || part.Height <= 0) return;
+
+        var rect = new SKRect(part.Left, part.Top, part.Right, part.Bottom);
+
+        using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = SKColors.White };
+        canvas.DrawRect(rect, fillPaint);
+
+        switch (part.Style)
+        {
+            case PartStyle.Rectangle:
+            case PartStyle.Scrolling:
+            {
+                using var borderPaint = new SKPaint
+                    { Style = SKPaintStyle.Stroke, Color = SKColors.Black, StrokeWidth = 1 };
+                canvas.DrawRect(rect, borderPaint);
+                break;
+            }
+            case PartStyle.Shadow:
+            {
+                using var borderPaint = new SKPaint
+                    { Style = SKPaintStyle.Stroke, Color = SKColors.Black, StrokeWidth = 1 };
+                using var shadowPaint = new SKPaint
+                    { Style = SKPaintStyle.Fill, Color = SKColors.Black };
+                canvas.DrawRect(rect, borderPaint);
+                canvas.DrawRect(new SKRect(rect.Left + 3, rect.Bottom,  rect.Right + 3, rect.Bottom + 3), shadowPaint);
+                canvas.DrawRect(new SKRect(rect.Right,    rect.Top + 3, rect.Right + 3, rect.Bottom + 3), shadowPaint);
+                break;
+            }
+            // Opaque: white fill only, no border
         }
     }
 
