@@ -86,6 +86,21 @@ public class HyperTalkInterpreter
     public Action StopSound { get; set; } = () => {};
 
     /// <summary>
+    /// Called when HyperTalk executes <c>show cards</c> or <c>show all cards</c>.
+    /// The integer argument is the delay between cards in milliseconds (default 500).
+    /// </summary>
+    public Action<int> ShowAllCards { get; set; } = _ => {};
+
+    /// <summary>
+    /// Called when HyperTalk executes <c>doMenu "item"</c>.
+    /// The handler may return false to indicate the item was not handled.
+    /// </summary>
+    public Func<string, bool> DoMenuItem { get; set; } = _ => false;
+
+    /// <summary>Called when HyperTalk executes <c>print card</c>.</summary>
+    public Action PrintCard { get; set; } = () => {};
+
+    /// <summary>
     /// Called when HyperTalk executes <c>do &lt;script&gt;</c>.
     /// The string is the HyperTalk expression result that should be parsed and run.
     /// </summary>
@@ -145,6 +160,12 @@ public class HyperTalkInterpreter
     /// </summary>
     public Func<string> GetScreenRect { get; set; } = () => "0,0,512,342";
 
+    /// <summary>
+    /// Returns the current mouse position as "(h,v)" in card coordinates.
+    /// Used to implement <c>the mouseLoc</c>, <c>the mouseH</c>, <c>the mouseV</c>.
+    /// </summary>
+    public Func<(int h, int v)> GetMousePosition { get; set; } = () => (0, 0);
+
     // ── Interpreter state ─────────────────────────────────────────────────────
 
     /// <summary>The target that originally received the current message (e.g. "button \"Go\"").</summary>
@@ -163,6 +184,17 @@ public class HyperTalkInterpreter
     private string _foundText = "";
     private string _foundField = "";
     private string _foundChunk = "";
+
+    // ── Phase 17 — mouse/keyboard state ──────────────────────────────────────
+
+    /// <summary>Card-coordinate position of the last mouse click, or (-1,-1) if none.</summary>
+    public (int h, int v) LastClickPos { get; set; } = (-1, -1);
+
+    /// <summary>Last key pressed (single character or key name).</summary>
+    public string LastKey { get; set; } = "";
+
+    /// <summary>Last keyCode (integer as string).</summary>
+    public string LastKeyCode { get; set; } = "";
 
     // Current script being executed — used for user-defined function lookup.
     private ScriptNode? _currentScript;
@@ -668,6 +700,13 @@ public class HyperTalkInterpreter
 
     private ExecutionResult ExecShow(ShowStatement s, ExecutionEnvironment env)
     {
+        var target = EvalToString(s.Target, env).Trim().ToLowerInvariant();
+        // 'show cards' / 'show all cards' — slideshow
+        if (target is "cards" or "all cards" or "all")
+        {
+            ShowAllCards(500);
+            return ExecutionResult.Normal;
+        }
         SetPartVisible(EvalToString(s.Target, env), true);
         return ExecutionResult.Normal;
     }
@@ -776,6 +815,48 @@ public class HyperTalkInterpreter
             return ExecutionResult.Normal;
         }
 
+        // show cards / show all cards [at NN ms]
+        if (cmdLower is "show" or "show cards" or "show all cards" or "show all")
+        {
+            var evalArgs = Array.ConvertAll(s.Args, a => Evaluate(a, env));
+            int delay = 500;
+            foreach (var a in evalArgs)
+            {
+                if (int.TryParse(a.Raw, out int ms)) { delay = ms; break; }
+            }
+            ShowAllCards(delay);
+            return ExecutionResult.Normal;
+        }
+
+        // doMenu "item"
+        if (cmdLower == "domenu")
+        {
+            var item = s.Args.Length > 0 ? Evaluate(s.Args[0], env).Raw : "";
+            if (!DoMenuItem(item))
+                LogMessage($"HyperTalk: doMenu '{item}' — not handled");
+            return ExecutionResult.Normal;
+        }
+
+        // choose <tool> tool (player mode: no-op, but update _currentTool)
+        if (cmdLower == "choose")
+        {
+            // 'choose browse tool' / 'choose button tool' etc.
+            var evalArgs = Array.ConvertAll(s.Args, a => Evaluate(a, env));
+            // Tool name is everything before the word "tool" in the arg list
+            var toolName = string.Join(" ", evalArgs
+                .Select(a => a.Raw)
+                .TakeWhile(r => !r.Equals("tool", StringComparison.OrdinalIgnoreCase)));
+            // Silently accept in player mode; browse tool is the only meaningful one
+            return ExecutionResult.Normal;
+        }
+
+        // print [card]
+        if (cmdLower is "print" or "print card")
+        {
+            PrintCard();
+            return ExecutionResult.Normal;
+        }
+
         // User-defined command handler (on commandName ... end commandName)
         if (_currentScript != null)
         {
@@ -881,9 +962,15 @@ public class HyperTalkInterpreter
                 "tool"          => new HyperTalkValue("browse"),
                 "userlevel"     => new HyperTalkValue("5"),
                 "screenrect"    => new HyperTalkValue(GetScreenRect()),
-                "mouse"         => HyperTalkValue.Empty, // TODO: Phase 17
-                "mouseh" or "mousev" => new HyperTalkValue("0"), // TODO: Phase 17
-                "key" or "keycode"   => HyperTalkValue.Empty, // TODO: Phase 17
+                "mouse"         => HyperTalkValue.Empty, // TODO: Phase 17 — needs button-down state
+                "mouseh"        => new HyperTalkValue(GetMousePosition().h.ToString()),
+                "mousev"        => new HyperTalkValue(GetMousePosition().v.ToString()),
+                "mouseloc"      => new HyperTalkValue($"{GetMousePosition().h},{GetMousePosition().v}"),
+                "key"           => new HyperTalkValue(LastKey),
+                "keycode"       => new HyperTalkValue(LastKeyCode),
+                "clickloc"      => new HyperTalkValue(LastClickPos.h < 0 ? "" : $"{LastClickPos.h},{LastClickPos.v}"),
+                "clickh"        => new HyperTalkValue(LastClickPos.h < 0 ? "0" : LastClickPos.h.ToString()),
+                "clickv"        => new HyperTalkValue(LastClickPos.v < 0 ? "0" : LastClickPos.v.ToString()),
                 "foundtext"     => new HyperTalkValue(_foundText),
                 "foundfield"    => new HyperTalkValue(_foundField),
                 "foundchunk"    => new HyperTalkValue(_foundChunk),
@@ -1141,9 +1228,21 @@ public class HyperTalkInterpreter
             "sin"       => new HyperTalkValue(FormatNum(Math.Sin(args[0].AsNumber()))),
             "cos"       => new HyperTalkValue(FormatNum(Math.Cos(args[0].AsNumber()))),
             "tan"       => new HyperTalkValue(FormatNum(Math.Tan(args[0].AsNumber()))),
+            "atan"      => new HyperTalkValue(FormatNum(Math.Atan(args[0].AsNumber()))),
             "exp"       => new HyperTalkValue(FormatNum(Math.Exp(args[0].AsNumber()))),
+            "exp2"      => new HyperTalkValue(FormatNum(Math.Pow(2, args[0].AsNumber()))),
+            "exp1"      => new HyperTalkValue(FormatNum(Math.Exp(args[0].AsNumber()) - 1)),
             "ln"        => new HyperTalkValue(FormatNum(Math.Log(args[0].AsNumber()))),
+            "ln1"       => new HyperTalkValue(FormatNum(Math.Log(1 + args[0].AsNumber()))),
             "log2"      => new HyperTalkValue(FormatNum(Math.Log2(args[0].AsNumber()))),
+            // annuity(rate, periods): present value of an annuity
+            "annuity"   => args.Length >= 2
+                            ? new HyperTalkValue(FormatNum(AnnuityFn(args[0].AsNumber(), args[1].AsNumber())))
+                            : HyperTalkValue.Empty,
+            // compound(rate, periods): future value factor
+            "compound"  => args.Length >= 2
+                            ? new HyperTalkValue(FormatNum(Math.Pow(1 + args[0].AsNumber(), args[1].AsNumber())))
+                            : HyperTalkValue.Empty,
             "max"       => new HyperTalkValue(FormatNum(args.Max(a => a.AsNumber()))),
             "min"       => new HyperTalkValue(FormatNum(args.Min(a => a.AsNumber()))),
             "random"    => new HyperTalkValue(FormatNum(new Random().Next(1, (int)args[0].AsNumber() + 1))),
@@ -1245,5 +1344,12 @@ public class HyperTalkInterpreter
         if (string.IsNullOrEmpty(needle)) return 0;
         int idx = haystack.IndexOf(needle, StringComparison.Ordinal);
         return idx < 0 ? 0 : idx + 1;
+    }
+
+    /// <summary>HyperCard <c>annuity(rate, periods)</c> — present value of periodic payments of 1.</summary>
+    private static double AnnuityFn(double rate, double periods)
+    {
+        if (rate == 0) return periods;
+        return (1 - Math.Pow(1 + rate, -periods)) / rate;
     }
 }

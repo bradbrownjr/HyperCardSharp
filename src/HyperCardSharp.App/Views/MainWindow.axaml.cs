@@ -139,6 +139,7 @@ public partial class MainWindow : Window
             cardDisplay.CardPointerReleased += (x, y) => _viewModel.HandleCardClick(x, y);
             cardDisplay.CardPointerMoved += (x, y) =>
             {
+                _viewModel.UpdateMousePosition(x, y);
                 cardDisplay.Cursor = _viewModel.IsOverClickableButton(x, y)
                     ? new Cursor(StandardCursorType.Hand)
                     : Cursor.Default;
@@ -242,6 +243,13 @@ public partial class MainWindow : Window
                 Close();
                 e.Handled = true;
                 break;
+        }
+
+        // Phase 17: forward un-consumed key presses to HyperTalk as "keyDown".
+        // Skip command/ctrl combinations — those are app shortcuts, not typed characters.
+        if (!e.Handled && !HasCmdOrCtrl(e.KeyModifiers) && _viewModel.IsLoaded)
+        {
+            _viewModel.DispatchKeyDown(e.Key.ToString(), (int)e.Key);
         }
     }
 

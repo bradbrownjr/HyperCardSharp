@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HyperCardSharp.Core.Parts;
@@ -26,6 +27,13 @@ public partial class StackViewModel : ObservableObject
     // Tracks the background ID of the currently displayed card so we can detect
     // background changes during navigation and fire openBackground / closeBackground.
     private int _currentBackgroundId = -1;
+
+    // Phase 17: mouse position (card-local coordinates, updated by pointer move events).
+    private int _lastMouseH;
+    private int _lastMouseV;
+
+    // Phase 17: idle timer — sends "idle" to the current card/bg/stack scripts periodically.
+    private Avalonia.Threading.DispatcherTimer? _idleTimer;
 
     [ObservableProperty]
     private int _currentCardIndex;
@@ -431,6 +439,39 @@ public partial class StackViewModel : ObservableObject
 
         _interpreter.GoHome = () => GoHomeRequested?.Invoke();
 
+        // show cards / show all cards — rapid flip-through
+        _interpreter.ShowAllCards = delayMs =>
+        {
+            if (_stack == null || _cardOrder.Count == 0) return;
+            // Fire openCard lifecycle for each card with a brief delay.
+            // We use a simple async Task to avoid blocking the HyperTalk thread.
+            _ = ShowAllCardsAsync(delayMs);
+        };
+
+        // doMenu — handle common menu commands; return false for unsupported items
+        _interpreter.DoMenuItem = item =>
+        {
+            var lower = item.ToLowerInvariant().Trim();
+            switch (lower)
+            {
+                case "next card":     NextCard(); return true;
+                case "prev card":
+                case "previous card": PreviousCard(); return true;
+                case "first card":    FirstCard(); return true;
+                case "last card":     LastCard(); return true;
+                default:
+                    _interpreter.LogMessage($"[HyperTalk] doMenu '{item}' not handled");
+                    return false;
+            }
+        };
+
+        // print card — render and log (no printer API yet)
+        _interpreter.PrintCard = () =>
+            _interpreter.LogMessage("[HyperTalk] print card — printing not implemented");
+
+        // Phase 17: live mouse position (updated through UpdateMousePosition)
+        _interpreter.GetMousePosition = () => (_lastMouseH, _lastMouseV);
+
         // XCMD/XFCN registry — register built-in emulations
         var xcmds = new XcmdRegistry(_interpreter.LogMessage);
         // AddColor is handled by the rendering layer; register as a no-op so scripts calling it
@@ -444,6 +485,9 @@ public partial class StackViewModel : ObservableObject
 
     public void HandleCardClick(float cardX, float cardY)
     {
+        // Phase 17: record click position for "the clickLoc" / "the clickH" / "the clickV"
+        _interpreter.LastClickPos = ((int)cardX, (int)cardY);
+
         var card = CurrentCard();
         if (card == null) return;
         var bg = CurrentBackground(card);
@@ -496,6 +540,31 @@ public partial class StackViewModel : ObservableObject
         return part is { IsButton: true };
     }
 
+    /// <summary>
+    /// Called by the UI whenever the pointer moves over the card surface.
+    /// Keeps <c>the mouseH</c> / <c>the mouseV</c> / <c>the mouseLoc</c> up-to-date for HyperTalk.
+    /// </summary>
+    public void UpdateMousePosition(float cardX, float cardY)
+    {
+        _lastMouseH = (int)cardX;
+        _lastMouseV = (int)cardY;
+    }
+
+    /// <summary>
+    /// Called by the UI on every key press. Records the key for <c>the key</c> / <c>the keyCode</c>
+    /// and dispatches <c>keyDown</c> through the HyperCard message hierarchy.
+    /// </summary>
+    public void DispatchKeyDown(string key, int keyCode)
+    {
+        _interpreter.LastKey     = key;
+        _interpreter.LastKeyCode = keyCode.ToString();
+
+        var card = CurrentCard();
+        if (card == null) return;
+        var bg = CurrentBackground(card);
+        DispatchLifecycle("keyDown", card, bg);
+    }
+
     /// <summary>The file name of the currently opened file (e.g., "neuroblast.img").</summary>
     public string? CurrentFileName { get; private set; }
 
@@ -543,6 +612,21 @@ public partial class StackViewModel : ObservableObject
             _currentBackgroundId = firstCard?.BackgroundId ?? -1;
             DispatchLifecycle("openStack", firstCard, firstBg);
             DispatchLifecycle("openCard",  firstCard, firstBg);
+
+            // Phase 17: idle timer — dispatches "idle" to card/bg/stack scripts at ~10 fps.
+            _idleTimer?.Stop();
+            _idleTimer = new Avalonia.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(100)
+            };
+            _idleTimer.Tick += (_, _) =>
+            {
+                var card2 = CurrentCard();
+                if (card2 == null) return;
+                var bg2 = CurrentBackground(card2);
+                DispatchLifecycle("idle", card2, bg2);
+            };
+            _idleTimer.Start();
         }
         catch (Exception ex)
         {
@@ -556,7 +640,6 @@ public partial class StackViewModel : ObservableObject
         if (_stack == null || _cardOrder.Count == 0) return;
         NavigateTo((CurrentCardIndex + 1) % _cardOrder.Count);
     }
-
     [RelayCommand]
     public void PreviousCard()
     {
@@ -576,6 +659,24 @@ public partial class StackViewModel : ObservableObject
     {
         if (_stack == null || _cardOrder.Count == 0) return;
         NavigateTo(_cardOrder.Count - 1);
+    }
+
+    /// <summary>
+    /// Rapidly navigates through all cards, pausing <paramref name="delayMs"/> milliseconds
+    /// between each card. Called by <c>show cards</c> / <c>show all cards</c>.
+    /// </summary>
+    private async Task ShowAllCardsAsync(int delayMs)
+    {
+        if (_stack == null || _cardOrder.Count == 0) return;
+        int saved = CurrentCardIndex;
+        int delay = Math.Max(delayMs, 50); // never faster than 50 ms
+        for (int i = 0; i < _cardOrder.Count; i++)
+        {
+            NavigateTo(i);
+            await Task.Delay(delay);
+        }
+        // Return to the card that was current when show cards started
+        NavigateTo(saved);
     }
 
     /// <summary>
