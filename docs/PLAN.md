@@ -185,13 +185,97 @@ Install .NET 8 SDK. Create solution, all projects, wire references. Minimal Aval
 
 **Milestone:** `play` command triggers audio. MOV files play in embedded viewer. **Commit.**
 
-### Phase 10: Polish + Extended HyperTalk
+### Phase 10: Polish + Extended HyperTalk ✅ COMPLETE — tagged v0.1.0
 - Extended HyperTalk: `repeat with/while/until`, `do`, `send`, string/math/date functions
 - Chunk expressions: `char`, `word`, `item`, `line` of containers
 - Visual effects: dissolve, wipe, iris, checkerboard (SkiaSharp transitions)
 - Scrolling fields, Find command
 - Menu bar, drag-and-drop, recent files
 - Error display in status bar / log panel
+
+---
+
+## Post-v0.1.0 Phases
+
+These phases address stubs and gaps identified during v0.1.0 development. Each is a discrete vertical slice of work.
+
+### Phase 11: HyperTalk Runtime Completeness
+
+Resolve all interpreter stubs so scripts behave as they would in real HyperCard.
+
+- **`show` / `hide` commands** — toggle `Part.Visible` on the live card model and request a redraw (currently log-only)
+- **`click at <x,y>` command** — hit-test parts at the given point and synthesise a `mouseUp` dispatch (currently log-only)
+- **`type <text>` command** — append text to the focused field (currently log-only)
+- **`wait <n> [ticks|seconds|milliseconds]`** — implement async delay using `Task.Delay` (currently skipped)
+- **`send <msg> to <target>` command** — script is retrieved but never executed; wire `ExecuteHandler()` call after lookup
+- **`set <property> of <part>` full coverage** — currently only `hilite`, `text`, `visible` work; add `name`, `rect`, `style`, `textFont`, `textSize`, `textStyle`, `enabled`
+- **Field text mutation** — `SetFieldText` / `SetPartVisible` currently log "deferred"; make card/background part content mutable and trigger re-render
+- **Button hilite read-back** — `GetButtonHilite` returns `null`; read from live part state
+
+**Milestone:** All HyperTalk VM commands execute real behavior. Re-run NEUROBLAST — all script interactions work without log stubs. **Commit.**
+
+### Phase 12: Styled Text Rendering
+
+Styled text run data is parsed and stored but completely ignored during rendering.
+
+- **`StyleTableBlock` + `FontTableBlock` lookup** — wire into `TextRenderer.DrawFieldText` and `TextRenderer.DrawButtonLabel`
+- **Per-run font/size/style application** — apply `SKTypeface`, `TextSize`, bold/italic/underline per `StyleRun` span
+- **Mac font ID → system font mapping** — extend `FontMapper` with Geneva (12/9pt special-case), Chicago, Monaco, Palatino, Times, Helvetica substitution table
+- **Mixed-style layout** — measure each run individually; line-wrap across run boundaries; handle superscript/subscript offsets
+- **`set textFont/textSize/textStyle of field`** — update style runs at runtime when set via HyperTalk
+
+**Milestone:** Open a stack with styled fields — different fonts, sizes, bold/italic render correctly. **Commit.**
+
+### Phase 13: Sound Playback via LibVLC
+
+The `play` command callback exists but has a TODO — no audio output.
+
+- **`SoundDecoder.cs`** — implement Mac `snd ` resource PCM extraction: parse sound header (format 1/2), extract 8-bit µ-law or raw PCM samples, write to a temp WAV or pipe
+- **`MediaService.cs`** — LibVLCSharp wrapper: `PlayAudio(byte[] pcm, int sampleRate)` using `LibVLC.Media` from stream; also `PlayFile(string path)` for external MOV
+- **Wire `PlaySound` callback** in `StackViewModel` — look up `snd ` resource by name in `StackFile.Resources`, decode, hand to `MediaService`
+- **`stop sound` command** — add to interpreter and stop active media
+- **MOV playback** — wire `VideoView` into the card area when a `play movie` command targets a rect
+
+**Milestone:** `play "boing"` triggers the correct sampled sound. MOV resources play inline. **Commit.**
+
+### Phase 14: AddColor / Color Rendering
+
+Color mode currently returns the B&W bitmap unchanged — `AddColorDecoder` is a complete stub.
+
+- **`AddColorDecoder.cs`** — parse `HCcd` (card color) and `HCbg` (background color) resources: 4-byte header, list of color regions (`partId`, `rect`, `fill color`, `frame color`)
+- **`ColorRenderer.cs`** — apply color regions as filled rectangles composited over the B&W base layer using SkiaSharp `SKPaint` with `SKBlendMode.Multiply` / `SrcOver`
+- **`AddColor` part-level color** — match `partId` to rendered part rect and tint button/field backgrounds
+- **`PICT` resource rendering** — implement `PictDecoder.cs` covering the opcodes found in real stacks: `0x0001` ClipRect, `0x0011` VersionOp, `0x001E`/`0x001F` DefHilite, `0x0098` PackBitsRect, `0x009A` DirectBitsRect, `0x00FF` EndPic; log any unrecognised opcode rather than crashing
+- **Resource fork → rendering pipeline integration** — ensure `StackFile` exposes color resources so `CardRenderer` can access them in Color mode
+
+**Milestone:** Toggle to Color mode — AddColor stacks show filled color regions. PICT backgrounds render. **Commit.**
+
+### Phase 15: Format Robustness
+
+Gaps in format handling that cause silent failures or crashes on real-world stacks.
+
+- **HyperCard 1.x stack support** — detect format version ≤ 7 in `StackBlock`; map the different field offsets for card count, card size, and list block location; log a warning for any 1.x-only feature
+- **Mac Roman encoding** — replace Latin-1 proxy in `PartContent.cs` with a proper Mac Roman → UTF-16 lookup table (characters 0x80–0xFF differ)
+- **`go home` / Home stack** — resolve to a configured home stack path or open the file picker rather than logging a no-op
+- **Unknown block tracing** — ensure every unknown block type logs its 4-char type code, byte offset, and size (already partial; audit and harden)
+- **Large stack stability** — test with stacks > 100 cards; verify `LIST`/`PAGE` B-tree walk handles multi-page card lists without index errors
+- **Password-protected stacks** — detect encrypted STAK flag; surface a readable "This stack is password-protected" message instead of garbage rendering
+
+**Milestone:** Open a diverse set of real-world stacks without crashes. 1.x stacks display a version warning rather than corrupting. **Commit.**
+
+### Phase 16: Community Release Readiness
+
+Non-functional work to make the project welcoming to contributors and end-users.
+
+- **README.md** — feature overview, screenshots, download instructions, contributor guide, link to `docs/`
+- **`docs/hypertalk-coverage.md`** — table of every HyperTalk command and function with ✅/⚠️/❌ status
+- **`docs/stack-format.md`** — update with all block types encountered, field offsets confirmed against real stacks
+- **GitHub Issues** — file issues for each Phase 11–15 stub so the community can contribute
+- **CI workflow** — `.github/workflows/build.yml`: `dotnet build` + `dotnet test` on push/PR for Windows, macOS, Linux
+- **Self-contained publish** — verify `dotnet publish -r win-x64 --self-contained` produces a single-folder app with LibVLC bundled
+- **App icon + About dialog polish** — replace placeholder icon; About dialog shows version from assembly metadata
+
+**Milestone:** Project is publicly presentable. CI is green. Single-folder redistributable builds for all three platforms. **Commit + tag v0.2.0.**
 
 **Milestone:** Polished, usable viewer for community release. **Commit + tag v0.1.0.**
 
