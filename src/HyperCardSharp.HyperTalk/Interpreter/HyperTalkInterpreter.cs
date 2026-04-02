@@ -213,6 +213,9 @@ public class HyperTalkInterpreter
     // StreamReaders for currently "open" files keyed by script-supplied file name.
     private readonly Dictionary<string, System.IO.StreamReader> _openFiles = new(StringComparer.OrdinalIgnoreCase);
 
+    // StreamWriters for currently "open" files keyed by script-supplied file name.
+    private readonly Dictionary<string, System.IO.StreamWriter> _openWriteFiles = new(StringComparer.OrdinalIgnoreCase);
+
     // Current script being executed — used for user-defined function lookup.
     private ScriptNode? _currentScript;
 
@@ -909,6 +912,11 @@ public class HyperTalkInterpreter
                     sr.Dispose();
                     _openFiles.Remove(fileName);
                 }
+                if (_openWriteFiles.TryGetValue(fileName, out var sw))
+                {
+                    sw.Dispose();
+                    _openWriteFiles.Remove(fileName);
+                }
                 return ExecutionResult.Normal;
             }
         }
@@ -946,7 +954,7 @@ public class HyperTalkInterpreter
             }
         }
 
-        // write <expr> to file <path>  — read-only mode; log and skip
+        // write <expr> to file <path>
         if (cmdLower == "write" && s.Args.Length >= 4)
         {
             var evalArgs = Array.ConvertAll(s.Args, a => Evaluate(a, env));
@@ -955,7 +963,36 @@ public class HyperTalkInterpreter
             if (toIdx >= 0 && toIdx + 2 < evalArgs.Length &&
                 evalArgs[toIdx + 1].Raw.Equals("file", StringComparison.OrdinalIgnoreCase))
             {
-                LogMessage("HyperTalk: write to file — not supported in read-only player mode");
+                string valueStr = string.Join(" ", evalArgs[..toIdx].Select(a => a.Raw));
+                string fileName  = evalArgs[toIdx + 2].Raw;
+
+                if (ResolveFilePath == null)
+                {
+                    LogMessage($"HyperTalk: write to file '{fileName}' — file I/O not available");
+                    return ExecutionResult.Normal;
+                }
+                var resolved = ResolveFilePath(fileName);
+                if (resolved == null)
+                {
+                    LogMessage($"HyperTalk: write to file '{fileName}' — access denied by sandbox");
+                    LogMessage($"HyperTalk: write to file '{fileName}' — file I/O not available");
+                    return ExecutionResult.Normal;
+                }
+
+                try
+                {
+                    if (!_openWriteFiles.TryGetValue(fileName, out var sw))
+                    {
+                        sw = new System.IO.StreamWriter(resolved, append: true, System.Text.Encoding.UTF8);
+                        _openWriteFiles[fileName] = sw;
+                    }
+                    sw.Write(valueStr);
+                    sw.Flush();
+                }
+                catch (Exception ex)
+                {
+                    LogMessage($"HyperTalk: write to file '{fileName}' failed — {ex.Message}");
+                }
                 return ExecutionResult.Normal;
             }
         }

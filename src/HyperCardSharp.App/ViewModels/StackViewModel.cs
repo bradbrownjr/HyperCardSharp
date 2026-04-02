@@ -479,7 +479,7 @@ public partial class StackViewModel : ObservableObject
         _interpreter.GetIsMouseDown   = () => _isMouseDown;
 
         // Phase 23: sandboxed file I/O — restrict to files in the same directory as the
-        // currently loaded stack (read-only; write is blocked in the interpreter).
+        // currently loaded stack. Resolver returns the sandboxed path (creation allowed).
         _interpreter.ResolveFilePath = scriptPath =>
         {
             if (string.IsNullOrWhiteSpace(CurrentFileName)) return null;
@@ -499,7 +499,9 @@ public partial class StackViewModel : ObservableObject
                 && !candidate.Equals(sourceDir, StringComparison.OrdinalIgnoreCase))
                 return null;
 
-            return System.IO.File.Exists(candidate) ? candidate : null;
+            // Return the sandboxed path regardless of whether the file exists yet,
+            // so that write-to-file can create new files within the sandbox.
+            return candidate;
         };
 
         // XCMD/XFCN registry — register built-in emulations
