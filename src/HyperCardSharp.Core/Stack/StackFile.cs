@@ -1,5 +1,6 @@
 using HyperCardSharp.Core.Binary;
 using HyperCardSharp.Core.Bitmap;
+using HyperCardSharp.Core.Resources;
 
 namespace HyperCardSharp.Core.Stack;
 
@@ -40,6 +41,24 @@ public class StackFile
     /// </summary>
     public Dictionary<string, byte[]> SoundsByName { get; init; } =
         new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// HCcd (card-level AddColor) resources keyed by card block ID.
+    /// Each value is a list of colour regions that should be composited under the card BMAP
+    /// when rendering in Colour mode.
+    /// </summary>
+    public Dictionary<int, IReadOnlyList<AddColorDecoder.ColorRegion>> CardColorData { get; init; } = new();
+
+    /// <summary>
+    /// HCbg (background-level AddColor) resources keyed by background block ID.
+    /// </summary>
+    public Dictionary<int, IReadOnlyList<AddColorDecoder.ColorRegion>> BackgroundColorData { get; init; } = new();
+
+    /// <summary>
+    /// 'PICT' resources keyed by resource ID.
+    /// Raw PICT data; use <see cref="HyperCardSharp.Rendering.PictDecoder"/> to decode to bitmap.
+    /// </summary>
+    public Dictionary<short, byte[]> PictResources { get; init; } = new();
 
     /// <summary>
     /// Get the ordered list of card IDs from PAGE blocks.

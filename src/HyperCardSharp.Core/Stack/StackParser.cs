@@ -164,6 +164,10 @@ public class StackParser
         }
 
         var (soundsById, soundsByName) = ParseSoundResources(resourceFork);
+        var (cardColorData, bgColorData) = ParseAddColorResources(resourceFork);
+        var pictResources = MacResourceForkReader.GetResources(resourceFork, "PICT");
+        if (pictResources.Count > 0)
+            _logger.LogInformation("Resource fork: {Count} PICT resource(s) loaded.", pictResources.Count);
 
         return new StackFile
         {
@@ -179,8 +183,11 @@ public class StackParser
             Blocks = blocks,
             RawData = fileData,
             Icons = ParseIconResources(resourceFork),
-            SoundsById   = soundsById,
-            SoundsByName = soundsByName,
+            SoundsById          = soundsById,
+            SoundsByName        = soundsByName,
+            CardColorData       = cardColorData,
+            BackgroundColorData = bgColorData,
+            PictResources       = pictResources,
         };
     }
 
@@ -209,6 +216,36 @@ public class StackParser
             _logger.LogInformation("Resource fork: {Count} 'snd ' resource(s) loaded.", sndResources.Count);
 
         return (byId, byName);
+    }
+
+    private (Dictionary<int, IReadOnlyList<AddColorDecoder.ColorRegion>> Cards,
+             Dictionary<int, IReadOnlyList<AddColorDecoder.ColorRegion>> Bgs)
+        ParseAddColorResources(byte[]? resourceFork)
+    {
+        var cardData = new Dictionary<int, IReadOnlyList<AddColorDecoder.ColorRegion>>();
+        var bgData   = new Dictionary<int, IReadOnlyList<AddColorDecoder.ColorRegion>>();
+
+        var hccd = MacResourceForkReader.GetResources(resourceFork, "HCcd");
+        foreach (var (id, raw) in hccd)
+        {
+            var regions = AddColorDecoder.Decode(raw);
+            if (regions.Count > 0)
+                cardData[(int)id] = regions;
+        }
+
+        var hcbg = MacResourceForkReader.GetResources(resourceFork, "HCbg");
+        foreach (var (id, raw) in hcbg)
+        {
+            var regions = AddColorDecoder.Decode(raw);
+            if (regions.Count > 0)
+                bgData[(int)id] = regions;
+        }
+
+        if (hccd.Count > 0 || hcbg.Count > 0)
+            _logger.LogInformation("AddColor: {CdCount} HCcd + {BgCount} HCbg resource(s).",
+                hccd.Count, hcbg.Count);
+
+        return (cardData, bgData);
     }
 
     /// <summary>
