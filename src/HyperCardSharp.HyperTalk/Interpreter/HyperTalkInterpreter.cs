@@ -166,6 +166,12 @@ public class HyperTalkInterpreter
     /// </summary>
     public Func<(int h, int v)> GetMousePosition { get; set; } = () => (0, 0);
 
+    /// <summary>
+    /// Returns whether the primary mouse button is currently held down.
+    /// Used to implement <c>the mouse</c> (returns "down" or "up").
+    /// </summary>
+    public Func<bool> GetIsMouseDown { get; set; } = () => false;
+
     // ── Interpreter state ─────────────────────────────────────────────────────
 
     /// <summary>The target that originally received the current message (e.g. "button \"Go\"").</summary>
@@ -1059,7 +1065,7 @@ public class HyperTalkInterpreter
                 "tool"          => new HyperTalkValue("browse"),
                 "userlevel"     => new HyperTalkValue("5"),
                 "screenrect"    => new HyperTalkValue(GetScreenRect()),
-                "mouse"         => HyperTalkValue.Empty, // TODO: Phase 17 — needs button-down state
+                "mouse"         => new HyperTalkValue(GetIsMouseDown() ? "down" : "up"),
                 "mouseh"        => new HyperTalkValue(GetMousePosition().h.ToString()),
                 "mousev"        => new HyperTalkValue(GetMousePosition().v.ToString()),
                 "mouseloc"      => new HyperTalkValue($"{GetMousePosition().h},{GetMousePosition().v}"),

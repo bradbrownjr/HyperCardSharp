@@ -31,6 +31,7 @@ public partial class StackViewModel : ObservableObject
     // Phase 17: mouse position (card-local coordinates, updated by pointer move events).
     private int _lastMouseH;
     private int _lastMouseV;
+    private bool _isMouseDown;
 
     // Phase 17: hover tracking for mouseEnter / mouseLeave / mouseWithin.
     // Stores the Part the pointer was over on the last pointer-move event; null = card background.
@@ -475,6 +476,7 @@ public partial class StackViewModel : ObservableObject
 
         // Phase 17: live mouse position (updated through UpdateMousePosition)
         _interpreter.GetMousePosition = () => (_lastMouseH, _lastMouseV);
+        _interpreter.GetIsMouseDown   = () => _isMouseDown;
 
         // Phase 23: sandboxed file I/O — restrict to files in the same directory as the
         // currently loaded stack (read-only; write is blocked in the interpreter).
@@ -511,8 +513,11 @@ public partial class StackViewModel : ObservableObject
         _interpreter.Xcmds = xcmds;
     }
 
+    public void SetMouseButtonDown(bool isDown) => _isMouseDown = isDown;
+
     public void HandleCardClick(float cardX, float cardY)
     {
+        _isMouseDown = false;
         // Phase 17: record click position for "the clickLoc" / "the clickH" / "the clickV"
         _interpreter.LastClickPos = ((int)cardX, (int)cardY);
 

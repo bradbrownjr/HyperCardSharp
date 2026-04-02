@@ -46,6 +46,9 @@ public class SkiaBitmapControl : Control
     private double _renderOffsetX, _renderOffsetY, _renderScale = 1.0;
     private double _renderSourceW, _renderSourceH;
 
+    /// <summary>Fired (card X, card Y) on pointer press over a loaded card bitmap.</summary>
+    public event Action<float, float>? CardPointerPressed;
+
     /// <summary>Fired (card X, card Y) on pointer release over a loaded card bitmap.</summary>
     public event Action<float, float>? CardPointerReleased;
 
@@ -356,6 +359,17 @@ public class SkiaBitmapControl : Control
         context.DrawImage(bitmapToRender,
             new Rect(0, 0, sourceSize.Width, sourceSize.Height),
             new Rect(offsetX, offsetY, scaledWidth, scaledHeight));
+    }
+
+    protected override void OnPointerPressed(Avalonia.Input.PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+        if (_writeableBitmap == null || _renderScale <= 0) return;
+        var pt = e.GetPosition(this);
+        double cardX = (pt.X - _renderOffsetX) / _renderScale;
+        double cardY = (pt.Y - _renderOffsetY) / _renderScale;
+        if (cardX < 0 || cardY < 0 || cardX >= _renderSourceW || cardY >= _renderSourceH) return;
+        CardPointerPressed?.Invoke((float)cardX, (float)cardY);
     }
 
     protected override void OnPointerReleased(Avalonia.Input.PointerReleasedEventArgs e)

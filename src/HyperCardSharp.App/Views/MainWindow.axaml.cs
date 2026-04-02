@@ -136,6 +136,7 @@ public partial class MainWindow : Window
         var cardDisplay = this.FindControl<HyperCardSharp.App.Controls.SkiaBitmapControl>("CardDisplay");
         if (cardDisplay != null)
         {
+            cardDisplay.CardPointerPressed  += (x, y) => _viewModel.SetMouseButtonDown(true);
             cardDisplay.CardPointerReleased += (x, y) => _viewModel.HandleCardClick(x, y);
             cardDisplay.CardPointerMoved += (x, y) =>
             {
