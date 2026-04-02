@@ -1,5 +1,6 @@
 using HyperCardSharp.Core.Binary;
 using HyperCardSharp.Core.Parts;
+using HyperCardSharp.Core.Text;
 
 namespace HyperCardSharp.Core.Stack;
 
@@ -88,6 +89,6 @@ public class CardBlock
         while (end < data.Length && data[end] != 0)
             end++;
         if (end == offset) return "";
-        return System.Text.Encoding.Latin1.GetString(data.Slice(offset, end - offset));
+        return MacRomanEncoding.GetString(data.Slice(offset, end - offset));
     }
 }

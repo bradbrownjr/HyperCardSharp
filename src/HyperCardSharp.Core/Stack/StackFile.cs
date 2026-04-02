@@ -61,6 +61,18 @@ public class StackFile
     public Dictionary<short, byte[]> PictResources { get; init; } = new();
 
     /// <summary>
+    /// True when the stack was created by HyperCard 1.x (format version ≤ 7).
+    /// Full 1.x format support is not yet implemented — the stack may render partially.
+    /// </summary>
+    public bool IsHyperCard1x => StackHeader.FormatVersion is >= 1 and <= 7;
+
+    /// <summary>
+    /// True when the stack has a non-zero password hash, indicating it is password-protected.
+    /// The player can display cards but cannot verify or remove the password.
+    /// </summary>
+    public bool IsPasswordProtected => StackHeader.PasswordHash != 0;
+
+    /// <summary>
     /// Get the ordered list of card IDs from PAGE blocks.
     /// </summary>
     public IEnumerable<int> GetCardOrder()

@@ -1,4 +1,5 @@
 using HyperCardSharp.Core.Binary;
+using HyperCardSharp.Core.Text;
 
 namespace HyperCardSharp.Core.Parts;
 
@@ -155,6 +156,6 @@ public class Part
         if (end == offset)
             return "";
 
-        return System.Text.Encoding.Latin1.GetString(data.Slice(offset, end - offset));
+        return MacRomanEncoding.GetString(data.Slice(offset, end - offset));
     }
 }

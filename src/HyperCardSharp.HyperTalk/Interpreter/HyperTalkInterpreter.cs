@@ -103,6 +103,12 @@ public class HyperTalkInterpreter
     /// </summary>
     public Action<string, string?, int?> GoToStack { get; set; } = (_, _, _) => {};
 
+    /// <summary>
+    /// Called when HyperTalk executes <c>go home</c>.
+    /// Defaults to a simple log message; the App layer should override this to open the file picker.
+    /// </summary>
+    public Action GoHome { get; set; } = () => {};
+
     // Return value from the most-recently executed handler/function
     public HyperTalkValue ReturnValue { get; private set; } = HyperTalkValue.Empty;
 
@@ -435,7 +441,8 @@ public class HyperTalkInterpreter
         // Cross-stack navigation: go home / go to stack "name" — not supported in single-stack player
         if (s.IsHome)
         {
-            LogMessage("HyperTalk: go home — Home stack not available (graceful no-op)");
+            LogMessage("HyperTalk: go home — triggering home navigation");
+            GoHome();
             return ExecutionResult.Normal;
         }
         if (s.StackName != null)

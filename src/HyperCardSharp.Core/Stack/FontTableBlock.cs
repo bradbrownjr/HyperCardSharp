@@ -1,4 +1,5 @@
 using HyperCardSharp.Core.Binary;
+using HyperCardSharp.Core.Text;
 
 namespace HyperCardSharp.Core.Stack;
 
@@ -36,7 +37,7 @@ public class FontTableBlock
             int nameStart = offset;
             while (offset < blockData.Length && blockData[offset] != 0)
                 offset++;
-            var name = System.Text.Encoding.Latin1.GetString(blockData.Slice(nameStart, offset - nameStart));
+            var name = MacRomanEncoding.GetString(blockData.Slice(nameStart, offset - nameStart));
             offset++; // skip null terminator
 
             // Word-align

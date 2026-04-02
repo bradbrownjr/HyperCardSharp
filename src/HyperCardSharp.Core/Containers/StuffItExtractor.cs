@@ -30,11 +30,9 @@ public class StuffItExtractor : IContainerExtractor
 
     /// <summary>
     /// Decode a Mac OS Pascal string (length-prefixed, bytes) to a .NET string.
-    /// Uses Latin-1 (ISO 8859-1) as a safe subset of Mac Roman for non-ASCII characters.
-    /// This avoids the need for System.Text.Encoding.CodePages.
     /// </summary>
     private static string DecodeMacName(ReadOnlySpan<byte> nameBytes)
-        => Encoding.Latin1.GetString(nameBytes);
+        => HyperCardSharp.Core.Text.MacRomanEncoding.GetString(nameBytes);
 
     public bool CanHandle(ReadOnlySpan<byte> data)
     {

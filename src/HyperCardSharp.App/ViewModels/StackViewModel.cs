@@ -62,6 +62,12 @@ public partial class StackViewModel : ObservableObject
     public event Action<string, string?, int?>? CrossStackNavigationRequested;
 
     /// <summary>
+    /// Raised when a HyperTalk <c>go home</c> command is executed.
+    /// The App layer should handle this by opening a file picker.
+    /// </summary>
+    public event Action? GoHomeRequested;
+
+    /// <summary>
     /// Raised when a HyperTalk <c>visual effect</c> / <c>go</c> pair fires a named transition.
     /// from: old card bitmap (caller must dispose); to: new card bitmap (same as CurrentBitmap).
     /// </summary>
@@ -331,6 +337,8 @@ public partial class StackViewModel : ObservableObject
 
         _interpreter.GoToStack = (stackName, cardName, cardNum) =>
             CrossStackNavigationRequested?.Invoke(stackName, cardName, cardNum);
+
+        _interpreter.GoHome = () => GoHomeRequested?.Invoke();
     }
 
     public void HandleCardClick(float cardX, float cardY)
@@ -546,7 +554,19 @@ public partial class StackViewModel : ObservableObject
         var partInfo = card.Parts.Count > 0 ? $", {card.Parts.Count} parts" : "";
         var nameInfo = !string.IsNullOrEmpty(card.Name) ? $" \"{card.Name}\"" : "";
         var fileInfo = CurrentFileName != null ? $"{CurrentFileName}: " : "";
-        StatusText = $"{fileInfo}Card {CurrentCardIndex + 1}/{TotalCards}{nameInfo}{partInfo}";
+        var warning = BuildStackWarning();
+        StatusText = $"{fileInfo}Card {CurrentCardIndex + 1}/{TotalCards}{nameInfo}{partInfo}{warning}";
+    }
+
+    private string BuildStackWarning()
+    {
+        if (_stack == null) return "";
+        var parts = new System.Text.StringBuilder();
+        if (_stack.IsHyperCard1x)
+            parts.Append(" [HyperCard 1.x — partial support]");
+        if (_stack.IsPasswordProtected)
+            parts.Append(" [Password protected]");
+        return parts.ToString();
     }
 
     private void RenderCurrentCard()

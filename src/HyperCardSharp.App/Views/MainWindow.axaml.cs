@@ -52,6 +52,7 @@ public partial class MainWindow : Window
         KeyDown += OnKeyDown;
         _viewModel.ShowAnswerDialog  += OnShowAnswerDialog;
         _viewModel.CrossStackNavigationRequested += OnCrossStackNavigation;
+        _viewModel.GoHomeRequested += () => _ = OpenFileAsync();
 
         LoadRecentFiles();
 

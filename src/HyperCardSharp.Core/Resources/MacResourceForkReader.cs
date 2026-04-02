@@ -219,7 +219,7 @@ public static class MacResourceForkReader
                         int nameAbsOff = nameListStart + nameListOff;
                         byte nameLen = span[nameAbsOff];
                         if (nameAbsOff + 1 + nameLen <= fork.Length)
-                            resName = Encoding.Latin1.GetString(span.Slice(nameAbsOff + 1, nameLen));
+                            resName = HyperCardSharp.Core.Text.MacRomanEncoding.GetString(span.Slice(nameAbsOff + 1, nameLen));
                     }
 
                     result.Add((resourceId, resName, resData));

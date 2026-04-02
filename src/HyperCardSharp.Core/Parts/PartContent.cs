@@ -1,4 +1,5 @@
 using HyperCardSharp.Core.Binary;
+using HyperCardSharp.Core.Text;
 
 namespace HyperCardSharp.Core.Parts;
 
@@ -101,10 +102,7 @@ public class PartContent
     }
 
     private static string ReadMacRoman(ReadOnlySpan<byte> data)
-    {
-        // Use Latin1 as an approximation of Mac Roman for now
-        return System.Text.Encoding.Latin1.GetString(data);
-    }
+        => MacRomanEncoding.GetString(data);
 }
 
 public class StyleRun

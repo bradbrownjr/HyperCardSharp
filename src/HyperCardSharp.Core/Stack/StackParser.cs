@@ -90,6 +90,12 @@ public class StackParser
                         "STAK: version={Version}, cards={Cards}, backgrounds={Backgrounds}, size={Width}x{Height}",
                         stackBlock.FormatVersion, stackBlock.CardCount, stackBlock.BackgroundCount,
                         stackBlock.CardWidth, stackBlock.CardHeight);
+                    if (stackBlock.FormatVersion is >= 1 and <= 7)
+                        _logger.LogWarning(
+                            "HyperCard 1.x stack detected (format version {V}). Full 1.x support is not yet implemented.",
+                            stackBlock.FormatVersion);
+                    if (stackBlock.PasswordHash != 0)
+                        _logger.LogWarning("Stack is password-protected (hash={Hash:X8}). Password cannot be verified or removed.", stackBlock.PasswordHash);
                     break;
 
                 case "MAST":
