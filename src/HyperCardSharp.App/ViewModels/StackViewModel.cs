@@ -32,6 +32,10 @@ public partial class StackViewModel : ObservableObject
     private int _lastMouseH;
     private int _lastMouseV;
 
+    // Phase 17: hover tracking for mouseEnter / mouseLeave / mouseWithin.
+    // Stores the Part the pointer was over on the last pointer-move event; null = card background.
+    private Part? _lastHoveredPart;
+
     // Phase 17: idle timer — sends "idle" to the current card/bg/stack scripts periodically.
     private Avalonia.Threading.DispatcherTimer? _idleTimer;
 
@@ -472,6 +476,30 @@ public partial class StackViewModel : ObservableObject
         // Phase 17: live mouse position (updated through UpdateMousePosition)
         _interpreter.GetMousePosition = () => (_lastMouseH, _lastMouseV);
 
+        // Phase 23: sandboxed file I/O — restrict to files in the same directory as the
+        // currently loaded stack (read-only; write is blocked in the interpreter).
+        _interpreter.ResolveFilePath = scriptPath =>
+        {
+            if (string.IsNullOrWhiteSpace(CurrentFileName)) return null;
+
+            // Reject absolute paths and path-traversal attempts
+            if (System.IO.Path.IsPathRooted(scriptPath)) return null;
+            if (scriptPath.Contains("..")) return null;
+
+            // Sandbox root: same folder as the file that was opened
+            var sourceDir = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(CurrentFileName));
+            if (sourceDir == null) return null;
+
+            var candidate = System.IO.Path.GetFullPath(System.IO.Path.Combine(sourceDir, scriptPath));
+
+            // Final check: ensure the resolved path stays inside the sandbox root
+            if (!candidate.StartsWith(sourceDir + System.IO.Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+                && !candidate.Equals(sourceDir, StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            return System.IO.File.Exists(candidate) ? candidate : null;
+        };
+
         // XCMD/XFCN registry — register built-in emulations
         var xcmds = new XcmdRegistry(_interpreter.LogMessage);
         // AddColor is handled by the rendering layer; register as a no-op so scripts calling it
@@ -530,6 +558,28 @@ public partial class StackViewModel : ObservableObject
     /// Returns true if the given card coordinates are over a clickable button.
     /// In HyperCard, the browse tool always shows a hand cursor over any visible button.
     /// </summary>
+    /// <summary>
+    /// Called when the main window loses focus. Dispatches <c>suspendStack</c>.
+    /// </summary>
+    public void SuspendStack()
+    {
+        var card = CurrentCard();
+        if (card == null) return;
+        var bg = CurrentBackground(card);
+        DispatchLifecycle("suspendStack", card, bg);
+    }
+
+    /// <summary>
+    /// Called when the main window regains focus. Dispatches <c>resumeStack</c>.
+    /// </summary>
+    public void ResumeStack()
+    {
+        var card = CurrentCard();
+        if (card == null) return;
+        var bg = CurrentBackground(card);
+        DispatchLifecycle("resumeStack", card, bg);
+    }
+
     public bool IsOverClickableButton(float cardX, float cardY)
     {
         var card = CurrentCard();
@@ -542,27 +592,62 @@ public partial class StackViewModel : ObservableObject
 
     /// <summary>
     /// Called by the UI whenever the pointer moves over the card surface.
-    /// Keeps <c>the mouseH</c> / <c>the mouseV</c> / <c>the mouseLoc</c> up-to-date for HyperTalk.
+    /// Keeps <c>the mouseH</c> / <c>the mouseV</c> / <c>the mouseLoc</c> up-to-date for HyperTalk,
+    /// and dispatches <c>mouseEnter</c> / <c>mouseLeave</c> / <c>mouseWithin</c> messages.
     /// </summary>
     public void UpdateMousePosition(float cardX, float cardY)
     {
         _lastMouseH = (int)cardX;
         _lastMouseV = (int)cardY;
+
+        var card = CurrentCard();
+        if (card == null) return;
+        var bg = CurrentBackground(card);
+        var nowOver = HitTest(cardX, cardY, card, bg);
+
+        if (!ReferenceEquals(nowOver, _lastHoveredPart))
+        {
+            // Fire mouseLeave on the part we just left (if it has a script)
+            if (_lastHoveredPart != null && !string.IsNullOrWhiteSpace(_lastHoveredPart.Script))
+                _dispatcher.DispatchMessage("mouseLeave", _lastHoveredPart.Script, _interpreter);
+
+            // Fire mouseEnter on the part we just entered (if it has a script)
+            if (nowOver != null && !string.IsNullOrWhiteSpace(nowOver.Script))
+                _dispatcher.DispatchMessage("mouseEnter", nowOver.Script, _interpreter);
+
+            _lastHoveredPart = nowOver;
+        }
+        else if (nowOver != null && !string.IsNullOrWhiteSpace(nowOver.Script))
+        {
+            // Pointer is staying within the same part — fire mouseWithin
+            _dispatcher.DispatchMessage("mouseWithin", nowOver.Script, _interpreter);
+        }
     }
 
     /// <summary>
     /// Called by the UI on every key press. Records the key for <c>the key</c> / <c>the keyCode</c>
-    /// and dispatches <c>keyDown</c> through the HyperCard message hierarchy.
+    /// and dispatches <c>keyDown</c> (or a specialised key message) through the message hierarchy.
     /// </summary>
     public void DispatchKeyDown(string key, int keyCode)
     {
         _interpreter.LastKey     = key;
         _interpreter.LastKeyCode = keyCode.ToString();
 
+        // HyperCard dispatches dedicated handlers for special keys.
+        // Map Avalonia Key names → HyperCard handler names.
+        var handlerName = key switch
+        {
+            "Tab"    => "tabKey",
+            "Return" => "returnKey",
+            "Enter"  => "enterKey",
+            "Up" or "Down" or "Left" or "Right" => "arrowKey",
+            _        => "keyDown",
+        };
+
         var card = CurrentCard();
         if (card == null) return;
         var bg = CurrentBackground(card);
-        DispatchLifecycle("keyDown", card, bg);
+        DispatchLifecycle(handlerName, card, bg);
     }
 
     /// <summary>The file name of the currently opened file (e.g., "neuroblast.img").</summary>

@@ -196,6 +196,17 @@ public class HyperTalkInterpreter
     /// <summary>Last keyCode (integer as string).</summary>
     public string LastKeyCode { get; set; } = "";
 
+    // ── Phase 23 — file I/O ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Optional callback that resolves a script-supplied file name to a full, sandboxed path.
+    /// Return <c>null</c> to deny access. When not set, all file I/O is disabled.
+    /// </summary>
+    public Func<string, string?>? ResolveFilePath { get; set; }
+
+    // StreamReaders for currently "open" files keyed by script-supplied file name.
+    private readonly Dictionary<string, System.IO.StreamReader> _openFiles = new(StringComparer.OrdinalIgnoreCase);
+
     // Current script being executed — used for user-defined function lookup.
     private ScriptNode? _currentScript;
 
@@ -855,6 +866,92 @@ public class HyperTalkInterpreter
         {
             PrintCard();
             return ExecutionResult.Normal;
+        }
+
+        // ── Phase 23: File I/O ────────────────────────────────────────────────
+
+        // open file <path>
+        if (cmdLower == "open" && s.Args.Length >= 2)
+        {
+            var evalArgs = Array.ConvertAll(s.Args, a => Evaluate(a, env));
+            if (evalArgs[0].Raw.Equals("file", StringComparison.OrdinalIgnoreCase))
+            {
+                var fileName = evalArgs[1].Raw;
+                if (ResolveFilePath == null)
+                    LogMessage($"HyperTalk: file I/O not available (open file '{fileName}')");
+                else
+                {
+                    var resolved = ResolveFilePath(fileName);
+                    if (resolved == null)
+                        LogMessage($"HyperTalk: access denied — open file '{fileName}'");
+                    else if (!_openFiles.ContainsKey(fileName))
+                        _openFiles[fileName] = new System.IO.StreamReader(resolved, System.Text.Encoding.UTF8);
+                }
+                return ExecutionResult.Normal;
+            }
+        }
+
+        // close file <path>
+        if (cmdLower == "close" && s.Args.Length >= 2)
+        {
+            var evalArgs = Array.ConvertAll(s.Args, a => Evaluate(a, env));
+            if (evalArgs[0].Raw.Equals("file", StringComparison.OrdinalIgnoreCase))
+            {
+                var fileName = evalArgs[1].Raw;
+                if (_openFiles.TryGetValue(fileName, out var sr))
+                {
+                    sr.Dispose();
+                    _openFiles.Remove(fileName);
+                }
+                return ExecutionResult.Normal;
+            }
+        }
+
+        // read from file <path> [until <delim> | for <count>]
+        if (cmdLower == "read" && s.Args.Length >= 3)
+        {
+            var evalArgs = Array.ConvertAll(s.Args, a => Evaluate(a, env));
+            // expected: read / "from" / "file" / <path> [/ "until"|"for" / ...]
+            if (evalArgs[0].Raw.Equals("from", StringComparison.OrdinalIgnoreCase) &&
+                evalArgs[1].Raw.Equals("file", StringComparison.OrdinalIgnoreCase))
+            {
+                var fileName = evalArgs[2].Raw;
+                if (!_openFiles.TryGetValue(fileName, out var sr))
+                    LogMessage($"HyperTalk: file '{fileName}' is not open");
+                else
+                {
+                    string text;
+                    // Check for "for <n>" clause
+                    if (evalArgs.Length >= 5 && evalArgs[3].Raw.Equals("for", StringComparison.OrdinalIgnoreCase)
+                        && int.TryParse(evalArgs[4].Raw, out int count))
+                    {
+                        var buf = new char[count];
+                        int n = sr.Read(buf, 0, count);
+                        text = new string(buf, 0, n);
+                    }
+                    else
+                    {
+                        // Default: read a line (until newline)
+                        text = sr.ReadLine() ?? "";
+                    }
+                    env.It = new HyperTalkValue(text);
+                }
+                return ExecutionResult.Normal;
+            }
+        }
+
+        // write <expr> to file <path>  — read-only mode; log and skip
+        if (cmdLower == "write" && s.Args.Length >= 4)
+        {
+            var evalArgs = Array.ConvertAll(s.Args, a => Evaluate(a, env));
+            // expected: write / <value> / "to" / "file" / <path>
+            int toIdx = Array.FindIndex(evalArgs, a => a.Raw.Equals("to", StringComparison.OrdinalIgnoreCase));
+            if (toIdx >= 0 && toIdx + 2 < evalArgs.Length &&
+                evalArgs[toIdx + 1].Raw.Equals("file", StringComparison.OrdinalIgnoreCase))
+            {
+                LogMessage("HyperTalk: write to file — not supported in read-only player mode");
+                return ExecutionResult.Normal;
+            }
         }
 
         // User-defined command handler (on commandName ... end commandName)

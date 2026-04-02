@@ -159,6 +159,10 @@ public partial class MainWindow : Window
         DragDrop.SetAllowDrop(dropTarget, true);
         dropTarget.AddHandler(DragDrop.DragOverEvent, OnDragOver);
         dropTarget.AddHandler(DragDrop.DropEvent, OnDrop);
+
+        // Phase 17: suspendStack / resumeStack on window focus changes
+        Deactivated += (_, _) => _viewModel.SuspendStack();
+        Activated   += (_, _) => _viewModel.ResumeStack();
     }
 
     private void OnShowAnswerDialog(string message)
