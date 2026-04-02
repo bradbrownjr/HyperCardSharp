@@ -163,22 +163,33 @@ public static class PartRenderer
         float right  = part.Right;
         float bottom = part.Bottom;
 
-        using var whiteFill  = new SKPaint { Style = SKPaintStyle.Fill,   Color = SKColors.White };
+        using var whiteFill   = new SKPaint { Style = SKPaintStyle.Fill,   Color = SKColors.White };
         using var blackBorder = new SKPaint { Style = SKPaintStyle.Stroke, Color = SKColors.Black, StrokeWidth = 1 };
         using var blackFill   = new SKPaint { Style = SKPaintStyle.Fill,   Color = SKColors.Black };
 
-        // Scrollbar track background
-        var trackRect = new SKRect(left, top, right, bottom);
-        canvas.DrawRect(trackRect, whiteFill);
-        canvas.DrawRect(trackRect, blackBorder);
+        // --- 50% dithered gray track (2×2 checkerboard = classic Mac 1-bit gray) ---
+        using var dithBmp = new SKBitmap(2, 2, SKColorType.Bgra8888, SKAlphaType.Opaque);
+        dithBmp.SetPixel(0, 0, SKColors.Black);
+        dithBmp.SetPixel(1, 0, SKColors.White);
+        dithBmp.SetPixel(0, 1, SKColors.White);
+        dithBmp.SetPixel(1, 1, SKColors.Black);
+        using var dithShader = SKShader.CreateBitmap(dithBmp, SKShaderTileMode.Repeat, SKShaderTileMode.Repeat);
+        using var grayFill   = new SKPaint { Shader = dithShader, IsAntialias = false };
 
         const float arrowH = 15f;
 
-        // Up arrow box at the top
+        // Outer border for entire scrollbar rail
+        var trackRect = new SKRect(left, top, right, bottom);
+        canvas.DrawRect(trackRect, blackBorder);
+
+        // Gray dithered track between the two arrow boxes
+        var dithRect = new SKRect(left, top + arrowH, right, bottom - arrowH);
+        canvas.DrawRect(dithRect, grayFill);
+
+        // --- Up arrow box: solid black fill + white up-triangle ---
         var upBox = new SKRect(left, top, right, top + arrowH);
-        canvas.DrawRect(upBox, whiteFill);
+        canvas.DrawRect(upBox, blackFill);
         canvas.DrawRect(upBox, blackBorder);
-        // Up triangle
         float ax = left + ScrollbarWidth / 2f;
         float ay = top + arrowH * 0.65f;
         float aw = 4f;
@@ -187,13 +198,12 @@ public static class PartRenderer
         triPath.LineTo(ax - aw, ay + aw * 0.5f);
         triPath.LineTo(ax + aw, ay + aw * 0.5f);
         triPath.Close();
-        canvas.DrawPath(triPath, blackFill);
+        canvas.DrawPath(triPath, whiteFill);
 
-        // Down arrow box at the bottom
+        // --- Down arrow box: solid black fill + white down-triangle ---
         var downBox = new SKRect(left, bottom - arrowH, right, bottom);
-        canvas.DrawRect(downBox, whiteFill);
+        canvas.DrawRect(downBox, blackFill);
         canvas.DrawRect(downBox, blackBorder);
-        // Down triangle
         float bx = left + ScrollbarWidth / 2f;
         float by = bottom - arrowH * 0.65f;
         using var triPath2 = new SKPath();
@@ -201,17 +211,18 @@ public static class PartRenderer
         triPath2.LineTo(bx - aw, by - aw * 0.5f);
         triPath2.LineTo(bx + aw, by - aw * 0.5f);
         triPath2.Close();
-        canvas.DrawPath(triPath2, blackFill);
+        canvas.DrawPath(triPath2, whiteFill);
 
-        // Thumb — small rectangle near the top (represents scrolled-to-top)
+        // --- Thumb: white fill with 1px black border, positioned at scroll-to-top ---
         float thumbAreaTop = top + arrowH + 1;
         float thumbAreaH   = bottom - arrowH - arrowH - 2;
         if (thumbAreaH > 6)
         {
             float thumbH = Math.Min(thumbAreaH * 0.2f, 20f);
             thumbH = Math.Max(thumbH, 8f);
-            var thumbRect = new SKRect(left + 2, thumbAreaTop, right - 2, thumbAreaTop + thumbH);
-            canvas.DrawRect(thumbRect, blackFill);
+            var thumbRect = new SKRect(left + 1, thumbAreaTop, right - 1, thumbAreaTop + thumbH);
+            canvas.DrawRect(thumbRect, whiteFill);
+            canvas.DrawRect(thumbRect, blackBorder);
         }
     }
 

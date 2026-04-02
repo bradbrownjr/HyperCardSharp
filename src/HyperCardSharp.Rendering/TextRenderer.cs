@@ -166,12 +166,14 @@ public static class TextRenderer
             // Wrap tokenGroups onto visual lines
             var visualLines = WrapTokenGroups(tokenGroups, availWidth);
 
-            // Render each visual line
-            foreach (var visualLine in visualLines)
+            // Render each visual line.
+            // y was already advanced for the FIRST visual line of this logical line (above).
+            // For additional wrapped lines, advance y BEFORE drawing so they don't overlap.
+            for (int vli = 0; vli < visualLines.Count; vli++)
             {
-                if (y > rect.Bottom + lineHeight) break;
-                RenderVisualLine(canvas, visualLine, align, x0, xRight, y, part, styleTable, fontTable);
-                if (visualLine != visualLines[0]) y += lineHeight; // extra visual lines after first
+                if (vli > 0) y += lineHeight; // advance before each wrapped continuation line
+                if (y > rect.Bottom) break;
+                RenderVisualLine(canvas, visualLines[vli], align, x0, xRight, y, part, styleTable, fontTable);
             }
 
             lineStart = lineEnd + 1; // skip the '\n'
