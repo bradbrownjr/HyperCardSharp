@@ -4,6 +4,8 @@
 
 HyperCard# is a cross-platform, native HyperCard stack player and HyperTalk interpreter for retro computing enthusiasts and digital preservationists. It opens classic Mac HyperCard stacks directly on modern Windows, macOS, and Linux systems — no Mac emulation. It handles stacks delivered as raw files, StuffIt (.sit) archives, or Mac disk images (.img), with support for B&W and color display modes, embedded QuickTime MOV playback, and HyperTalk script execution.
 
+**Target version: HyperCard 2.4.1** — the final Apple-shipped release and the most widely distributed version. Full compatibility with HC 2.4.1 stacks is the primary correctness goal. HyperCard 1.x stacks are a secondary goal (detect and warn; full 1.x format support in Phase 15). Password-protected stacks (2.4 encryption) are detected and gracefully reported; decryption without the original password is out of scope.
+
 ## Technical Stack
 
 - **Language:** C# 12 / .NET 8 (LTS)

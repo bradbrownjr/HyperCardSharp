@@ -4,6 +4,8 @@
 
 We are building a native, cross-platform HyperCard stack viewer in C# / .NET 8 that opens classic Mac HyperCard files directly — no Mac emulation. The project must handle stacks arriving as raw files, StuffIt archives, or disk images. It must support B&W and color display modes, embedded QuickTime MOV playback via LibVLC, and a HyperTalk script interpreter. The goal is to create a usable foundation that attracts community contributors interested in retro computing preservation.
 
+**Target version: HyperCard 2.4.1.** This is the last version Apple shipped and the most widely distributed — the vast majority of community stacks were created with it. Full HC 2.4.1 compatibility is the primary correctness bar for every subsystem (parser, renderer, interpreter, container formats). HyperCard 1.x is a secondary target: detect the older format version and surface a warning; full 1.x support is deferred to Phase 15. Password-protected stacks (HC 2.4 XOR encryption) are out of scope for decryption — detect them and show a clear user message.
+
 Three sample files drive initial development:
 - `NEUROBLAST_HyperCard` — raw HC 2.x stack (STAK magic, version 10, ~70 cards)
 - `NEUROBLAST_Cyberdelia.sit` — StuffIt archive containing a stack
@@ -309,7 +311,7 @@ Tracks A (rendering), B (parsing/interpreter), and C (containers) can be develop
 
 1. **Language:** C# 12 / .NET 8 (LTS)
 2. **Container extraction:** All native C#, no external tool dependencies
-3. **HC version support:** HC 2.x first, 1.x deferred
+3. **HC version support:** HyperCard 2.4.1 is the explicit target. HC 2.x ≥ 2.0 should work. HC 1.x: detect and warn (Phase 15). Encryption: detect and report, no decryption.
 4. **Binary parsing:** Span<byte> + BinaryPrimitives (big-endian), no BinaryReader
 
 ## Verification
