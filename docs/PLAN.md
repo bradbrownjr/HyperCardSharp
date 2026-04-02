@@ -283,6 +283,121 @@ Non-functional work to make the project welcoming to contributors and end-users.
 
 ---
 
+## Post-v0.2.0 Phases — HyperTalk Full Functionality
+
+These phases close the remaining gaps in `docs/hypertalk-coverage.md` to achieve full HyperCard 2.4.1 script compatibility.
+
+### Phase 17: System Messages & Idle Loop
+
+HyperCard delivered a steady stream of system messages that scripts could intercept. Many stacks depend on these for animation, rollovers, and auto-advance.
+
+- **`idle` message** — fire on a timer (every ~100 ms) when no user interaction is pending; dispatch through card → background → stack hierarchy
+- **`mouseEnter` / `mouseLeave`** — track mouse position over parts; fire on enter/leave; enables rollover highlight stacks
+- **`mouseWithin`** — fire repeatedly while mouse stays inside a part
+- **`keyDown` / `tabKey` / `returnKey` / `enterKey` / `arrowKey`** — dispatch keyboard events as system messages with key value in `the paramList`
+- **`newCard` / `deleteCard`** — fire on card creation/deletion (player mode: `newCard` is informational)
+- **`suspendStack` / `resumeStack`** — fire on window focus changes
+- **Mouse/keyboard properties** — implement `the mouse`, `the mouseH`, `the mouseV`, `the mouseClick`, `the clickLoc`, `the key`, `the keyCode` as live-read properties from the UI layer
+
+**Milestone:** `idle`-based animation stacks auto-advance. `mouseEnter`/`mouseLeave` stacks highlight on hover. Keyboard messages dispatch. **Commit.**
+
+### Phase 18: Stack-Level Script & Message Hierarchy Completion
+
+The message hierarchy is incomplete — the stack script itself and the HyperCard level are missing.
+
+- **Stack-level script** — parse the STAK block's script field; add it to the message dispatch chain after background and before HyperCard
+- **HyperCard-level handlers** — implement a built-in "Home stack" script context at the top of the hierarchy (after stack); stub common Home handlers like `doMenu`
+- **`pass` semantics** — verify `pass <handler>` correctly bubbles through all five levels: part → card → background → stack → HyperCard
+- **`the target`** — return the part that originally received the message
+- **`the params` / `the paramList`** — return handler arguments as passed
+
+**Milestone:** Stacks with handlers in the stack script (not just card/background) work correctly. Full 5-level message hierarchy operational. **Commit.**
+
+### Phase 19: Nested Chunk Expressions & Container Improvements
+
+Chunk expressions are the string-processing backbone of HyperTalk. Nested chunks are used in almost every non-trivial stack.
+
+- **Nested chunk reads** — `word 2 of line 3 of field "data"` evaluates inner-to-outer; implement recursive chunk resolution in expression evaluator
+- **Nested chunk writes** — `put "x" into word 2 of line 3 of myVar` reconstructs the string with the inner chunk replaced
+- **`the number of` chunks** — `the number of words of line 3 of x`; chain with nested chunks
+- **Range chunk writes** — `put "x" into char 3 to 5 of line 2 of myVar`
+- **`last` / `any` / `middle` chunk qualifiers** — `last word of x`, `any line of x`, `middle char of x`
+- **`the message box`** — implement as a special container; `put x into message` shows a message log/text area
+
+**Milestone:** Complex chunk expressions like `word 2 of line 3 of field "data"` evaluate and assign correctly. **Commit.**
+
+### Phase 20: Property System Completion
+
+Many stacks read and write part properties dynamically. Property read-back has several gaps.
+
+- **`visible of part` read-back** — return actual `Part.Visible` state instead of always `true`
+- **`the result`** — set to the outcome of the last command (`empty` on success, error message on failure); particularly important for `find`, `go`, `play`
+- **`answer` button read-back** — set `it` to the label of the button the user clicked in `answer` dialogs
+- **`set script of` / `set cursor to` / `set userLevel to`** — implement or stub remaining `set` targets
+- **`the screenRect`** — return the rendering area dimensions
+- **`the tool`** — return `"browse"` (player mode only)
+- **`the userLevel`** — return `5` (scripting level, read-only in player)
+- **`text of card`** — concatenate all field text on the current card
+- **`hilite of button` read-back** — ensure bidirectional: `set` and `get` both work on live state
+
+**Milestone:** Property-dependent stacks (especially those that read `the result` or `visible`) work correctly. **Commit.**
+
+### Phase 21: Find Command Completion & Text Search
+
+The `find` command is central to many educational and reference stacks.
+
+- **`find "text" in field X`** — parse `in field` scope clause; restrict search to named field
+- **Find mode qualifiers** — implement `find whole`, `find chars`, `find word`, `find string` with distinct matching semantics (whole word, substring, word-start, exact)
+- **Find highlight** — visually highlight the found text on the card (box around matching text, as original HC did)
+- **`find` across backgrounds** — search continues across background boundaries
+- **`the foundText` / `the foundChunk` / `the foundLine` / `the foundField`** — properties that report what `find` matched
+
+**Milestone:** `find whole "mitochondria" in field "glossary"` works with correct scoping and visual highlight. **Commit.**
+
+### Phase 22: XCMD/XFCN Integration
+
+XCMDs (external commands) and XFCNs (external functions) were HyperCard's plugin system. Many stacks used common XCMDs for color, sound, and file access.
+
+- **XCMD registry wiring** — connect the existing `XcmdRegistry` to the interpreter so `ExecCommand` falls through to registered handlers before logging "unknown command"
+- **Built-in XCMD emulations** — implement common XCMDs as native C# handlers:
+  - `AddColor` — already handled via rendering; register name so scripts expecting a response get one
+  - `Flash` — briefly invert the screen/card region
+  - `ResCopy` / `GetResource` — resource fork access (return resource data or empty)
+  - `FileName` / `FileIO` — basic file dialog / read-only file access (sandboxed)
+  - `Palette` — color palette window (stub with log)
+- **XFCN return values** — ensure XFCNs can return a string value via `it` or `the result`
+- **Unknown XCMD handling** — graceful "XCMD not available" dialog matching original HC behavior
+
+**Milestone:** Stacks that call common XCMDs get reasonable behavior instead of silent no-ops. **Commit.**
+
+### Phase 23: File I/O & Miscellaneous Commands
+
+Remaining HyperTalk commands that real stacks use.
+
+- **`open file` / `close file` / `read from file` / `write to file`** — sandboxed file I/O (read-only by default; write requires user confirmation)
+- **`show cards` / `show all cards`** — rapid flip-through of all cards (slideshow mode)
+- **`drag from <point> to <point>`** — synthesize mouse-drag events
+- **`choose <tool>`** — log or ignore in player mode; some stacks test `the tool`
+- **`print card`** — render current card to printer or PDF
+- **`doMenu <menuItem>`** — handle common menu commands (`New Card`, `Delete Card`, `Copy`, `Paste`, etc.) or log unsupported
+- **Remaining math functions** — `atan()`, `exp2()`, `annuity()`, `compound()`
+
+**Milestone:** File-reading stacks, slideshow stacks, and stacks using `doMenu` work. **Commit.**
+
+### Phase 24: Real-World Stack Test Suite
+
+Validate all previous work against a broad corpus of real stacks.
+
+- **Stack test harness** — automated loader that opens each stack in `samples/`, navigates all cards, verifies no exceptions
+- **Script execution smoke tests** — extract scripts from sample stacks, parse and interpret each, verify no unhandled errors
+- **Rendering regression tests** — render first/last card of each sample stack, compare against golden reference bitmaps (pixel hash comparison)
+- **Coverage report** — log every unrecognized command, unknown block type, and missing property across the full test corpus; feed results back into gap tracking
+- **Community stack corpus** — curated collection of diverse stacks: educational, games, multimedia, database, with notes on expected behavior
+
+**Milestone:** 90%+ of community stacks load and navigate without errors. Known gaps documented per-stack. **Commit + tag v0.3.0.**
+
+---
+
 ## Dependency Graph
 
 ```
