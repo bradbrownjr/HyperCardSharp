@@ -192,6 +192,43 @@ public partial class StackViewModel : ObservableObject
             }
         };
 
+        _interpreter.GetPartVisible = partSpec =>
+        {
+            var card = CurrentCard();
+            if (card == null) return null;
+            var bg = CurrentBackground(card);
+            var part = FindPartBySpec(partSpec, card, bg);
+            return part?.Visible;
+        };
+
+        _interpreter.GetCardText = () =>
+        {
+            var card = CurrentCard();
+            if (card == null) return "";
+            var bg = CurrentBackground(card);
+            var sb = new System.Text.StringBuilder();
+            // Collect text from visible fields on card and background
+            foreach (var p in card.Parts.Where(p => p.IsField && p.Visible))
+            {
+                var c = card.PartContents.FirstOrDefault(pc => pc.PartId == p.PartId);
+                if (c != null && !string.IsNullOrEmpty(c.Text))
+                    sb.AppendLine(c.Text);
+            }
+            if (bg != null)
+            {
+                foreach (var p in bg.Parts.Where(p => p.IsField && p.Visible))
+                {
+                    var c = card.PartContents.FirstOrDefault(pc => pc.PartId == p.PartId);
+                    if (c != null && !string.IsNullOrEmpty(c.Text))
+                        sb.AppendLine(c.Text);
+                }
+            }
+            return sb.ToString().TrimEnd();
+        };
+
+        _interpreter.GetScreenRect = () =>
+            $"0,0,{CardWidth},{CardHeight}";
+
         _interpreter.GetScriptForTarget = (msg, targetStr) =>
         {
             var lower = targetStr.ToLowerInvariant().Trim();
@@ -202,7 +239,7 @@ public partial class StackViewModel : ObservableObject
             if (lower is "this background" or "this bkgd" or "background" or "bkgd")
                 return bg?.Script;
             if (lower == "this stack" || lower == "stack")
-                return null; // stack-level script not parsed yet
+                return _stack?.StackHeader.Script;
             // Resolve "button <name>" / "field <name>" by name
             if (card != null)
             {
@@ -374,9 +411,14 @@ public partial class StackViewModel : ObservableObject
                 var card = _stack.Cards.FirstOrDefault(c => c.Header.Id == cardId);
                 if (card == null) continue;
                 var bg = CurrentBackground(card);
-                if (CardContainsText(searchText, card, bg, fieldName))
+                var (found, foundFieldName) = CardContainsTextWithField(searchText, card, bg, fieldName);
+                if (found)
                 {
                     NavigateTo(idx);
+                    var chunk = foundFieldName != null
+                        ? $"char 1 to {searchText.Length} of field \"{foundFieldName}\""
+                        : "";
+                    _interpreter.SetFoundResult(searchText, foundFieldName ?? "", chunk);
                     return;
                 }
             }
@@ -397,7 +439,14 @@ public partial class StackViewModel : ObservableObject
 
         var part = HitTest(cardX, cardY, card, bg);
 
-        // HyperCard message hierarchy: button → card → background
+        // Set the target — the object that first receives the message
+        _interpreter.CurrentTarget = part != null
+            ? (string.IsNullOrEmpty(part.Name)
+                ? (part.IsButton ? $"button {part.PartId}" : $"field {part.PartId}")
+                : (part.IsButton ? $"button \"{part.Name}\"" : $"field \"{part.Name}\""))
+            : "card";
+
+        // HyperCard message hierarchy: button → card → background → stack
         // Stop on Handled; continue climbing on NotFound or Passed.
         if (part != null && !string.IsNullOrWhiteSpace(part.Script))
         {
@@ -413,8 +462,13 @@ public partial class StackViewModel : ObservableObject
 
         if (bg != null && !string.IsNullOrWhiteSpace(bg.Script))
         {
-            _dispatcher.DispatchMessage("mouseUp", bg.Script, _interpreter);
+            var r = _dispatcher.DispatchMessage("mouseUp", bg.Script, _interpreter);
+            if (r == DispatchResult.Handled) return;
         }
+
+        var stackScript = _stack?.StackHeader.Script;
+        if (!string.IsNullOrWhiteSpace(stackScript))
+            _dispatcher.DispatchMessage("mouseUp", stackScript, _interpreter);
     }
 
     /// <summary>
@@ -573,7 +627,7 @@ public partial class StackViewModel : ObservableObject
 
     /// <summary>
     /// Dispatches a lifecycle message (e.g. openCard, closeCard) to the card script,
-    /// then to the background script if the card script returned Passed or NotFound.
+    /// then background, then stack — stopping on the first Handled result.
     /// </summary>
     private void DispatchLifecycle(string handlerName, CardBlock? card, BackgroundBlock? bg)
     {
@@ -583,7 +637,13 @@ public partial class StackViewModel : ObservableObject
             if (r == DispatchResult.Handled) return;
         }
         if (bg != null && !string.IsNullOrWhiteSpace(bg.Script))
-            _dispatcher.DispatchMessage(handlerName, bg.Script, _interpreter);
+        {
+            var r = _dispatcher.DispatchMessage(handlerName, bg.Script, _interpreter);
+            if (r == DispatchResult.Handled) return;
+        }
+        var stackScript = _stack?.StackHeader.Script;
+        if (!string.IsNullOrWhiteSpace(stackScript))
+            _dispatcher.DispatchMessage(handlerName, stackScript, _interpreter);
     }
 
 
@@ -821,6 +881,15 @@ public partial class StackViewModel : ObservableObject
     /// </summary>
     private static bool CardContainsText(
         string searchText, CardBlock card, BackgroundBlock? bg, string? fieldName)
+        => CardContainsTextWithField(searchText, card, bg, fieldName).Item1;
+
+    /// <summary>
+    /// Searches card and background fields for <paramref name="searchText"/>.
+    /// Returns (true, fieldName) on the first match, or (false, null) if not found.
+    /// When <paramref name="fieldName"/> is non-null, only that field is searched.
+    /// </summary>
+    private static (bool found, string? fieldName) CardContainsTextWithField(
+        string searchText, CardBlock card, BackgroundBlock? bg, string? fieldName)
     {
         bool Match(string? text) =>
             text != null && text.Contains(searchText, StringComparison.OrdinalIgnoreCase);
@@ -832,7 +901,7 @@ public partial class StackViewModel : ObservableObject
             if (fieldName != null &&
                 !string.Equals(part.Name, fieldName, StringComparison.OrdinalIgnoreCase)) continue;
             var content = card.PartContents.FirstOrDefault(pc => pc.PartId == part.PartId);
-            if (Match(content?.Text)) return true;
+            if (Match(content?.Text)) return (true, part.Name);
         }
 
         if (bg != null)
@@ -850,10 +919,10 @@ public partial class StackViewModel : ObservableObject
                 string? text = cardBgContent.TryGetValue(part.PartId, out var ct)
                     ? ct
                     : bg.PartContents.FirstOrDefault(pc => pc.PartId == part.PartId)?.Text;
-                if (Match(text)) return true;
+                if (Match(text)) return (true, part.Name);
             }
         }
-        return false;
+        return (false, null);
     }
 
     // ── Public navigation helpers (used by MainWindow for cross-stack navigation) ──

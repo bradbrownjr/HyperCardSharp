@@ -1,4 +1,5 @@
 using HyperCardSharp.Core.Binary;
+using HyperCardSharp.Core.Text;
 
 namespace HyperCardSharp.Core.Stack;
 
@@ -8,6 +9,8 @@ namespace HyperCardSharp.Core.Stack;
 ///
 /// Key offsets within the block (after the 16-byte header at +0x00):
 ///   +0x10: format version (4 bytes) — 10 for HC 2.x
+///   ...
+///   +0x1BC: stack-level script (null-terminated Mac Roman string)
 ///   +0x14: total size of stack data (4 bytes)
 ///   +0x18: size of STAK block (4 bytes, typically 0x800 = 2048)
 ///   +0x1C: (unknown/reserved)
@@ -50,6 +53,8 @@ public class StackBlock
     public short CardHeight { get; init; }
     public short CardWidth { get; init; }
     public byte[][] Patterns { get; init; } = Array.Empty<byte[]>();
+    /// <summary>Stack-level HyperTalk script (null-terminated Mac Roman string at +0x1BC).</summary>
+    public string Script { get; init; } = "";
 
     public static StackBlock Parse(ReadOnlySpan<byte> blockData, BlockHeader header)
     {
@@ -91,6 +96,11 @@ public class StackBlock
         var cardHeight = reader.ReadInt16();           // +0x1B8
         var cardWidth = reader.ReadInt16();            // +0x1BA
 
+        // Stack-level script: null-terminated Mac Roman string at +0x1BC
+        string script = "";
+        if (blockData.Length > 0x1BC)
+            script = ReadNullTerminatedString(blockData, 0x1BC);
+
         return new StackBlock
         {
             Header = header,
@@ -112,7 +122,17 @@ public class StackBlock
             StyleTableId = styleTableId,
             CardHeight = cardHeight,
             CardWidth = cardWidth,
-            Patterns = patterns
+            Patterns = patterns,
+            Script = script
         };
+    }
+
+    private static string ReadNullTerminatedString(ReadOnlySpan<byte> data, int offset)
+    {
+        int end = offset;
+        while (end < data.Length && data[end] != 0)
+            end++;
+        if (end == offset) return "";
+        return MacRomanEncoding.GetString(data.Slice(offset, end - offset));
     }
 }

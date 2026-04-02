@@ -98,6 +98,17 @@ public class HyperTalkInterpreter
     public Action<string, string?> FindInStack { get; set; } = (_, _) => {};
 
     /// <summary>
+    /// Called by the app layer after a successful find to record the matched text and field.
+    /// Sets <c>the foundText</c>, <c>the foundField</c>, and <c>the foundChunk</c>.
+    /// </summary>
+    public void SetFoundResult(string foundText, string foundField, string foundChunk)
+    {
+        _foundText  = foundText;
+        _foundField = foundField;
+        _foundChunk = foundChunk;
+    }
+
+    /// <summary>
     /// Called when HyperTalk executes <c>go [to] stack "name"</c> (cross-stack navigation).
     /// Arguments: stackName, optional cardName, optional 1-based cardNumber.
     /// </summary>
@@ -109,8 +120,42 @@ public class HyperTalkInterpreter
     /// </summary>
     public Action GoHome { get; set; } = () => {};
 
+    /// <summary>
+    /// Called when HyperTalk reads <c>the visible of button/field X</c>.
+    /// Returns null if the part is not found.
+    /// </summary>
+    public Func<string, bool?> GetPartVisible { get; set; } = _ => null;
+
+    /// <summary>
+    /// Called when HyperTalk reads <c>the text of card</c>.
+    /// Should return all field text concatenated on the current card.
+    /// </summary>
+    public Func<string> GetCardText { get; set; } = () => "";
+
+    /// <summary>
+    /// Called when HyperTalk reads <c>the screenRect</c>.
+    /// Should return "left,top,right,bottom" for the card render area.
+    /// </summary>
+    public Func<string> GetScreenRect { get; set; } = () => "0,0,512,342";
+
+    // ── Interpreter state ─────────────────────────────────────────────────────
+
+    /// <summary>The target that originally received the current message (e.g. "button \"Go\"").</summary>
+    public string CurrentTarget { get; set; } = "";
+
     // Return value from the most-recently executed handler/function
     public HyperTalkValue ReturnValue { get; private set; } = HyperTalkValue.Empty;
+
+    // `the result` — set by commands like find/go; empty = success, message = failure/info
+    private string _lastResult = "";
+
+    // Args of the currently-executing handler (for `the params` / `the paramList`)
+    private HyperTalkValue[] _currentHandlerArgs = [];
+
+    // Last find results (for `the foundText` / `the foundField` etc.)
+    private string _foundText = "";
+    private string _foundField = "";
+    private string _foundChunk = "";
 
     // Current script being executed — used for user-defined function lookup.
     private ScriptNode? _currentScript;
@@ -135,6 +180,10 @@ public class HyperTalkInterpreter
 
         var env = new ExecutionEnvironment();
 
+        // Track args for `the params` / `the paramList`
+        var prevArgs = _currentHandlerArgs;
+        _currentHandlerArgs = args;
+
         // Bind parameters
         for (int i = 0; i < handler.Params.Length && i < args.Length; i++)
             env.SetLocal(handler.Params[i], args[i]);
@@ -148,6 +197,7 @@ public class HyperTalkInterpreter
         finally
         {
             _currentScript = prevScript;
+            _currentHandlerArgs = prevArgs;
         }
     }
 
@@ -672,19 +722,42 @@ public class HyperTalkInterpreter
         // find [whole|word|chars|string] <text> [in field "name"]
         if (cmdLower == "find")
         {
-            // Extract the search text: last string literal arg, or first evaluated arg
             string? searchText = null;
             string? fieldName = null;
             var evalArgs = Array.ConvertAll(s.Args, a => Evaluate(a, env));
-            foreach (var a in evalArgs.Reverse())
+            // Scan args: qualifier keywords → skip; "in" → next is field spec; else = search text
+            bool nextIsField = false;
+            foreach (var a in evalArgs)
             {
-                // Skip qualifier keywords
-                if (a.Raw is "whole" or "word" or "chars" or "string" or "marked") continue;
-                searchText = a.Raw;
-                break;
+                var raw = a.Raw;
+                if (nextIsField)
+                {
+                    // Strip leading "field " / "fld " if present
+                    var fSpec = raw;
+                    if (fSpec.StartsWith("field ", StringComparison.OrdinalIgnoreCase))
+                        fSpec = fSpec[6..].Trim().Trim('"');
+                    else if (fSpec.StartsWith("fld ", StringComparison.OrdinalIgnoreCase))
+                        fSpec = fSpec[4..].Trim().Trim('"');
+                    fieldName = fSpec;
+                    nextIsField = false;
+                    continue;
+                }
+                if (string.Equals(raw, "in", StringComparison.OrdinalIgnoreCase))
+                { nextIsField = true; continue; }
+                if (raw is "whole" or "word" or "chars" or "string" or "marked") continue;
+                searchText = raw;
             }
             if (searchText != null)
+            {
+                _foundText = "";
+                _foundField = "";
+                _foundChunk = "";
                 FindInStack(searchText, fieldName);
+                if (string.IsNullOrEmpty(_foundText))
+                    _lastResult = "Not found";
+                else
+                    _lastResult = "";
+            }
             return ExecutionResult.Normal;
         }
 
@@ -778,8 +851,20 @@ public class HyperTalkInterpreter
                 "time"          => new HyperTalkValue(DateTime.Now.ToString("h:mm:ss tt")),
                 "ticks"         => new HyperTalkValue(((long)(TimeSpan.FromTicks(Environment.TickCount64 * TimeSpan.TicksPerMillisecond)).TotalSeconds * 60).ToString()),
                 "seconds"       => new HyperTalkValue(((long)(TimeSpan.FromTicks(Environment.TickCount64 * TimeSpan.TicksPerMillisecond)).TotalSeconds).ToString()),
-                "result"        => HyperTalkValue.Empty,
+                "result"        => new HyperTalkValue(_lastResult),
                 "it"            => env.It,
+                "target"        => new HyperTalkValue(CurrentTarget),
+                "params" or "paramlist" => new HyperTalkValue(string.Join(",", _currentHandlerArgs.Select(a => a.Raw))),
+                "tool"          => new HyperTalkValue("browse"),
+                "userlevel"     => new HyperTalkValue("5"),
+                "screenrect"    => new HyperTalkValue(GetScreenRect()),
+                "mouse"         => HyperTalkValue.Empty, // TODO: Phase 17
+                "mouseh" or "mousev" => new HyperTalkValue("0"), // TODO: Phase 17
+                "key" or "keycode"   => HyperTalkValue.Empty, // TODO: Phase 17
+                "foundtext"     => new HyperTalkValue(_foundText),
+                "foundfield"    => new HyperTalkValue(_foundField),
+                "foundchunk"    => new HyperTalkValue(_foundChunk),
+                "foundline"     => HyperTalkValue.Empty, // not tracked yet
                 // the number of cards
                 "number of cards" or "number of the cards" =>
                     new HyperTalkValue(GetTotalCards().ToString()),
@@ -805,7 +890,7 @@ public class HyperTalkInterpreter
                             "number"   => new HyperTalkValue(GetCurrentCardNumber().ToString()),
                             "id"       => new HyperTalkValue(GetCurrentCardId().ToString()),
                             "name"     => new HyperTalkValue(GetCurrentCardName()),
-                            "text" or "contents" => HyperTalkValue.Empty,
+                            "text" or "contents" => new HyperTalkValue(GetCardText()),
                             _          => HyperTalkValue.Empty,
                         };
                     }
@@ -827,7 +912,11 @@ public class HyperTalkInterpreter
                     if (propLower is "hilite" or "highlight")
                         return GetButtonHilite(partName) == true ? HyperTalkValue.True : HyperTalkValue.False;
                     if (propLower == "visible")
-                        return HyperTalkValue.True; // assume visible by default; no read-back yet
+                    {
+                        var vis = GetPartVisible(partName);
+                        return vis.HasValue ? (vis.Value ? HyperTalkValue.True : HyperTalkValue.False)
+                                            : HyperTalkValue.True;
+                    }
                     break;
                 }
             }
