@@ -8,7 +8,8 @@ namespace HyperCardSharp.Core.Parts;
 public class PartContent
 {
     public short PartId { get; init; }
-    public string Text { get; init; } = "";
+    /// <summary>Field/button text content. Settable so HyperTalk can mutate it at runtime.</summary>
+    public string Text { get; set; } = "";
     public List<StyleRun> StyleRuns { get; init; } = new();
     public bool HasStyles => StyleRuns.Count > 0;
 

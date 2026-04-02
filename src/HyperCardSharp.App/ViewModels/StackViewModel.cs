@@ -125,11 +125,32 @@ public partial class StackViewModel : ObservableObject
         };
         _interpreter.SetFieldText = (fieldSpec, text) =>
         {
-            // Field text mutation deferred (model uses init-only properties)
-            _interpreter.LogMessage($"[HyperTalk] put into field \"{fieldSpec}\" → deferred");
+            var card = CurrentCard();
+            if (card == null) return;
+            var bg = CurrentBackground(card);
+            if (MutateFieldText(fieldSpec, text, card, bg))
+                RenderCurrentCard();
         };
-        _interpreter.GetButtonHilite = _ => null;   // read-only for now
-        _interpreter.SetButtonHilite = (_, _) => { };
+        _interpreter.GetButtonHilite = partSpec =>
+        {
+            var card = CurrentCard();
+            if (card == null) return null;
+            var bg = CurrentBackground(card);
+            var part = FindPartBySpec(partSpec, card, bg);
+            return part?.HiliteState;
+        };
+        _interpreter.SetButtonHilite = (partSpec, hilite) =>
+        {
+            var card = CurrentCard();
+            if (card == null) return;
+            var bg = CurrentBackground(card);
+            var part = FindPartBySpec(partSpec, card, bg);
+            if (part != null)
+            {
+                part.HiliteState = hilite;
+                RenderCurrentCard();
+            }
+        };
         _interpreter.QueueVisualEffect = (effect, speed, dir)
             => _pendingEffect = (effect, speed, dir);
         _interpreter.ShowDialog = msg => ShowAnswerDialog?.Invoke(msg);
@@ -151,18 +172,94 @@ public partial class StackViewModel : ObservableObject
         _interpreter.UnlockScreen = () => { };
 
         _interpreter.SetPartVisible = (partSpec, visible) =>
-            _interpreter.LogMessage($"[HyperTalk] set visible of '{partSpec}' to {visible} — deferred");
+        {
+            var card = CurrentCard();
+            if (card == null) return;
+            var bg = CurrentBackground(card);
+            var part = FindPartBySpec(partSpec, card, bg);
+            if (part != null)
+            {
+                part.VisibleOverride = visible;
+                RenderCurrentCard();
+            }
+        };
 
         _interpreter.GetScriptForTarget = (msg, targetStr) =>
         {
             var lower = targetStr.ToLowerInvariant().Trim();
             var card = CurrentCard();
             var bg   = card != null ? CurrentBackground(card) : null;
-            if (lower == "this card" || lower == "card")
+            if (lower is "this card" or "card")
                 return card?.Script;
             if (lower is "this background" or "this bkgd" or "background" or "bkgd")
                 return bg?.Script;
-            return null; // button/field by name not resolved yet
+            if (lower == "this stack" || lower == "stack")
+                return null; // stack-level script not parsed yet
+            // Resolve "button <name>" / "field <name>" by name
+            if (card != null)
+            {
+                var part = FindPartBySpec(targetStr, card, bg);
+                if (part != null && !string.IsNullOrWhiteSpace(part.Script))
+                    return part.Script;
+            }
+            return null;
+        };
+
+        _interpreter.DispatchMessageInScript = (msg, scriptText) =>
+        {
+            var result = _dispatcher.DispatchMessage(msg, scriptText, _interpreter);
+            return result == DispatchResult.Handled
+                ? HyperCardSharp.HyperTalk.Interpreter.ExecutionResult.Normal
+                : HyperCardSharp.HyperTalk.Interpreter.ExecutionResult.Normal;
+        };
+
+        _interpreter.SimulateClickAt = (x, y) => HandleCardClick(x, y);
+
+        _interpreter.AppendToFocusedField = text =>
+        {
+            // Append to the last field that received a click, or the first visible field
+            var card = CurrentCard();
+            if (card == null) return;
+            var bg = CurrentBackground(card);
+            var field = card.Parts.FirstOrDefault(p => p.IsField && p.Visible)
+                     ?? bg?.Parts.FirstOrDefault(p => p.IsField && p.Visible);
+            if (field == null) return;
+            var content = card.PartContents.FirstOrDefault(pc => pc.PartId == field.PartId);
+            if (content != null)
+            {
+                content.Text += text;
+                RenderCurrentCard();
+            }
+        };
+
+        _interpreter.SetPartProperty = (partSpec, property, value) =>
+        {
+            var card = CurrentCard();
+            if (card == null) return;
+            var bg = CurrentBackground(card);
+            var part = FindPartBySpec(partSpec, card, bg);
+            if (part == null) return;
+            switch (property)
+            {
+                case "name":      part.Name = value; break;
+                case "enabled":
+                    part.EnabledOverride = string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+                    break;
+                case "textfont":
+                    // Accept a number (Mac font ID) or a font name string (map to ID if known)
+                    if (short.TryParse(value, out short fontId))
+                        part.TextFontId = fontId;
+                    break;
+                case "textsize":
+                    if (ushort.TryParse(value, out ushort sz))
+                        part.TextSize = sz;
+                    break;
+                case "textstyle":
+                    // "bold", "italic", "plain" etc. — map to style-flag byte
+                    part.TextStyle = ParseTextStyleFlags(value);
+                    break;
+            }
+            RenderCurrentCard();
         };
 
         _interpreter.PlaySound = soundName =>
@@ -506,6 +603,120 @@ public partial class StackViewModel : ObservableObject
             }
         }
         return null;
+    }
+
+    /// <summary>
+    /// Resolves a HyperTalk part specifier (e.g. "button 1", "button \"Name\"", "field 3")
+    /// to the matching <see cref="Part"/> on the current card or background, or null if not found.
+    /// </summary>
+    private static Part? FindPartBySpec(string spec, CardBlock card, BackgroundBlock? bg)
+    {
+        if (string.IsNullOrWhiteSpace(spec)) return null;
+
+        // Strip optional type prefix: "button", "field", "btn"
+        var s = spec.Trim();
+        PartType? typeFilter = null;
+        foreach (var (prefix, t) in new[] { ("button ", PartType.Button), ("btn ", PartType.Button), ("field ", PartType.Field) })
+        {
+            if (s.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                typeFilter = t;
+                s = s[prefix.Length..].Trim().Trim('"');
+                break;
+            }
+        }
+
+        // Check card-layer parts first, then background
+        IEnumerable<IEnumerable<Part>> layers = bg != null
+            ? [card.Parts, bg.Parts]
+            : [card.Parts];
+
+        foreach (var layer in layers)
+        {
+            foreach (var part in layer)
+            {
+                if (typeFilter.HasValue && part.Type != typeFilter.Value) continue;
+                if (string.Equals(part.Name, s, StringComparison.OrdinalIgnoreCase)) return part;
+                if (short.TryParse(s, out short id) && part.PartId == id) return part;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Sets the text content for a field identified by <paramref name="fieldSpec"/>.
+    /// Returns true if a matching field was found and updated.
+    /// </summary>
+    private static bool MutateFieldText(string fieldSpec, string text, CardBlock card, BackgroundBlock? bg)
+    {
+        // Card-layer fields
+        foreach (var part in card.Parts)
+        {
+            if (!part.IsField) continue;
+            if (!string.Equals(part.Name, fieldSpec, StringComparison.OrdinalIgnoreCase) &&
+                part.PartId.ToString() != fieldSpec) continue;
+
+            var content = card.PartContents.FirstOrDefault(pc => pc.PartId == part.PartId);
+            if (content != null)
+            {
+                content.Text = text;
+            }
+            else
+            {
+                // Create a new PartContent entry so the field has text
+                card.PartContents.Add(new PartContent { PartId = part.PartId, Text = text });
+            }
+            return true;
+        }
+
+        // Background-layer fields
+        if (bg != null)
+        {
+            foreach (var part in bg.Parts)
+            {
+                if (!part.IsField) continue;
+                if (!string.Equals(part.Name, fieldSpec, StringComparison.OrdinalIgnoreCase) &&
+                    part.PartId.ToString() != fieldSpec) continue;
+
+                var content = bg.PartContents.FirstOrDefault(pc => pc.PartId == part.PartId);
+                if (content != null)
+                {
+                    content.Text = text;
+                }
+                else
+                {
+                    bg.PartContents.Add(new PartContent { PartId = part.PartId, Text = text });
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Maps a HyperTalk text style string to the Mac-style style-flag byte.
+    /// Handles "plain", "bold", "italic", "underline" and comma-separated combos.
+    /// </summary>
+    private static byte ParseTextStyleFlags(string styleStr)
+    {
+        if (string.IsNullOrWhiteSpace(styleStr)) return 0;
+        if (string.Equals(styleStr.Trim(), "plain", StringComparison.OrdinalIgnoreCase)) return 0;
+        byte flags = 0;
+        foreach (var token in styleStr.Split(','))
+        {
+            flags |= token.Trim().ToLowerInvariant() switch
+            {
+                "bold"      => 0x01,
+                "italic"    => 0x02,
+                "underline" => 0x04,
+                "outline"   => 0x08,
+                "shadow"    => 0x10,
+                "condense"  => 0x20,
+                "extend"    => 0x40,
+                _           => 0x00
+            };
+        }
+        return flags;
     }
 
     /// <summary>

@@ -60,6 +60,24 @@ public class HyperTalkInterpreter
     /// </summary>
     public Func<string, string, string?> GetScriptForTarget { get; set; } = (_, _) => null;
 
+    /// <summary>
+    /// Dispatches a message name into a resolved script text.
+    /// Used by <c>send</c> to actually execute the found handler.
+    /// </summary>
+    public Func<string, string, ExecutionResult> DispatchMessageInScript { get; set; } = (_, _) => ExecutionResult.Normal;
+
+    /// <summary>Called when HyperTalk executes <c>click at h,v</c>.</summary>
+    public Action<float, float> SimulateClickAt { get; set; } = (_, _) => {};
+
+    /// <summary>Called when HyperTalk executes <c>type "text"</c>.</summary>
+    public Action<string> AppendToFocusedField { get; set; } = _ => {};
+
+    /// <summary>
+    /// Called for <c>set &lt;property&gt; of &lt;part&gt;</c> properties beyond hilite/text/visible.
+    /// Arguments: partSpec (e.g. "button 1"), propertyName (lower-cased), newValue as string.
+    /// </summary>
+    public Action<string, string, string> SetPartProperty { get; set; } = (_, _, _) => {};
+
     /// <summary>Called when HyperTalk executes <c>play "soundName"</c>.</summary>
     public Action<string> PlaySound { get; set; } = _ => {};
 
@@ -384,6 +402,20 @@ public class HyperTalkInterpreter
             return ExecutionResult.Normal;
         }
 
+        // Extended property set: name, style, textFont, textSize, textStyle, enabled, rect
+        if (s.ContainerExpr != null)
+        {
+            var prop = s.Property.ToLowerInvariant();
+            if (prop is "name" or "style" or "textfont" or "textsize" or "textstyle"
+                     or "textcolor" or "enabled" or "rect" or "rectangle" or "loc"
+                     or "location" or "width" or "height")
+            {
+                string partSpec = EvalToString(s.ContainerExpr, env);
+                SetPartProperty(partSpec, prop, value.Raw);
+                return ExecutionResult.Normal;
+            }
+        }
+
         // Generic: log unsupported property sets
         LogMessage($"HyperTalk: set {s.Property} — not fully implemented");
         return ExecutionResult.Normal;
@@ -467,9 +499,23 @@ public class HyperTalkInterpreter
 
     private ExecutionResult ExecWait(WaitStatement s, ExecutionEnvironment env)
     {
-        // Just log; actual waiting is not implemented in a viewer context
-        var dur = Evaluate(s.Duration, env).Raw;
-        LogMessage($"HyperTalk: wait {dur} {s.Unit} (skipped)");
+        if (!Evaluate(s.Duration, env).TryAsNumber(out double dur))
+            return ExecutionResult.Normal;
+
+        int ms = s.Unit.ToLowerInvariant() switch
+        {
+            "ticks"        => (int)(dur * 1000.0 / 60.0), // 60 ticks/sec
+            "tick"         => (int)(dur * 1000.0 / 60.0),
+            "seconds"      => (int)(dur * 1000.0),
+            "second"       => (int)(dur * 1000.0),
+            "milliseconds" => (int)dur,
+            "millisecond"  => (int)dur,
+            _              => (int)(dur * 1000.0 / 60.0),  // default: ticks
+        };
+
+        // Cap at 5 s to prevent apparent freezes in a viewer context
+        if (ms > 5000) ms = 5000;
+        if (ms > 0) System.Threading.Thread.Sleep(ms);
         return ExecutionResult.Normal;
     }
 
@@ -491,17 +537,15 @@ public class HyperTalkInterpreter
         }
 
         var targetStr = EvalToString(s.Target, env);
-        // Resolve target kind (e.g. "this card", "background", "button 1")
-        string targetKind = targetStr.Split(' ')[0].ToLowerInvariant();
         string targetScript = GetScriptForTarget(msg, targetStr) ?? "";
         if (string.IsNullOrWhiteSpace(targetScript))
         {
             LogMessage($"HyperTalk: send '{msg}' to '{targetStr}' — no script found (ignored)");
             return ExecutionResult.Normal;
         }
-        // Parse and dispatch inline to avoid infinite recursion
-        LogMessage($"HyperTalk: send '{msg}' to '{targetStr}'");
-        return ExecutionResult.Normal;
+
+        // Dispatch the message into the resolved script
+        return DispatchMessageInScript(msg, targetScript);
     }
 
     private ExecutionResult ExecDo(DoStatement s, ExecutionEnvironment env)
@@ -549,25 +593,37 @@ public class HyperTalkInterpreter
 
     private ExecutionResult ExecShow(ShowStatement s, ExecutionEnvironment env)
     {
-        LogMessage($"HyperTalk: show {EvalToString(s.Target, env)} (not implemented)");
+        SetPartVisible(EvalToString(s.Target, env), true);
         return ExecutionResult.Normal;
     }
 
     private ExecutionResult ExecHide(HideStatement s, ExecutionEnvironment env)
     {
-        LogMessage($"HyperTalk: hide {EvalToString(s.Target, env)} (not implemented)");
+        SetPartVisible(EvalToString(s.Target, env), false);
         return ExecutionResult.Normal;
     }
 
     private ExecutionResult ExecClick(ClickStatement s, ExecutionEnvironment env)
     {
-        LogMessage($"HyperTalk: click at {EvalToString(s.Location, env)} (not implemented)");
+        // Parse "h,v" or "h, v" coordinate string and simulate a click
+        var locStr = EvalToString(s.Location, env);
+        var parts = locStr.Split(',');
+        if (parts.Length == 2 &&
+            float.TryParse(parts[0].Trim(), out float cx) &&
+            float.TryParse(parts[1].Trim(), out float cy))
+        {
+            SimulateClickAt(cx, cy);
+        }
+        else
+        {
+            LogMessage($"HyperTalk: click at '{locStr}' — could not parse coordinates");
+        }
         return ExecutionResult.Normal;
     }
 
     private ExecutionResult ExecType(TypeStatement s, ExecutionEnvironment env)
     {
-        LogMessage($"HyperTalk: type '{EvalToString(s.Text, env)}' (not implemented)");
+        AppendToFocusedField(EvalToString(s.Text, env));
         return ExecutionResult.Normal;
     }
 

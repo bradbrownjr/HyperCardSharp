@@ -20,17 +20,41 @@ public class Part
     public short TitleWidthOrLastSelectedLine { get; init; }
     public short IconIdOrFirstSelectedLine { get; init; }
     public short TextAlign { get; init; }
-    public short TextFontId { get; init; }
-    public ushort TextSize { get; init; }
-    public byte TextStyle { get; init; }
+    /// <summary>Mac font ID. Settable so HyperTalk can change it at runtime.</summary>
+    public short TextFontId { get; set; }
+    /// <summary>Text point size. Settable so HyperTalk can change it at runtime.</summary>
+    public ushort TextSize { get; set; }
+    /// <summary>Text style flags (bold=1, italic=2, underline=4 …). Settable by HyperTalk.</summary>
+    public byte TextStyle { get; set; }
     public ushort TextHeight { get; init; }
-    public string Name { get; init; } = "";
+    /// <summary>Part name. Settable so HyperTalk can rename a part at runtime.</summary>
+    public string Name { get; set; } = "";
     public string Script { get; init; } = "";
+
+    // ── Runtime-mutable state (overrides parsed values during script execution) ──
+
+    /// <summary>
+    /// Runtime visibility override.  <c>null</c> means use the parsed flag;
+    /// <c>true</c>/<c>false</c> was set by a HyperTalk <c>show</c>/<c>hide</c> command.
+    /// </summary>
+    public bool? VisibleOverride { get; set; }
+
+    /// <summary>Runtime hilite/highlight state for buttons (toggled by HyperTalk).</summary>
+    public bool HiliteState { get; set; }
+
+    /// <summary>
+    /// Runtime enabled override.  <c>null</c> means enabled (default);
+    /// <c>false</c> was set by <c>set the enabled of button X to false</c>.
+    /// </summary>
+    public bool? EnabledOverride { get; set; }
+
+    /// <summary>True unless <see cref="EnabledOverride"/> has been set to <c>false</c>.</summary>
+    public bool Enabled => EnabledOverride ?? true;
 
     // Convenience properties
     public bool IsButton => Type == PartType.Button;
     public bool IsField => Type == PartType.Field;
-    public bool Visible => (Flags & 0x80) == 0; // bit 7 inverted = ~visible
+    public bool Visible => VisibleOverride ?? ((Flags & 0x80) == 0); // override wins; bit 7 inverted = ~visible
     /// <summary>For buttons: bit 7 of MoreFlags = showName (display the button label).</summary>
     public bool ShowName => IsButton && (MoreFlags & 0x80) != 0;
     /// <summary>For buttons: the icon resource ID (0 = no icon).</summary>
