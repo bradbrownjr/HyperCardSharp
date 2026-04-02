@@ -23,6 +23,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\HyperCardSharp.Core\HyperCardSharp.Core.csproj" />
+    <ProjectReference Include="..\..\src\HyperCardSharp.HyperTalk\HyperCardSharp.HyperTalk.csproj" />
+    <ProjectReference Include="..\..\src\HyperCardSharp.Rendering\HyperCardSharp.Rendering.csproj" />
   </ItemGroup>
 
 </Project>
