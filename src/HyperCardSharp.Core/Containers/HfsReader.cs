@@ -42,11 +42,14 @@ public class HfsReader
     // Catalog record types
     private const short CatalogFileRecord = 2;
 
-    // CdrFilRec offsets from start of data record (verified against working stack extraction)
-    private const int FilDataLogEofOffset = 0x18;   // data fork logical EOF (LongInt)
-    private const int FilRsrcLogEofOffset = 0x22;   // rsrc fork logical EOF (LongInt)
-    private const int FilDataExtOffset    = 0x46;   // data fork extent record (3 × 4 bytes)
-    private const int FilRsrcExtOffset    = 0x52;   // rsrc fork extent record (3 × 4 bytes)
+    // CdrFilRec offsets from start of data record.
+    // Layout (Inside Macintosh: Files, §2.76): cdrType(1)+cdrResrv2(1)+filFlags(2)+filUsrWds(16)
+    //   +filFlNum(4)+filStBlk(2)+filLgLen(4)+filPyLen(4)+filRStBlk(2)+filRLgLen(4)+filRPyLen(4)
+    //   +filCrDat(4)+filMdDat(4)+filBkDat(4)+filFndrInfo(16)+filClpSize(2)+filExtRec(12)+filRExtRec(12)
+    private const int FilDataLogEofOffset = 0x1A;   // data fork logical EOF (offset 26)
+    private const int FilRsrcLogEofOffset = 0x24;   // rsrc fork logical EOF (offset 36)
+    private const int FilDataExtOffset    = 0x4A;   // data fork extent record (offset 74, 3 × 4 bytes)
+    private const int FilRsrcExtOffset    = 0x56;   // rsrc fork extent record (offset 86, 3 × 4 bytes)
 
     private readonly byte[] _disk;
 
@@ -231,9 +234,9 @@ public class HfsReader
             if (dataStart + 2 > BtNodeSize)
                 continue;
 
-            // Record type
-            short recType = BinaryPrimitives.ReadInt16BigEndian(node.Slice(dataStart, 2));
-            if (recType != CatalogFileRecord)
+            // Record type: cdrType is a 1-byte field at dataStart[0], followed by 1-byte cdrResrv2.
+            // Reading as int16BE gives 0x0200=512 for a file record, not 2 — compare byte only.
+            if (node[dataStart] != CatalogFileRecord)
                 continue;
 
             // File record: finder info at data offset 4 (first 4 bytes = file type)
@@ -245,7 +248,7 @@ public class HfsReader
             if (fileType != "STAK")
                 continue;
 
-            // Data fork: dataLogEOF at data offset 0x18
+            // Data fork: dataLogEOF at data offset 0x1A (filLgLen)
             int dataLogEofOff = dataStart + FilDataLogEofOffset;
             if (dataLogEofOff + 4 > BtNodeSize)
                 continue;
@@ -254,7 +257,7 @@ public class HfsReader
             if (dataLogEof <= 0)
                 continue;
 
-            // Data fork extents at data offset 0x46 (3 extents × 4 bytes)
+            // Data fork extents at data offset 0x4A (3 extents × 4 bytes, filExtRec)
             int dataExtOff = dataStart + FilDataExtOffset;
             if (dataExtOff + 12 > BtNodeSize)
                 continue;
@@ -307,8 +310,7 @@ public class HfsReader
             if (dataStart + 2 > BtNodeSize)
                 continue;
 
-            short recType = BinaryPrimitives.ReadInt16BigEndian(node.Slice(dataStart, 2));
-            if (recType != CatalogFileRecord)
+            if (node[dataStart] != CatalogFileRecord)
                 continue;
 
             int finderInfoOff = dataStart + 4;
@@ -319,7 +321,7 @@ public class HfsReader
             if (fileType != "STAK")
                 continue;
 
-            int dataLogEofOff = dataStart + 0x18;
+            int dataLogEofOff = dataStart + FilDataLogEofOffset;
             if (dataLogEofOff + 4 > BtNodeSize)
                 continue;
 
@@ -327,7 +329,7 @@ public class HfsReader
             if (dataLogEof <= 0)
                 continue;
 
-            int dataExtOff = dataStart + 0x46;
+            int dataExtOff = dataStart + FilDataExtOffset;
             if (dataExtOff + 12 > BtNodeSize)
                 continue;
 
@@ -496,8 +498,7 @@ public class HfsReader
             if ((dataStart & 1) != 0) dataStart++;
             if (dataStart + 2 > BtNodeSize) continue;
 
-            short recType = BinaryPrimitives.ReadInt16BigEndian(node.Slice(dataStart, 2));
-            if (recType != CatalogFileRecord) continue;
+            if (node[dataStart] != CatalogFileRecord) continue;
 
             int finderInfoOff = dataStart + 4;
             if (finderInfoOff + 4 > BtNodeSize) continue;

@@ -155,9 +155,11 @@ public class StackParser
         var pages = new List<PageBlock>();
         if (listBlock != null)
         {
-            // Build a lookup from page block ID to expected card count
-            var pageCardCounts = listBlock.PageReferences.ToDictionary(
-                pr => pr.PageBlockId, pr => (int)pr.CardCount);
+            // Build a lookup from page block ID to expected card count.
+            // Use indexer (not ToDictionary) in case a corrupt stack has duplicate page IDs.
+            var pageCardCounts = new Dictionary<int, int>();
+            foreach (var pr in listBlock.PageReferences)
+                pageCardCounts[pr.PageBlockId] = (int)pr.CardCount;
 
             foreach (var pageHeader in pageHeaders)
             {
