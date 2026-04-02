@@ -163,6 +163,8 @@ public class StackParser
             }
         }
 
+        var (soundsById, soundsByName) = ParseSoundResources(resourceFork);
+
         return new StackFile
         {
             StackHeader = stackBlock,
@@ -177,6 +179,8 @@ public class StackParser
             Blocks = blocks,
             RawData = fileData,
             Icons = ParseIconResources(resourceFork),
+            SoundsById   = soundsById,
+            SoundsByName = soundsByName,
         };
     }
 
@@ -186,6 +190,25 @@ public class StackParser
         if (icons.Count > 0)
             _logger.LogInformation("Resource fork: {Count} ICON resource(s) loaded.", icons.Count);
         return icons;
+    }
+
+    private (Dictionary<short, byte[]> ById, Dictionary<string, byte[]> ByName) ParseSoundResources(byte[]? resourceFork)
+    {
+        var byId   = new Dictionary<short, byte[]>();
+        var byName = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+
+        var sndResources = MacResourceForkReader.GetResourcesWithNames(resourceFork, "snd ");
+        foreach (var (id, name, data) in sndResources)
+        {
+            byId[id] = data;
+            if (!string.IsNullOrEmpty(name))
+                byName[name] = data;
+        }
+
+        if (sndResources.Count > 0)
+            _logger.LogInformation("Resource fork: {Count} 'snd ' resource(s) loaded.", sndResources.Count);
+
+        return (byId, byName);
     }
 
     /// <summary>

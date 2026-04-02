@@ -29,6 +29,19 @@ public class StackFile
     public Dictionary<short, byte[]> Icons { get; init; } = new();
 
     /// <summary>
+    /// 'snd ' resources keyed by resource ID.
+    /// Raw resource bytes; use <see cref="HyperCardSharp.Core.Resources.SoundDecoder"/> to convert to WAV.
+    /// </summary>
+    public Dictionary<short, byte[]> SoundsById { get; init; } = new();
+
+    /// <summary>
+    /// 'snd ' resources keyed by resource name (case-insensitive).
+    /// Populated only for resources that have a name in the resource fork name list.
+    /// </summary>
+    public Dictionary<string, byte[]> SoundsByName { get; init; } =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Get the ordered list of card IDs from PAGE blocks.
     /// </summary>
     public IEnumerable<int> GetCardOrder()

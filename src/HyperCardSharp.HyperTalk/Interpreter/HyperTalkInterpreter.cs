@@ -81,6 +81,9 @@ public class HyperTalkInterpreter
     /// <summary>Called when HyperTalk executes <c>play "soundName"</c>.</summary>
     public Action<string> PlaySound { get; set; } = _ => {};
 
+    /// <summary>Called when HyperTalk executes <c>stop sound</c>.</summary>
+    public Action StopSound { get; set; } = () => {};
+
     /// <summary>
     /// Called when HyperTalk executes <c>do &lt;script&gt;</c>.
     /// The string is the HyperTalk expression result that should be parsed and run.
@@ -636,6 +639,16 @@ public class HyperTalkInterpreter
     private ExecutionResult ExecCommand(CommandStatement s, ExecutionEnvironment env)
     {
         var cmdLower = s.CommandName.ToLowerInvariant();
+
+        // stop sound
+        if (cmdLower == "stop")
+        {
+            // Check if first arg is "sound" (stop sound) or just treat any "stop" as stop sound
+            var firstArg = s.Args.Length > 0 ? Evaluate(s.Args[0], env).Raw : "";
+            if (firstArg.Equals("sound", StringComparison.OrdinalIgnoreCase) || s.Args.Length == 0)
+                StopSound();
+            return ExecutionResult.Normal;
+        }
 
         // lock screen / unlock screen
         if (cmdLower == "lock")

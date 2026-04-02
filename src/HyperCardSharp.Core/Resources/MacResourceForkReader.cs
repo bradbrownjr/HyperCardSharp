@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Text;
 
 namespace HyperCardSharp.Core.Resources;
 
@@ -120,6 +121,110 @@ public static class MacResourceForkReader
                 }
 
                 break;  // found the requested type; no need to keep scanning
+            }
+        }
+        catch
+        {
+            // Return whatever was collected before the fault.
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Extract all resources of the given four-character type, returning each one with
+    /// its resource name (null if not set in the name list).
+    /// Returns an empty list if the fork is absent, malformed, or has no matching resources.
+    /// </summary>
+    public static List<(short Id, string? Name, byte[] Data)> GetResourcesWithNames(byte[]? fork, string type)
+    {
+        var result = new List<(short, string?, byte[])>();
+        if (fork == null || fork.Length < 16 || type.Length != 4)
+            return result;
+
+        try
+        {
+            var span = fork.AsSpan();
+
+            uint dataOffset = BinaryPrimitives.ReadUInt32BigEndian(span.Slice(0, 4));
+            uint mapOffset  = BinaryPrimitives.ReadUInt32BigEndian(span.Slice(4, 4));
+
+            if (dataOffset < 16 || dataOffset >= (uint)fork.Length)
+                return result;
+            if (mapOffset < 16 || mapOffset + 28 > (uint)fork.Length)
+                return result;
+
+            ushort typeListOffset = BinaryPrimitives.ReadUInt16BigEndian(span.Slice((int)mapOffset + 24, 2));
+            ushort nameListOffset = BinaryPrimitives.ReadUInt16BigEndian(span.Slice((int)mapOffset + 26, 2));
+
+            int typeListStart = (int)mapOffset + typeListOffset;
+            int nameListStart = (int)mapOffset + nameListOffset;
+            if (typeListStart + 2 > fork.Length)
+                return result;
+
+            short numTypesMinusOne = BinaryPrimitives.ReadInt16BigEndian(span.Slice(typeListStart, 2));
+            int numTypes = numTypesMinusOne + 1;
+            if (numTypes <= 0 || numTypes > 4096)
+                return result;
+
+            uint targetTypeCode = (uint)(type[0] << 24 | type[1] << 16 | type[2] << 8 | type[3]);
+
+            for (int t = 0; t < numTypes; t++)
+            {
+                int typeEntryOffset = typeListStart + 2 + t * 8;
+                if (typeEntryOffset + 8 > fork.Length)
+                    break;
+
+                uint entryType = BinaryPrimitives.ReadUInt32BigEndian(span.Slice(typeEntryOffset, 4));
+                if (entryType != targetTypeCode)
+                    continue;
+
+                short numRefsMinusOne = BinaryPrimitives.ReadInt16BigEndian(span.Slice(typeEntryOffset + 4, 2));
+                ushort refListOffset  = BinaryPrimitives.ReadUInt16BigEndian(span.Slice(typeEntryOffset + 6, 2));
+                int numRefs = numRefsMinusOne + 1;
+                int refListStart = typeListStart + refListOffset;
+
+                for (int r = 0; r < numRefs; r++)
+                {
+                    int refOffset = refListStart + r * 12;
+                    if (refOffset + 12 > fork.Length)
+                        break;
+
+                    short resourceId    = BinaryPrimitives.ReadInt16BigEndian(span.Slice(refOffset, 2));
+                    short nameListOff   = BinaryPrimitives.ReadInt16BigEndian(span.Slice(refOffset + 2, 2));
+
+                    int resDataOffset = (span[refOffset + 5] << 16) |
+                                        (span[refOffset + 6] << 8)  |
+                                         span[refOffset + 7];
+
+                    int resourceDataStart = (int)dataOffset + resDataOffset;
+                    if (resourceDataStart + 4 > fork.Length)
+                        continue;
+
+                    uint resDataLen = BinaryPrimitives.ReadUInt32BigEndian(span.Slice(resourceDataStart, 4));
+                    if (resDataLen > 1024 * 1024)
+                        continue;
+
+                    int contentStart = resourceDataStart + 4;
+                    if (contentStart + (int)resDataLen > fork.Length)
+                        continue;
+
+                    var resData = new byte[resDataLen];
+                    span.Slice(contentStart, (int)resDataLen).CopyTo(resData);
+
+                    // Read Pascal string name from name list (nameListOff is offset within name list)
+                    string? resName = null;
+                    if (nameListOff >= 0 && nameListStart + nameListOff + 1 <= fork.Length)
+                    {
+                        int nameAbsOff = nameListStart + nameListOff;
+                        byte nameLen = span[nameAbsOff];
+                        if (nameAbsOff + 1 + nameLen <= fork.Length)
+                            resName = Encoding.Latin1.GetString(span.Slice(nameAbsOff + 1, nameLen));
+                    }
+
+                    result.Add((resourceId, resName, resData));
+                }
+                break;
             }
         }
         catch

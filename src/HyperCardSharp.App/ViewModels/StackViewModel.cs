@@ -4,6 +4,7 @@ using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HyperCardSharp.Core.Parts;
+using HyperCardSharp.Core.Resources;
 using HyperCardSharp.Core.Stack;
 using HyperCardSharp.HyperTalk.Interpreter;
 using HyperCardSharp.HyperTalk.MessagePassing;
@@ -19,6 +20,7 @@ public partial class StackViewModel : ObservableObject
     private List<int> _cardOrder = new();
     private readonly HyperTalkInterpreter _interpreter;
     private readonly MessageDispatcher _dispatcher;
+    private readonly MediaService _media = new();
 
     // Tracks the background ID of the currently displayed card so we can detect
     // background changes during navigation and fire openBackground / closeBackground.
@@ -264,9 +266,34 @@ public partial class StackViewModel : ObservableObject
 
         _interpreter.PlaySound = soundName =>
         {
-            // TODO: look up "snd " resource by name and play it via a media service
-            _interpreter.LogMessage($"[HyperTalk] play '{soundName}' — sound playback not yet implemented");
+            if (_stack == null) return;
+
+            // Look up snd resource by name first, then fall back to first available
+            byte[]? rawSnd = null;
+            if (!_stack.SoundsByName.TryGetValue(soundName, out rawSnd) &&
+                !string.IsNullOrEmpty(soundName) &&
+                short.TryParse(soundName, out short sndId))
+            {
+                _stack.SoundsById.TryGetValue(sndId, out rawSnd);
+            }
+
+            if (rawSnd == null)
+            {
+                _interpreter.LogMessage($"[HyperTalk] play '{soundName}' — snd resource not found");
+                return;
+            }
+
+            var wav = SoundDecoder.Decode(rawSnd);
+            if (wav == null)
+            {
+                _interpreter.LogMessage($"[HyperTalk] play '{soundName}' — could not decode snd resource");
+                return;
+            }
+
+            _media.PlayWav(wav);
         };
+
+        _interpreter.StopSound = () => _media.Stop();
 
         _interpreter.ExecuteScriptText = scriptText =>
         {
