@@ -26,6 +26,7 @@ public class StuffItExtractor : IContainerExtractor
     private const byte MethodRle = 1;
     private const byte MethodLzw = 2;
     private const byte MethodHuffman = 3;
+    private const byte MethodLzss = 5;
     private const byte MethodLzssHuffman = 13;
 
     /// <summary>
@@ -209,6 +210,7 @@ public class StuffItExtractor : IContainerExtractor
                 MethodNone => compData,
                 MethodRle => DecompressRle(compData, uncompLen),
                 MethodLzw => DecompressLzw(compData, uncompLen),
+                MethodLzss => DecompressLzss(compData, uncompLen),
                 MethodLzssHuffman => StuffIt13Decompressor.Decompress(compData, uncompLen),
                 _ => null  // Unsupported method
             };
@@ -217,6 +219,69 @@ public class StuffItExtractor : IContainerExtractor
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// StuffIt Classic LZSS (method 5): Okumura LZSS, 4 KB sliding window.
+    /// Parameters: N=4096 (12-bit offset), F=17 (max match), THRESHOLD=2 (min match).
+    /// Ring buffer initialised to ASCII spaces (0x20); initial write pointer r = N-F = 4079.
+    /// Flag byte: bit 7 processed first; 1 = literal byte, 0 = back-reference.
+    /// Back-reference (2 bytes): byte0 = position[7:0], byte1 = position[11:8] | (len-2)<<4.
+    /// TODO: verify against real stack extraction if decompressed output shows garbage.
+    /// </summary>
+    private static byte[]? DecompressLzss(byte[] input, int uncompLen)
+    {
+        const int N = 4096;         // ring-buffer / window size
+        const int F = 17;           // max match length  (1<<EJ) + THRESHOLD - 1  where EJ=4, T=2
+        const int Threshold = 2;    // minimum encoded match length
+
+        var ringBuf = new byte[N];
+        Array.Fill(ringBuf, (byte)0x20);   // initialise to ASCII spaces
+        int r = N - F;                     // initial write position = 4079
+
+        var output = new byte[uncompLen];
+        int outPos = 0;
+        int inPos = 0;
+
+        while (outPos < uncompLen && inPos < input.Length)
+        {
+            byte flags = input[inPos++];
+
+            // Process 8 flag bits, MSB (bit 7) first.
+            for (int bit = 7; bit >= 0 && outPos < uncompLen; bit--)
+            {
+                if (inPos >= input.Length) break;
+
+                if ((flags & (1 << bit)) != 0)
+                {
+                    // Literal byte
+                    byte b = input[inPos++];
+                    output[outPos++] = b;
+                    ringBuf[r] = b;
+                    r = (r + 1) & (N - 1);
+                }
+                else
+                {
+                    // Back-reference: 2 bytes
+                    if (inPos + 1 >= input.Length) break;
+                    byte b0 = input[inPos++];
+                    byte b1 = input[inPos++];
+
+                    int pos = b0 | ((b1 & 0x0F) << 8);          // 12-bit position
+                    int matchLen = (b1 >> 4) + Threshold;        // 4-bit length + threshold
+
+                    for (int k = 0; k < matchLen && outPos < uncompLen; k++)
+                    {
+                        byte c = ringBuf[(pos + k) & (N - 1)];
+                        output[outPos++] = c;
+                        ringBuf[r] = c;
+                        r = (r + 1) & (N - 1);
+                    }
+                }
+            }
+        }
+
+        return output;
     }
 
     /// <summary>
