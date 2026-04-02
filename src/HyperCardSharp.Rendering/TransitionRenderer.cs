@@ -49,6 +49,21 @@ public static class TransitionRenderer
                 RenderScroll(from, to, result, t, dx: 0, dy: 1);
                 break;
 
+            // ── Wipe ──────────────────────────────────────────────────────────
+            // Wipe: the new image sweeps in from one edge; the old image is static.
+            case "wipe left":
+                RenderWipe(from, to, result, t, dx: -1, dy: 0);
+                break;
+            case "wipe right":
+                RenderWipe(from, to, result, t, dx: 1, dy: 0);
+                break;
+            case "wipe up":
+                RenderWipe(from, to, result, t, dx: 0, dy: -1);
+                break;
+            case "wipe down":
+                RenderWipe(from, to, result, t, dx: 0, dy: 1);
+                break;
+
             // ── Zoom ──────────────────────────────────────────────────────────
             case "zoom open":
                 RenderZoomOpen(from, to, result, t);
@@ -133,10 +148,48 @@ public static class TransitionRenderer
         canvas.DrawBitmap(to,   toX,   toY);
     }
 
+    // ── Wipe ──────────────────────────────────────────────────────────────────
+    // Wipe: "from" stays fixed. "to" is revealed by expanding a clip rect from one edge.
+
+    /// <param name="dx">-1 = wipe left (reveal from right), +1 = wipe right (reveal from left).</param>
+    /// <param name="dy">-1 = wipe up   (reveal from bottom), +1 = wipe down (reveal from top).</param>
+    private static void RenderWipe(
+        SKBitmap from, SKBitmap to, SKBitmap result, float t, int dx, int dy)
+    {
+        int w = result.Width, h = result.Height;
+        using var canvas = new SKCanvas(result);
+
+        // Draw the old image as the full background
+        canvas.DrawBitmap(from, 0, 0);
+
+        // Clip region for the new image expands from the leading edge
+        SKRect clip;
+        if (dx != 0)
+        {
+            float revealW = w * t;
+            if (dx > 0)      // wipe right: reveal from left edge
+                clip = new SKRect(0, 0, revealW, h);
+            else             // wipe left: reveal from right edge
+                clip = new SKRect(w - revealW, 0, w, h);
+        }
+        else
+        {
+            float revealH = h * t;
+            if (dy > 0)      // wipe down: reveal from top edge
+                clip = new SKRect(0, 0, w, revealH);
+            else             // wipe up: reveal from bottom edge
+                clip = new SKRect(0, h - revealH, w, h);
+        }
+
+        canvas.Save();
+        canvas.ClipRect(clip);
+        canvas.DrawBitmap(to, 0, 0);
+        canvas.Restore();
+    }
+
     // ── Zoom ──────────────────────────────────────────────────────────────────
 
-    private static void RenderZoomOpen(SKBitmap from, SKBitmap to, SKBitmap result, float t)
-    {
+    private static void RenderZoomOpen(SKBitmap from, SKBitmap to, SKBitmap result, float t)    {
         int w = result.Width, h = result.Height;
         using var canvas = new SKCanvas(result);
         canvas.DrawBitmap(from, 0, 0);

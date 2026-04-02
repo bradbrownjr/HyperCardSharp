@@ -52,6 +52,9 @@ public static class PartRenderer
 
                 if (!string.IsNullOrEmpty(text))
                     TextRenderer.DrawFieldText(canvas, part, text);
+
+                if (part.Style == PartStyle.Scrolling)
+                    RenderScrollbarChrome(canvas, part);
             }
             else if (part.IsButton)
             {
@@ -81,6 +84,9 @@ public static class PartRenderer
             {
                 if (contentLookup.TryGetValue(part.PartId, out var text) && !string.IsNullOrEmpty(text))
                     TextRenderer.DrawFieldText(canvas, part, text);
+
+                if (part.Style == PartStyle.Scrolling)
+                    RenderScrollbarChrome(canvas, part);
             }
             else if (part.IsButton)
             {
@@ -93,6 +99,73 @@ public static class PartRenderer
 
     private static readonly SKColor ButtonBorderColor = SKColors.Black;
     private const float ButtonCornerRadius = 8f;
+    private const float ScrollbarWidth = 15f; // Classic Mac scrollbar width
+
+    /// <summary>
+    /// Draws a classic System 7 scrollbar on the right edge of a scrolling field.
+    /// This is static (non-interactive) chrome — the thumb is rendered at the top to
+    /// indicate "scrolled to start" from the viewer's always-from-top rendering.
+    /// </summary>
+    private static void RenderScrollbarChrome(SKCanvas canvas, Part part)
+    {
+        if (part.Width <= ScrollbarWidth || part.Height <= 0) return;
+
+        float left   = part.Right - ScrollbarWidth;
+        float top    = part.Top;
+        float right  = part.Right;
+        float bottom = part.Bottom;
+
+        using var whiteFill  = new SKPaint { Style = SKPaintStyle.Fill,   Color = SKColors.White };
+        using var blackBorder = new SKPaint { Style = SKPaintStyle.Stroke, Color = SKColors.Black, StrokeWidth = 1 };
+        using var blackFill   = new SKPaint { Style = SKPaintStyle.Fill,   Color = SKColors.Black };
+
+        // Scrollbar track background
+        var trackRect = new SKRect(left, top, right, bottom);
+        canvas.DrawRect(trackRect, whiteFill);
+        canvas.DrawRect(trackRect, blackBorder);
+
+        const float arrowH = 15f;
+
+        // Up arrow box at the top
+        var upBox = new SKRect(left, top, right, top + arrowH);
+        canvas.DrawRect(upBox, whiteFill);
+        canvas.DrawRect(upBox, blackBorder);
+        // Up triangle
+        float ax = left + ScrollbarWidth / 2f;
+        float ay = top + arrowH * 0.65f;
+        float aw = 4f;
+        using var triPath = new SKPath();
+        triPath.MoveTo(ax,      ay - aw);
+        triPath.LineTo(ax - aw, ay + aw * 0.5f);
+        triPath.LineTo(ax + aw, ay + aw * 0.5f);
+        triPath.Close();
+        canvas.DrawPath(triPath, blackFill);
+
+        // Down arrow box at the bottom
+        var downBox = new SKRect(left, bottom - arrowH, right, bottom);
+        canvas.DrawRect(downBox, whiteFill);
+        canvas.DrawRect(downBox, blackBorder);
+        // Down triangle
+        float bx = left + ScrollbarWidth / 2f;
+        float by = bottom - arrowH * 0.65f;
+        using var triPath2 = new SKPath();
+        triPath2.MoveTo(bx,      by + aw);
+        triPath2.LineTo(bx - aw, by - aw * 0.5f);
+        triPath2.LineTo(bx + aw, by - aw * 0.5f);
+        triPath2.Close();
+        canvas.DrawPath(triPath2, blackFill);
+
+        // Thumb — small rectangle near the top (represents scrolled-to-top)
+        float thumbAreaTop = top + arrowH + 1;
+        float thumbAreaH   = bottom - arrowH - arrowH - 2;
+        if (thumbAreaH > 6)
+        {
+            float thumbH = Math.Min(thumbAreaH * 0.2f, 20f);
+            thumbH = Math.Max(thumbH, 8f);
+            var thumbRect = new SKRect(left + 2, thumbAreaTop, right - 2, thumbAreaTop + thumbH);
+            canvas.DrawRect(thumbRect, blackFill);
+        }
+    }
 
     /// <summary>
     /// Draws full HyperCard button chrome: white fill, outline, icon (if any), and label.

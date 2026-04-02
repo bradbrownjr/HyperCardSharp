@@ -53,6 +53,13 @@ public partial class StackViewModel : ObservableObject
     public event Action<string>? ShowAnswerDialog;
 
     /// <summary>
+    /// Raised when HyperTalk executes <c>go to stack "name"</c>.
+    /// The MainWindow handles this by locating and loading the named stack file.
+    /// Arguments: stackName, optional cardName, optional 1-based card number.
+    /// </summary>
+    public event Action<string, string?, int?>? CrossStackNavigationRequested;
+
+    /// <summary>
     /// Raised when a HyperTalk <c>visual effect</c> / <c>go</c> pair fires a named transition.
     /// from: old card bitmap (caller must dispose); to: new card bitmap (same as CurrentBitmap).
     /// </summary>
@@ -157,6 +164,49 @@ public partial class StackViewModel : ObservableObject
                 return bg?.Script;
             return null; // button/field by name not resolved yet
         };
+
+        _interpreter.PlaySound = soundName =>
+        {
+            // TODO: look up "snd " resource by name and play it via a media service
+            _interpreter.LogMessage($"[HyperTalk] play '{soundName}' — sound playback not yet implemented");
+        };
+
+        _interpreter.ExecuteScriptText = scriptText =>
+        {
+            // Parse and execute the script text at runtime ('do' command)
+            var card = CurrentCard();
+            var bg   = card != null ? CurrentBackground(card) : null;
+            // Wrap in a temporary mouseUp handler so dispatcher can run it
+            var wrapped = $"on __do__\n{scriptText}\nend __do__";
+            var result = _dispatcher.DispatchMessage("__do__", wrapped, _interpreter);
+            return result == DispatchResult.Handled
+                ? HyperCardSharp.HyperTalk.Interpreter.ExecutionResult.Normal
+                : HyperCardSharp.HyperTalk.Interpreter.ExecutionResult.Normal;
+        };
+
+        _interpreter.FindInStack = (searchText, fieldName) =>
+        {
+            if (_stack == null || _cardOrder.Count == 0) return;
+            // Search forward from current card (wrapping around)
+            int start = CurrentCardIndex;
+            for (int i = 1; i <= _cardOrder.Count; i++)
+            {
+                int idx = (start + i) % _cardOrder.Count;
+                int cardId = _cardOrder[idx];
+                var card = _stack.Cards.FirstOrDefault(c => c.Header.Id == cardId);
+                if (card == null) continue;
+                var bg = CurrentBackground(card);
+                if (CardContainsText(searchText, card, bg, fieldName))
+                {
+                    NavigateTo(idx);
+                    return;
+                }
+            }
+            _interpreter.LogMessage($"[HyperTalk] find: '{searchText}' not found");
+        };
+
+        _interpreter.GoToStack = (stackName, cardName, cardNum) =>
+            CrossStackNavigationRequested?.Invoke(stackName, cardName, cardNum);
     }
 
     public void HandleCardClick(float cardX, float cardY)
@@ -458,4 +508,69 @@ public partial class StackViewModel : ObservableObject
         return null;
     }
 
+    /// <summary>
+    /// Returns true if any field on the given card (or its background) contains
+    /// <paramref name="searchText"/> (case-insensitive).
+    /// If <paramref name="fieldName"/> is specified, only that field is searched.
+    /// </summary>
+    private static bool CardContainsText(
+        string searchText, CardBlock card, BackgroundBlock? bg, string? fieldName)
+    {
+        bool Match(string? text) =>
+            text != null && text.Contains(searchText, StringComparison.OrdinalIgnoreCase);
+
+        // Card parts
+        foreach (var part in card.Parts)
+        {
+            if (!part.IsField) continue;
+            if (fieldName != null &&
+                !string.Equals(part.Name, fieldName, StringComparison.OrdinalIgnoreCase)) continue;
+            var content = card.PartContents.FirstOrDefault(pc => pc.PartId == part.PartId);
+            if (Match(content?.Text)) return true;
+        }
+
+        if (bg != null)
+        {
+            // Card-specific bg content
+            var cardBgContent = card.PartContents
+                .Where(pc => pc.PartId < 0)
+                .ToDictionary(pc => (short)(-pc.PartId), pc => pc.Text);
+
+            foreach (var part in bg.Parts)
+            {
+                if (!part.IsField) continue;
+                if (fieldName != null &&
+                    !string.Equals(part.Name, fieldName, StringComparison.OrdinalIgnoreCase)) continue;
+                string? text = cardBgContent.TryGetValue(part.PartId, out var ct)
+                    ? ct
+                    : bg.PartContents.FirstOrDefault(pc => pc.PartId == part.PartId)?.Text;
+                if (Match(text)) return true;
+            }
+        }
+        return false;
+    }
+
+    // ── Public navigation helpers (used by MainWindow for cross-stack navigation) ──
+
+    /// <summary>Navigate to a 1-based card number.</summary>
+    public void GoToCardNumber(int cardNumber)
+    {
+        if (_stack == null || _cardOrder.Count == 0) return;
+        NavigateTo(Math.Clamp(cardNumber - 1, 0, _cardOrder.Count - 1));
+    }
+
+    /// <summary>Navigate to a card by name.</summary>
+    public void GoToCardByName(string name)
+    {
+        if (_stack == null || _cardOrder.Count == 0) return;
+        for (int i = 0; i < _cardOrder.Count; i++)
+        {
+            var card = _stack.Cards.FirstOrDefault(c => c.Header.Id == _cardOrder[i]);
+            if (card != null && string.Equals(card.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                NavigateTo(i);
+                return;
+            }
+        }
+    }
 }

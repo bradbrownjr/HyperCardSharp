@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Platform.Storage;
@@ -21,9 +22,19 @@ public partial class MainWindow : Window
     private static readonly double[] ZoomLevels = { 1.0, 1.5, 2.0, 4.0 };
     private int _currentScaleIndex = 0;
 
-    // Retained for Ctrl+L "switch stack" within the same file
+    // Retained for Ctrl+M "switch stack" within the same file
     private string? _currentOpenFileName;
     private List<StackEntry>? _currentStacks;
+
+    // ── Recent files ──────────────────────────────────────────────────────────
+    private const int MaxRecentFiles = 8;
+    private List<string> _recentFiles = new();
+    private static readonly string RecentFilesPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "HyperCardSharp", "recent.json");
+
+    // Menu item whose submenu we rebuild when the recent-files list changes
+    private HyperCardSharp.App.Controls.System7MenuBar.MenuItem? _recentFilesMenuItem;
 
     // Held so its Title can be updated when the render mode toggles
     private HyperCardSharp.App.Controls.System7MenuBar.MenuItem? _renderModeMenuItem;
@@ -40,9 +51,15 @@ public partial class MainWindow : Window
         DataContext = _viewModel;
         KeyDown += OnKeyDown;
         _viewModel.ShowAnswerDialog  += OnShowAnswerDialog;
+        _viewModel.CrossStackNavigationRequested += OnCrossStackNavigation;
+
+        LoadRecentFiles();
 
         // Set up the custom menu bar
         InitializeMenuBar();
+
+        // Populate the "Open Recent" submenu now that _recentFilesMenuItem is assigned
+        RebuildRecentFilesMenu();
     }
 
     private void InitializeMenuBar()
@@ -69,6 +86,7 @@ public partial class MainWindow : Window
                 {
                     new() { Title = "Open\u2026", Shortcut = Mod("O"), Click = (s, e) => OnMenuOpen(s, e) },
                     new() { Title = "Switch Stack\u2026", Shortcut = Mod("M"), Click = (s, e) => OnMenuSwitchStack(s, e) },
+                    (_recentFilesMenuItem = new() { Title = "Open Recent", Click = null }),
                     new() { IsSeparator = true },
                     new() { Title = "Quit", Shortcut = Mod("Q"), Click = (s, e) => OnMenuQuit(s, e) }
                 }
@@ -129,11 +147,16 @@ public partial class MainWindow : Window
                 cardDisplay.Cursor = Cursor.Default;
             };
 
-            // Visual effect transitions: StackViewModel captures from/to bitmaps and
-            // passes them here so SkiaBitmapControl can animate the switch.
+            // Visual effect transitions
             _viewModel.TransitionRequested += (from, to, effect, speed, dir) =>
                 cardDisplay.PlayTransition(from, to, effect, speed, dir);
         }
+
+        // Drag-and-drop: accept files dragged onto the window
+        var dropTarget = this.FindControl<Border>("RootBorder") ?? (InputElement)this;
+        DragDrop.SetAllowDrop(dropTarget, true);
+        dropTarget.AddHandler(DragDrop.DragOverEvent, OnDragOver);
+        dropTarget.AddHandler(DragDrop.DropEvent, OnDrop);
     }
 
     private void OnShowAnswerDialog(string message)
@@ -289,6 +312,7 @@ public partial class MainWindow : Window
             return;
 
         var file = files[0];
+        var localPath = file.TryGetLocalPath();
         try
         {
             await using var stream = await file.OpenReadAsync();
@@ -312,6 +336,9 @@ public partial class MainWindow : Window
             // Store for Ctrl+M re-pick
             _currentOpenFileName = file.Name;
             _currentStacks = stacks;
+
+            if (localPath != null)
+                AddToRecentFiles(localPath);
 
             await PickAndLoadStack(file.Name, stacks);
         }
@@ -413,4 +440,210 @@ public partial class MainWindow : Window
 
     private void OnMenuQuit(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => Close();
+
+    // ── Drag-and-drop ─────────────────────────────────────────────────────────
+
+    private static void OnDragOver(object? sender, DragEventArgs e)
+    {
+#pragma warning disable CS0618
+        e.DragEffects = e.Data.Contains(DataFormats.Files)
+            ? DragDropEffects.Copy
+            : DragDropEffects.None;
+#pragma warning restore CS0618
+        e.Handled = true;
+    }
+
+    private void OnDrop(object? sender, DragEventArgs e)
+    {
+#pragma warning disable CS0618
+        if (!e.Data.Contains(DataFormats.Files)) return;
+        var files = e.Data.GetFiles();
+#pragma warning restore CS0618
+        if (files == null) return;
+        var first = files.FirstOrDefault();
+        if (first == null) return;
+        e.Handled = true;
+        _ = OpenFileByPathAsync(first.TryGetLocalPath() ?? "");
+    }
+
+    // ── Recent files ──────────────────────────────────────────────────────────
+
+    private void LoadRecentFiles()
+    {
+        try
+        {
+            if (File.Exists(RecentFilesPath))
+            {
+                var json = File.ReadAllText(RecentFilesPath);
+                _recentFiles = JsonSerializer.Deserialize<List<string>>(json) ?? new();
+                // Remove paths that no longer exist
+                _recentFiles = _recentFiles.Where(File.Exists).ToList();
+            }
+        }
+        catch { _recentFiles = new(); }
+        RebuildRecentFilesMenu();
+    }
+
+    private void SaveRecentFiles()
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(RecentFilesPath)!);
+            File.WriteAllText(RecentFilesPath,
+                JsonSerializer.Serialize(_recentFiles));
+        }
+        catch { /* non-critical — ignore */ }
+    }
+
+    private void AddToRecentFiles(string path)
+    {
+        _recentFiles.Remove(path);          // move to top if already present
+        _recentFiles.Insert(0, path);
+        if (_recentFiles.Count > MaxRecentFiles)
+            _recentFiles = _recentFiles.Take(MaxRecentFiles).ToList();
+        SaveRecentFiles();
+        RebuildRecentFilesMenu();
+    }
+
+    private void RebuildRecentFilesMenu()
+    {
+        if (_recentFilesMenuItem == null) return;
+        // Note: System7MenuBar.MenuItem.SubItems would require richer menu model.
+        // We instead update the Title to show the count and use a Click handler
+        // that shows a file-picker pre-filtered to recent entries.
+        // This is a minimal but functional implementation.
+        if (_recentFiles.Count == 0)
+        {
+            _recentFilesMenuItem.Title = "Open Recent";
+            _recentFilesMenuItem.Click = null;
+        }
+        else
+        {
+            _recentFilesMenuItem.Title = $"Open Recent ({_recentFiles.Count})";
+            _recentFilesMenuItem.Click = (_, _) => _ = ShowRecentFilesPickerAsync();
+        }
+    }
+
+    private async System.Threading.Tasks.Task ShowRecentFilesPickerAsync()
+    {
+        // Show the most recent files as a stack picker (reuse existing dialog)
+        var entries = _recentFiles
+            .Select(p => new StackEntry { Name = Path.GetFileName(p), Data = Array.Empty<byte>(), FullPath = p })
+            .ToList();
+
+        // Pick path
+        string? selectedPath = null;
+        if (entries.Count == 1)
+        {
+            selectedPath = entries[0].FullPath;
+        }
+        else
+        {
+            // Use StackPickerWindow to let the user choose from recent files
+            var picker = new StackPickerWindow(entries);
+            picker.ColorMode = _viewModel.RenderMode == HyperCardSharp.Rendering.RenderMode.Color;
+            await picker.ShowDialog(this);
+            int idx = picker.SelectedIndex;
+            if (idx >= 0 && idx < entries.Count)
+                selectedPath = entries[idx].FullPath;
+        }
+
+        if (selectedPath != null)
+            await OpenFileByPathAsync(selectedPath);
+    }
+
+    /// <summary>Opens a file given its absolute path (used by drag-and-drop and recent files).</summary>
+    public async System.Threading.Tasks.Task OpenFileByPathAsync(string path)
+    {
+        if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
+        try
+        {
+            var raw = await File.ReadAllBytesAsync(path);
+            var logLines = new List<string>();
+            var stacks = ContainerPipeline.UnwrapEntries(raw, msg => logLines.Add(msg));
+
+            if (stacks.Count == 0)
+            {
+                var detail = logLines.Count > 0 ? logLines[^1] : "no stack found in container.";
+                _viewModel.StatusText = $"Could not open \"{Path.GetFileName(path)}\": {detail}";
+                return;
+            }
+
+            stacks.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name));
+            _currentOpenFileName = Path.GetFileName(path);
+            _currentStacks = stacks;
+
+            AddToRecentFiles(path);
+            await PickAndLoadStack(Path.GetFileName(path), stacks);
+        }
+        catch (Exception ex)
+        {
+            _viewModel.StatusText = $"Error opening \"{Path.GetFileName(path)}\": {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Called when HyperTalk executes <c>go to stack "name"</c>.
+    /// Looks for the stack in the same directory as the currently-open file.
+    /// </summary>
+    private void OnCrossStackNavigation(string stackName, string? cardName, int? cardNumber)
+    {
+        _ = OpenCrossStackAsync(stackName, cardName, cardNumber);
+    }
+
+    private async System.Threading.Tasks.Task OpenCrossStackAsync(
+        string stackName, string? cardName, int? cardNumber)
+    {
+        // Resolve the stack file relative to the current file's directory
+        string? baseDir = null;
+        if (_currentOpenFileName != null)
+        {
+            // Try to find the directory from a recent file entry with this name
+            var match = _recentFiles.FirstOrDefault(
+                p => string.Equals(Path.GetFileName(p), _currentOpenFileName,
+                     StringComparison.OrdinalIgnoreCase));
+            if (match != null) baseDir = Path.GetDirectoryName(match);
+        }
+
+        string? resolvedPath = null;
+        if (baseDir != null)
+        {
+            // Try exact name match, then with common HyperCard extensions
+            foreach (var candidate in new[]
+            {
+                Path.Combine(baseDir, stackName),
+                Path.Combine(baseDir, stackName + ".sit"),
+                Path.Combine(baseDir, stackName + ".img"),
+                Path.Combine(baseDir, stackName + "_HyperCard"),
+            })
+            {
+                if (File.Exists(candidate)) { resolvedPath = candidate; break; }
+            }
+
+            // Case-insensitive fallback: search for any file whose name starts with stackName
+            if (resolvedPath == null)
+            {
+                resolvedPath = Directory.EnumerateFiles(baseDir)
+                    .FirstOrDefault(p => Path.GetFileNameWithoutExtension(p)
+                        .StartsWith(stackName, StringComparison.OrdinalIgnoreCase));
+            }
+        }
+
+        if (resolvedPath != null)
+        {
+            await OpenFileByPathAsync(resolvedPath);
+            // Navigate to the specified card after loading
+            if (cardNumber.HasValue)
+                _viewModel.GoToCardNumber(cardNumber.Value);
+            else if (cardName != null)
+                _viewModel.GoToCardByName(cardName);
+        }
+        else
+        {
+            _viewModel.StatusText =
+                $"Cross-stack: stack \"{stackName}\" not found in the same directory. " +
+                "Use Ctrl+O to open it manually.";
+        }
+    }
+
 }

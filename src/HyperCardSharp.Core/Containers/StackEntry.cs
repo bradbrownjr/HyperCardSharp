@@ -13,6 +13,8 @@ public sealed class StackEntry
     public byte[] Data { get; init; } = [];
     /// <summary>Raw Mac resource fork bytes for this stack file, if available.</summary>
     public byte[]? ResourceFork { get; init; }
+    /// <summary>Absolute file-system path when this entry was opened from a local file (e.g. recent files).</summary>
+    public string? FullPath { get; init; }
     public long SizeBytes => Data.Length;
     public int CardCount { get; init; }
     public short CardWidth { get; init; }

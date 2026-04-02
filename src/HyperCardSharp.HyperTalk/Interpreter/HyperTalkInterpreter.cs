@@ -60,6 +60,28 @@ public class HyperTalkInterpreter
     /// </summary>
     public Func<string, string, string?> GetScriptForTarget { get; set; } = (_, _) => null;
 
+    /// <summary>Called when HyperTalk executes <c>play "soundName"</c>.</summary>
+    public Action<string> PlaySound { get; set; } = _ => {};
+
+    /// <summary>
+    /// Called when HyperTalk executes <c>do &lt;script&gt;</c>.
+    /// The string is the HyperTalk expression result that should be parsed and run.
+    /// </summary>
+    public Func<string, ExecutionResult> ExecuteScriptText { get; set; } = _ => ExecutionResult.Normal;
+
+    /// <summary>
+    /// Called when HyperTalk executes <c>find</c>.
+    /// Arguments: searchText, optional fieldName (null = search all fields).
+    /// Should navigate to the first matching card.
+    /// </summary>
+    public Action<string, string?> FindInStack { get; set; } = (_, _) => {};
+
+    /// <summary>
+    /// Called when HyperTalk executes <c>go [to] stack "name"</c> (cross-stack navigation).
+    /// Arguments: stackName, optional cardName, optional 1-based cardNumber.
+    /// </summary>
+    public Action<string, string?, int?> GoToStack { get; set; } = (_, _, _) => {};
+
     // Return value from the most-recently executed handler/function
     public HyperTalkValue ReturnValue { get; private set; } = HyperTalkValue.Empty;
 
@@ -383,7 +405,17 @@ public class HyperTalkInterpreter
         }
         if (s.StackName != null)
         {
-            LogMessage($"HyperTalk: go to stack \"{s.StackName}\" — cross-stack navigation not supported (graceful no-op)");
+            int? cardNum = null;
+            string? cardName = null;
+            if (s.CardExpr != null)
+            {
+                var cv = Evaluate(s.CardExpr, env);
+                if (cv.TryAsNumber(out double n))
+                    cardNum = (int)n;
+                else
+                    cardName = cv.Raw;
+            }
+            GoToStack(s.StackName, cardName, cardNum);
             return ExecutionResult.Normal;
         }
 
@@ -444,7 +476,7 @@ public class HyperTalkInterpreter
     private ExecutionResult ExecPlay(PlayStatement s, ExecutionEnvironment env)
     {
         var sound = Evaluate(s.Sound, env).Raw;
-        LogMessage($"HyperTalk: play '{sound}' (not implemented)");
+        PlaySound(sound);
         return ExecutionResult.Normal;
     }
 
@@ -475,8 +507,8 @@ public class HyperTalkInterpreter
     private ExecutionResult ExecDo(DoStatement s, ExecutionEnvironment env)
     {
         var script = Evaluate(s.Script, env).Raw;
-        LogMessage($"HyperTalk: do '{script}' (dynamic execution not implemented)");
-        return ExecutionResult.Normal;
+        if (string.IsNullOrWhiteSpace(script)) return ExecutionResult.Normal;
+        return ExecuteScriptText(script);
     }
 
     private ExecutionResult ExecAdd(AddStatement s, ExecutionEnvironment env)
@@ -558,6 +590,25 @@ public class HyperTalkInterpreter
         if (cmdLower == "unlock")
         {
             UnlockScreen();
+            return ExecutionResult.Normal;
+        }
+
+        // find [whole|word|chars|string] <text> [in field "name"]
+        if (cmdLower == "find")
+        {
+            // Extract the search text: last string literal arg, or first evaluated arg
+            string? searchText = null;
+            string? fieldName = null;
+            var evalArgs = Array.ConvertAll(s.Args, a => Evaluate(a, env));
+            foreach (var a in evalArgs.Reverse())
+            {
+                // Skip qualifier keywords
+                if (a.Raw is "whole" or "word" or "chars" or "string" or "marked") continue;
+                searchText = a.Raw;
+                break;
+            }
+            if (searchText != null)
+                FindInStack(searchText, fieldName);
             return ExecutionResult.Normal;
         }
 
@@ -785,6 +836,10 @@ public class HyperTalkInterpreter
             "max"       => new HyperTalkValue(FormatNum(args.Max(a => a.AsNumber()))),
             "min"       => new HyperTalkValue(FormatNum(args.Min(a => a.AsNumber()))),
             "random"    => new HyperTalkValue(FormatNum(new Random().Next(1, (int)args[0].AsNumber() + 1))),
+            // offset(needle, haystack) — HyperTalk standard: returns 1-based index or 0
+            "offset"    => args.Length >= 2
+                            ? new HyperTalkValue(OffsetOf(args[0].Raw, args[1].Raw).ToString())
+                            : HyperTalkValue.Empty,
             "number of words" or "numwords" => new HyperTalkValue(GetWords(args[0].Raw).Length.ToString()),
             "number of chars" or "numchars" => new HyperTalkValue(args[0].Raw.Length.ToString()),
             "number of lines" or "numlines" => new HyperTalkValue(GetLines(args[0].Raw).Length.ToString()),
@@ -856,5 +911,16 @@ public class HyperTalkInterpreter
         if (d == Math.Truncate(d) && !double.IsInfinity(d) && !double.IsNaN(d))
             return ((long)d).ToString();
         return d.ToString("G", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// HyperTalk <c>offset(needle, haystack)</c> — 1-based index, or 0 if not found.
+    /// Case-sensitive per the HyperCard spec.
+    /// </summary>
+    private static int OffsetOf(string needle, string haystack)
+    {
+        if (string.IsNullOrEmpty(needle)) return 0;
+        int idx = haystack.IndexOf(needle, StringComparison.Ordinal);
+        return idx < 0 ? 0 : idx + 1;
     }
 }

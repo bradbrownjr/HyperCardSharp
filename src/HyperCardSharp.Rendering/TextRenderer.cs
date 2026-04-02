@@ -23,6 +23,11 @@ public static class TextRenderer
         var rect = new SKRect(part.Left, part.Top, part.Right, part.Bottom);
         if (rect.Width <= 0 || rect.Height <= 0) return;
 
+        // Scrolling fields have a 15px scrollbar on the right — shrink the text area.
+        const float scrollbarWidth = 15f;
+        if (part.Style == PartStyle.Scrolling)
+            rect = new SKRect(rect.Left, rect.Top, rect.Right - scrollbarWidth, rect.Bottom);
+
         using var typeface = FontMapper.GetTypeface(part.TextFontId, part.TextStyle);
         float textSize = part.TextSize > 0 ? part.TextSize : 12f;
         float lineHeight = part.TextHeight > 0 ? part.TextHeight : textSize * 1.2f;
