@@ -102,7 +102,15 @@ public class PartContent
     }
 
     private static string ReadMacRoman(ReadOnlySpan<byte> data)
-        => MacRomanEncoding.GetString(data);
+    {
+        // HyperCard appends 0xCA as an internal record-termination byte at the end of
+        // styled and plain text content. In Mac Roman 0xCA maps to U+00C0 (À), but
+        // HyperCard's text engine never rendered it — it is structural punctuation.
+        // Strip any trailing 0xCA bytes before converting to a .NET string.
+        int len = data.Length;
+        while (len > 0 && data[len - 1] == 0xCA) len--;
+        return MacRomanEncoding.GetString(data.Slice(0, len));
+    }
 }
 
 public class StyleRun

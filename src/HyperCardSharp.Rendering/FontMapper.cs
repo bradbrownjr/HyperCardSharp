@@ -24,13 +24,13 @@ public static class FontMapper
         return stream != null ? SKTypeface.FromStream(stream) : null;
     }
     // Classic Mac font IDs → cross-platform font family names.
-    // IDs 0 and 1 intentionally map to the sentinel "_chicago" which triggers the
-    // embedded ChicagoFLF typeface rather than a system font lookup.
+    // Font 0 (System/Chicago) uses the embedded ChicagoFLF (MIT licence).
+    // Font 1 (Application font = Geneva in System 7) uses Arial — Chicago is WRONG here.
     // Primary source: Inside Macintosh, Volume I, Font Manager chapter.
     private static readonly Dictionary<int, string> FontFamilyMap = new()
     {
-        { 0,  "_chicago" },           // System (Chicago) → ChicagoFLF
-        { 1,  "_chicago" },           // Application font (Geneva) — use Chicago for now
+        { 0,  "_chicago" },           // System (Chicago) → ChicagoFLF (embedded)
+        { 1,  "Arial" },              // Application font (Geneva in System 7) → Arial
         { 2,  "Times New Roman" },    // New York → Times
         { 3,  "Arial" },              // Geneva → Arial
         { 4,  "Courier New" },        // Monaco → Courier New (monospace)
