@@ -56,7 +56,21 @@ public class Part
 
     /// <summary>True unless <see cref="EnabledOverride"/> has been set to <c>false</c>.</summary>
     public bool Enabled => EnabledOverride ?? true;
+    // ── Scroll state (runtime-only; not stored in the binary format) ──────────
 
+    /// <summary>
+    /// Current vertical scroll offset in pixels (0 = scrolled to top).
+    /// Updated when the user clicks the scrollbar arrows or track.
+    /// Clamped to [0, <see cref="MaxScrollY"/>].
+    /// </summary>
+    public float ScrollOffsetY { get; set; } = 0f;
+
+    /// <summary>
+    /// Maximum useful scroll offset in pixels (= total content height − field height).
+    /// Recomputed by <see cref="TextRenderer"/> after each render pass.
+    /// 0 means the content fits entirely within the field — no scrolling needed.
+    /// </summary>
+    public float MaxScrollY { get; set; } = 0f;
     // Convenience properties
     public bool IsButton => Type == PartType.Button;
     public bool IsField => Type == PartType.Field;

@@ -40,13 +40,21 @@ public static class TextRenderer
 
         canvas.Save();
         canvas.ClipRect(rect);
+        if (part.ScrollOffsetY > 0)
+            canvas.Translate(0, -part.ScrollOffsetY);
 
+        float contentBottom;
         if (content.HasStyles && styleTable != null)
-            DrawStyledText(canvas, part, content.Text, content.StyleRuns, styleTable, fontTable, rect, align);
+            contentBottom = DrawStyledText(canvas, part, content.Text, content.StyleRuns, styleTable, fontTable, rect, align);
         else
-            DrawPlainText(canvas, part, content.Text, fontTable, rect, align);
+            contentBottom = DrawPlainText(canvas, part, content.Text, fontTable, rect, align);
 
         canvas.Restore();
+
+        // Update max scroll so the scrollbar and click handler know when to stop.
+        float contentHeight = contentBottom - rect.Top;
+        float fieldHeight   = rect.Bottom   - rect.Top;
+        part.MaxScrollY = Math.Max(0f, contentHeight - fieldHeight);
     }
 
     /// <summary>Plain-text overload for callers that only have a string (no PartContent).</summary>
@@ -62,13 +70,19 @@ public static class TextRenderer
 
         canvas.Save();
         canvas.ClipRect(rect);
-        DrawPlainText(canvas, part, text, null, rect, (HcTextAlign)part.TextAlign);
+        if (part.ScrollOffsetY > 0)
+            canvas.Translate(0, -part.ScrollOffsetY);
+        float contentBottom = DrawPlainText(canvas, part, text, null, rect, (HcTextAlign)part.TextAlign);
         canvas.Restore();
+
+        float contentHeight = contentBottom - rect.Top;
+        float fieldHeight   = rect.Bottom   - rect.Top;
+        part.MaxScrollY = Math.Max(0f, contentHeight - fieldHeight);
     }
 
     // ── Plain-text path (no style runs) ──────────────────────────────────────
 
-    private static void DrawPlainText(
+    private static float DrawPlainText(
         SKCanvas canvas, Part part, string text, FontTableBlock? fontTable,
         SKRect rect, HcTextAlign align)
     {
@@ -79,10 +93,10 @@ public static class TextRenderer
         using var font  = new SKFont(typeface, textSize);
         using var paint = new SKPaint { Color = SKColors.Black, IsAntialias = false };
 
-        DrawLines(canvas, font, paint, text, part.TextStyle, rect, align, lineHeight, textSize);
+        return DrawLines(canvas, font, paint, text, part.TextStyle, rect, align, lineHeight, textSize);
     }
 
-    private static void DrawLines(
+    private static float DrawLines(
         SKCanvas canvas, SKFont font, SKPaint paint, string text, byte textStyle,
         SKRect rect, HcTextAlign align, float lineHeight, float textSize)
     {
@@ -98,8 +112,6 @@ public static class TextRenderer
         {
             foreach (var wrappedLine in WrapLine(rawLine, font, availWidth))
             {
-                if (y > rect.Bottom) return;
-
                 float tw = font.MeasureText(wrappedLine);
                 float x = align switch
                 {
@@ -119,6 +131,7 @@ public static class TextRenderer
                 y += lineHeight;
             }
         }
+        return y; // bottom of last drawn line = total content height reference
     }
 
     // ── Styled-run path ───────────────────────────────────────────────────────
@@ -126,7 +139,7 @@ public static class TextRenderer
     // A resolved run: a text span with its resolved font and style flags.
     private readonly record struct ResolvedRun(int CharFrom, int CharTo, float FontSize, byte StyleFlags, int StyleIdx);
 
-    private static void DrawStyledText(
+    private static float DrawStyledText(
         SKCanvas canvas,
         Part part,
         string text,
@@ -150,8 +163,6 @@ public static class TextRenderer
 
         while (lineStart <= normalised.Length)
         {
-            if (y > rect.Bottom) return;
-
             int nlIdx = normalised.IndexOf('\n', lineStart);
             int lineEnd = nlIdx < 0 ? normalised.Length : nlIdx;
 
@@ -172,12 +183,13 @@ public static class TextRenderer
             for (int vli = 0; vli < visualLines.Count; vli++)
             {
                 if (vli > 0) y += lineHeight; // advance before each wrapped continuation line
-                if (y > rect.Bottom) break;
                 RenderVisualLine(canvas, visualLines[vli], align, x0, xRight, y, part, styleTable, fontTable);
             }
 
             lineStart = lineEnd + 1; // skip the '\n'
         }
+
+        return y; // bottom of last drawn line = total content height reference
     }
 
     // A token: a word or space chunk with the style table index that applies to it (-1 = use part defaults)

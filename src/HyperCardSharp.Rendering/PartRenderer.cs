@@ -214,14 +214,18 @@ public static class PartRenderer
         downPath.Close();
         canvas.DrawPath(downPath, blackFill);
 
-        // --- Thumb: white fill with black border, full track width, at scroll-to-top ---
+        // --- Thumb: white fill with black border, full track width.
+        // Position reflects actual scroll ratio; fixed at top when MaxScrollY == 0.
         float thumbAreaTop = top + arrowH + 1;
         float thumbAreaH   = bottom - arrowH - arrowH - 2;
         if (thumbAreaH > 6)
         {
-            float thumbH = Math.Min(thumbAreaH * 0.2f, 20f);
-            thumbH = Math.Max(thumbH, 8f);
-            var thumbRect = new SKRect(left, thumbAreaTop, right, thumbAreaTop + thumbH);
+            float thumbH = Math.Max(8f, Math.Min(thumbAreaH * 0.2f, 20f));
+            float scrollRatio = part.MaxScrollY > 0
+                ? Math.Clamp(part.ScrollOffsetY / part.MaxScrollY, 0f, 1f)
+                : 0f;
+            float thumbTop = thumbAreaTop + scrollRatio * (thumbAreaH - thumbH);
+            var thumbRect = new SKRect(left, thumbTop, right, thumbTop + thumbH);
             canvas.DrawRect(thumbRect, whiteFill);
             canvas.DrawRect(thumbRect, blackBorder);
         }

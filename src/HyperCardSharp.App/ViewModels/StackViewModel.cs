@@ -529,6 +529,16 @@ public partial class StackViewModel : ObservableObject
 
         var part = HitTest(cardX, cardY, card, bg);
 
+        // Intercept scrollbar clicks before HyperTalk dispatch.
+        // The scrollbar is the rightmost 15px of a scrolling field.
+        const float scrollbarWidth = 15f;
+        if (part is { IsField: true, Style: PartStyle.Scrolling }
+            && cardX >= part.Right - scrollbarWidth)
+        {
+            HandleScrollbarClick(part, cardY);
+            return;
+        }
+
         // Set the target — the object that first receives the message
         _interpreter.CurrentTarget = part != null
             ? (string.IsNullOrEmpty(part.Name)
@@ -559,6 +569,36 @@ public partial class StackViewModel : ObservableObject
         var stackScript = _stack?.StackHeader.Script;
         if (!string.IsNullOrWhiteSpace(stackScript))
             _dispatcher.DispatchMessage("mouseUp", stackScript, _interpreter);
+    }
+
+    /// <summary>
+    /// Handles a click anywhere on the scrollbar chrome of a scrolling field.
+    /// Up/down arrows scroll one line; clicking the track scrolls one page.
+    /// </summary>
+    private void HandleScrollbarClick(Part part, float cardY)
+    {
+        // No content to scroll
+        if (part.MaxScrollY <= 0) return;
+
+        const float arrowH = 15f;
+        float lineHeight = part.TextHeight > 0 ? part.TextHeight
+                         : part.TextSize  > 0 ? part.TextSize * 1.2f
+                         : 14f;
+        float fieldHeight = part.Bottom - part.Top;
+        float pageSize    = Math.Max(lineHeight, fieldHeight - arrowH * 2 - lineHeight);
+
+        float delta;
+        if (cardY < part.Top + arrowH)
+            delta = -lineHeight;                  // up arrow
+        else if (cardY >= part.Bottom - arrowH)
+            delta = lineHeight;                   // down arrow
+        else if (cardY < part.Top + fieldHeight / 2f)
+            delta = -pageSize;                    // track above thumb → page up
+        else
+            delta = pageSize;                     // track below thumb → page down
+
+        part.ScrollOffsetY = Math.Clamp(part.ScrollOffsetY + delta, 0f, part.MaxScrollY);
+        RenderCurrentCard();
     }
 
     /// <summary>
