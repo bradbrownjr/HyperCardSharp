@@ -3,6 +3,9 @@ using System.Text;
 
 namespace HyperCardSharp.Core.Containers;
 
+/// <summary>Describes a file found on an HFS volume.</summary>
+public record HfsFileEntry(string Name, string Type, string Creator, int ParentId, int DataForkSize, int ResourceForkSize);
+
 /// <summary>
 /// Parses an HFS filesystem image and extracts files with type "STAK".
 /// Supports reading the Master Directory Block, catalog B-tree leaf nodes,
@@ -472,6 +475,95 @@ public class HfsReader
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Enumerate ALL files on the volume (any type code), returning name, Finder type,
+    /// Finder creator, data fork size, and resource fork size. For diagnostics and
+    /// resource extraction.
+    /// </summary>
+    public List<HfsFileEntry> EnumerateAllFiles()
+    {
+        var results = new List<HfsFileEntry>();
+        if (!IsHfs())
+            return results;
+
+        try
+        {
+            var mdb = _disk.AsSpan(MdbOffset);
+            int alBlkSiz = (int)BinaryPrimitives.ReadUInt32BigEndian(mdb.Slice(MdbAlBlkSiz, 4));
+            int alBlSt   = BinaryPrimitives.ReadUInt16BigEndian(mdb.Slice(MdbAlBlSt, 2));
+
+            var ctExtRec    = mdb.Slice(MdbCtExtRec, 12);
+            var catalogData = ReadExtents(ctExtRec, alBlSt, alBlkSiz);
+            if (catalogData == null || catalogData.Length < BtNodeSize)
+                return results;
+
+            int firstLeaf = GetFirstLeafNode(catalogData);
+            if (firstLeaf < 0)
+                return results;
+
+            int nodeNum = firstLeaf;
+            while (nodeNum > 0)
+            {
+                int nodeOffset = nodeNum * BtNodeSize;
+                if (nodeOffset + BtNodeSize > catalogData.Length)
+                    break;
+
+                var node = catalogData.AsSpan(nodeOffset, BtNodeSize);
+                if (node[BtNodeKindOffset] == 0xFF)
+                    ScanLeafNodeForAllFiles(node, BinaryPrimitives.ReadUInt16BigEndian(node.Slice(BtNumRecordsOffset, 2)), results);
+
+                nodeNum = (int)BinaryPrimitives.ReadUInt32BigEndian(node.Slice(0, 4));
+            }
+        }
+        catch { }
+
+        return results;
+    }
+
+    private void ScanLeafNodeForAllFiles(ReadOnlySpan<byte> node, ushort numRecords, List<HfsFileEntry> results)
+    {
+        for (int r = 0; r < numRecords; r++)
+        {
+            int tablePos = BtNodeSize - 2 * (r + 1);
+            if (tablePos < 14) break;
+
+            ushort recOffset = BinaryPrimitives.ReadUInt16BigEndian(node.Slice(tablePos, 2));
+            if (recOffset < 14 || recOffset >= BtNodeSize) continue;
+
+            var rec = node.Slice(recOffset);
+            int keyLen = rec[0];
+            if (keyLen < 6 || recOffset + 1 + keyLen > BtNodeSize) continue;
+
+            int parentId = (int)BinaryPrimitives.ReadUInt32BigEndian(node.Slice(recOffset + 2, 4));
+
+            int nameLen = rec[6];
+            string fileName = nameLen > 0 && 7 + nameLen <= 1 + keyLen
+                ? Encoding.ASCII.GetString(node.Slice(recOffset + 7, nameLen))
+                : "";
+
+            int dataStart = recOffset + 1 + keyLen;
+            if ((dataStart & 1) != 0) dataStart++;
+            if (dataStart + 2 > BtNodeSize) continue;
+
+            if (node[dataStart] != CatalogFileRecord) continue;
+
+            int finderInfoOff = dataStart + 4;
+            if (finderInfoOff + 8 > BtNodeSize) continue;
+
+            string fileType    = Encoding.ASCII.GetString(node.Slice(finderInfoOff, 4));
+            string fileCreator = Encoding.ASCII.GetString(node.Slice(finderInfoOff + 4, 4));
+
+            int dataLogEof = (dataStart + FilDataLogEofOffset + 4 <= BtNodeSize)
+                ? (int)BinaryPrimitives.ReadUInt32BigEndian(node.Slice(dataStart + FilDataLogEofOffset, 4))
+                : 0;
+            int rsrcLogEof = (dataStart + FilRsrcLogEofOffset + 4 <= BtNodeSize)
+                ? (int)BinaryPrimitives.ReadUInt32BigEndian(node.Slice(dataStart + FilRsrcLogEofOffset, 4))
+                : 0;
+
+            results.Add(new HfsFileEntry(fileName, fileType, fileCreator, parentId, dataLogEof, rsrcLogEof));
+        }
     }
 
     // fileTypeFilter == null → accept any file type.

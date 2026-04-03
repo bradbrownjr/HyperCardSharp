@@ -9,6 +9,7 @@ using Avalonia.Input;
 using Avalonia.Platform.Storage;
 using HyperCardSharp.App.ViewModels;
 using HyperCardSharp.Core.Containers;
+using HyperCardSharp.Rendering;
 
 namespace HyperCardSharp.App.Views;
 
@@ -55,6 +56,11 @@ public partial class MainWindow : Window
         _viewModel.GoHomeRequested += () => _ = OpenFileAsync();
 
         LoadRecentFiles();
+
+        // Point FontMapper at a "fonts" directory next to the app for user-supplied fonts
+        var appDir = AppContext.BaseDirectory;
+        var fontsDir = Path.Combine(appDir, "fonts");
+        FontMapper.UserFontDirectory = fontsDir;
 
         // Set up the custom menu bar
         InitializeMenuBar();

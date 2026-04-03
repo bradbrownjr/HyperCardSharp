@@ -113,16 +113,28 @@ void RunHfsDiag(string path)
 {
     var raw = File.ReadAllBytes(path);
     Console.WriteLine($"\n=== HFS VOLUME SCAN: {System.IO.Path.GetFileName(path)} ({raw.Length} bytes) ===");
-    Console.WriteLine($"  Bytes 0-7: {string.Join(" ", raw.Take(8).Select(b => b.ToString("X2")))}");
+
+    // Strip DiskCopy 4.2 header if present
+    var dcx = new HyperCardSharp.Core.Containers.DiskCopyExtractor();
+    byte[] hfsData;
+    if (dcx.CanHandle(raw))
+    {
+        hfsData = dcx.Extract(raw)!;
+        Console.WriteLine($"  DiskCopy header stripped → {hfsData.Length} bytes HFS data");
+    }
+    else
+    {
+        hfsData = raw;
+    }
 
     // Check for HFS MDB signature at standard offset
-    if (raw.Length >= 1026)
+    if (hfsData.Length >= 1026)
     {
-        ushort sig = System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(raw.AsSpan(1024, 2));
+        ushort sig = System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(hfsData.AsSpan(1024, 2));
         Console.WriteLine($"  Signature at offset 1024: 0x{sig:X4} ({(sig == 0xD2D7 ? "HFS MDB ✓" : "not D2D7")})");
     }
 
-    var reader = new HyperCardSharp.Core.Containers.HfsReader(raw);
+    var reader = new HyperCardSharp.Core.Containers.HfsReader(hfsData);
     Console.WriteLine($"  IsHfs(): {reader.IsHfs()}");
 
     if (reader.IsHfs())
@@ -146,13 +158,22 @@ void RunHfsDiag(string path)
             var icons = HyperCardSharp.Core.Resources.MacResourceForkReader.GetResources(fork, "ICON");
             Console.WriteLine($"    '{name}': {fork.Length} bytes rsrc fork, {icons.Count} ICON(s): [{string.Join(", ", icons.Keys)}]");
         }
+
+        Console.WriteLine("  --- ALL files on volume (EnumerateAllFiles): ---");
+        var allFiles = reader.EnumerateAllFiles();
+        Console.WriteLine($"  Total files: {allFiles.Count}");
+        foreach (var f in allFiles.OrderBy(f => f.ParentId).ThenBy(f => f.Name))
+        {
+            Console.WriteLine($"    [{f.Type}/{f.Creator}] \"{f.Name}\"  parent={f.ParentId}  data={f.DataForkSize}  rsrc={f.ResourceForkSize}");
+        }
     }
 }
 
+var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
 var paths = args.Length > 0 ? args : new[]
 {
-    @"C:\Users\bradb\Nextcloud\Documents\GitHub\HyperCardSharp\samples\NEUROBLAST_Cyberdelia.sit",
-    @"C:\Users\bradb\Nextcloud\Documents\GitHub\HyperCardSharp\samples\neuroblast.img",
+    Path.Combine(repoRoot, "samples", "NEUROBLAST_Cyberdelia.sit"),
+    Path.Combine(repoRoot, "samples", "NEUROBLAST_HyperCard.img"),
 };
 
 foreach (var p in paths)

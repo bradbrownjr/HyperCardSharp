@@ -78,6 +78,21 @@ Primary references:
 - Keep the codebase **DRY** — no duplicated logic across parsers, renderers, or interpreters.
 - Follow **SOLID** principles — especially single responsibility in the parser and interpreter layers.
 - Keep solutions **KISS** — simple, explicit, and maintainable over clever.
+
+## Font Policy
+
+HyperCard# is a digital preservation tool. We aim to present stacks as faithfully as possible
+while respecting font copyright. Original Mac system fonts cannot be redistributed.
+
+**Multi-tier font resolution (FontMapper.cs):**
+
+1. **User font directory** — `fonts/` folder next to the app; users drop original `.ttf`/`.otf` files here
+2. **System-installed fonts** — detected automatically (macOS ships many classic Mac fonts)
+3. **Embedded open-source substitutes** — ChicagoFLF (MIT), Noto Sans (SIL OFL)
+4. **Common cross-platform fonts** — Arial, Times New Roman, Courier New
+5. **System default** — `SKTypeface.Default`
+
+See `docs/fonts.md` for end-user documentation, font ID reference, and sourcing instructions.
 - Favor clear architecture and extensibility over short-term shortcuts.
 - Prefer cohesive refactors over layered quick fixes.
 
@@ -180,6 +195,9 @@ Use this map to locate code without re-exploring the codebase.
 |---------|------|
 | Card compositor | `CardRenderer.cs` |
 | 1-bit → SKBitmap | `BitmapRenderer.cs` |
+| Font resolution (multi-tier) | `FontMapper.cs` |
+| Styled text layout | `TextRenderer.cs` |
+| Button/field/scrollbar chrome | `PartRenderer.cs` |
 
 ### HyperTalk (`src/HyperCardSharp.HyperTalk/`)
 

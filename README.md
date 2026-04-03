@@ -58,6 +58,12 @@ dotnet publish src/HyperCardSharp.App -c Release -r osx-arm64 --self-contained -
 dotnet publish src/HyperCardSharp.App -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true
 ```
 
+## Fonts
+
+HyperCard# bundles free, open-source font substitutes (ChicagoFLF for Chicago, Noto Sans for Geneva) so stacks are always readable out of the box. For pixel-perfect accuracy, you can drop original Mac TrueType font files into a `fonts/` folder next to the app — they'll be picked up automatically. On macOS, many classic Mac fonts are detected from the system font collection.
+
+See [docs/fonts.md](docs/fonts.md) for the full font resolution strategy, sourcing instructions, and font ID reference.
+
 ## Current Limitations
 
 HyperCard# targets HyperCard 2.4.1 — the final Apple release. Most stacks from that era should work. A few things are still in progress:
@@ -86,6 +92,7 @@ For developers and contributors:
 
 - [HyperTalk command coverage](docs/hypertalk-coverage.md) — what's implemented, what's not
 - [Stack binary format notes](docs/stack-format.md) — reverse-engineered format documentation
+- [Font strategy](docs/fonts.md) — how fonts are resolved, where to find originals
 - [Development plan](docs/PLAN.md) — implementation roadmap and phasing
 - [Agent guide](AGENTS.md) — architecture, conventions, and engineering principles
 
