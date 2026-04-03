@@ -178,55 +178,50 @@ public static class PartRenderer
 
         const float arrowH = 15f;
 
-        // Outer border for entire scrollbar rail
-        var trackRect = new SKRect(left, top, right, bottom);
-        canvas.DrawRect(trackRect, blackBorder);
+        // Outer border for entire scrollbar rail (left edge only — right and top/bottom share field border)
+        canvas.DrawLine(left, top, left, bottom, blackBorder);
 
         // Gray dithered track between the two arrow boxes
         var dithRect = new SKRect(left, top + arrowH, right, bottom - arrowH);
         canvas.DrawRect(dithRect, grayFill);
 
-        // --- Arrow helper: centred filled black triangle in a white 15×15 box ---
-        // In System 7 B&W mode arrow buttons are white-fill + black border + small black arrow.
-        // Arrow triangle: centroid at box-centre, 8px wide base, ~6px tall (equilateral-ish).
-        // For up-arrow: tip points UP.
-        //   tip  = (cx, boxCentreY - 4)   base = (cx±4, boxCentreY + 2)
-        // For down-arrow: tip points DOWN.
-        //   tip  = (cx, boxCentreY + 4)   base = (cx±4, boxCentreY - 2)
+        // --- Arrow boxes: white fill + black top/bottom border lines.
+        // System 7 B&W: white square, small centered solid black triangle.
+        // Triangle sizes: 5px tall, 7px base — authentic to 72-dpi Mac proportions.
 
         // Up arrow box
         var upBox = new SKRect(left, top, right, top + arrowH);
         canvas.DrawRect(upBox, whiteFill);
-        canvas.DrawRect(upBox, blackBorder);
+        canvas.DrawLine(left, top + arrowH, right, top + arrowH, blackBorder); // bottom separator
         float cx = left + ScrollbarWidth / 2f;
         float upCy = top + arrowH / 2f;
         using var upPath = new SKPath();
-        upPath.MoveTo(cx,     upCy - 4f);           // tip
-        upPath.LineTo(cx - 4f, upCy + 2f);           // bottom-left
-        upPath.LineTo(cx + 4f, upCy + 2f);           // bottom-right
+        upPath.MoveTo(cx,       upCy - 3f);   // tip
+        upPath.LineTo(cx - 3f,  upCy + 2f);   // bottom-left
+        upPath.LineTo(cx + 3f,  upCy + 2f);   // bottom-right
         upPath.Close();
         canvas.DrawPath(upPath, blackFill);
 
         // Down arrow box
         var downBox = new SKRect(left, bottom - arrowH, right, bottom);
         canvas.DrawRect(downBox, whiteFill);
-        canvas.DrawRect(downBox, blackBorder);
+        canvas.DrawLine(left, bottom - arrowH, right, bottom - arrowH, blackBorder); // top separator
         float downCy = bottom - arrowH / 2f;
         using var downPath = new SKPath();
-        downPath.MoveTo(cx,      downCy + 4f);       // tip
-        downPath.LineTo(cx - 4f, downCy - 2f);       // top-left
-        downPath.LineTo(cx + 4f, downCy - 2f);       // top-right
+        downPath.MoveTo(cx,       downCy + 3f);  // tip
+        downPath.LineTo(cx - 3f,  downCy - 2f);  // top-left
+        downPath.LineTo(cx + 3f,  downCy - 2f);  // top-right
         downPath.Close();
         canvas.DrawPath(downPath, blackFill);
 
-        // --- Thumb: white fill with 1px black border, positioned at scroll-to-top ---
+        // --- Thumb: white fill with black border, full track width, at scroll-to-top ---
         float thumbAreaTop = top + arrowH + 1;
         float thumbAreaH   = bottom - arrowH - arrowH - 2;
         if (thumbAreaH > 6)
         {
             float thumbH = Math.Min(thumbAreaH * 0.2f, 20f);
             thumbH = Math.Max(thumbH, 8f);
-            var thumbRect = new SKRect(left + 1, thumbAreaTop, right - 1, thumbAreaTop + thumbH);
+            var thumbRect = new SKRect(left, thumbAreaTop, right, thumbAreaTop + thumbH);
             canvas.DrawRect(thumbRect, whiteFill);
             canvas.DrawRect(thumbRect, blackBorder);
         }

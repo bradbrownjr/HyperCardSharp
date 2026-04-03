@@ -6,6 +6,8 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Assets\ChicagoFLF.ttf" />
+    <EmbeddedResource Include="Assets\NotoSans-Regular.ttf" />
+    <EmbeddedResource Include="Assets\NotoSans-Bold.ttf" />
   </ItemGroup>
 
   <ItemGroup>

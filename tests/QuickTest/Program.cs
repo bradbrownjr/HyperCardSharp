@@ -27,6 +27,42 @@ void RunButtonDiag(string path)
         var blockTypes = stack.Blocks.Select(b => b.Type).Distinct().OrderBy(t => t);
         Console.WriteLine($"  Block types: [{string.Join(", ", blockTypes)}]");
 
+        // Font table
+        if (stack.FontTable != null)
+        {
+            Console.WriteLine($"  Font table ({stack.FontTable.FontCount} entries):");
+            foreach (var f in stack.FontTable.Fonts)
+                Console.WriteLine($"    ID {f.FontId,4}: \"{f.Name}\"");
+        }
+        else Console.WriteLine("  No font table.");
+
+        // Style table (first 20 styles)
+        if (stack.StyleTable != null)
+        {
+            Console.WriteLine($"  Style table ({stack.StyleTable.StyleCount} entries, first 20):");
+            foreach (var s in stack.StyleTable.Styles.Take(20))
+                Console.WriteLine($"    StyleNum {s.StyleNumber,4}: fontId={s.TextFontId,4} size={s.TextSize,3} style=0x{(s.TextStyle >= 0 ? (byte)s.TextStyle : (byte)0):X2} (inherit: font={s.InheritFont} sz={s.InheritSize} st={s.InheritStyle})");
+        }
+        else Console.WriteLine("  No style table.");
+
+        // Parts font diagnostic — all backgrounds and first card
+        Console.WriteLine($"  All backgrounds ({stack.Backgrounds.Count} total):");
+        foreach (var bg in stack.Backgrounds)
+        {
+            Console.WriteLine($"    Background blockId={bg.Header.Id} bitmapId={bg.BitmapId} partCount={bg.Parts.Count} name=\"{bg.Name}\"");
+            foreach (var p in bg.Parts)
+                Console.WriteLine($"      Part {p.PartId,4} {(p.IsField?"field":"btn  ")} font={p.TextFontId,6} size={p.TextSize,3} style=0x{p.TextStyle:X2} name=\"{p.Name}\"");
+        }
+        // Print parts for cards that have fields
+        var cardsWithFields = stack.Cards.Where(c => c.Parts.Any(p => p.IsField)).Take(3).ToList();
+        Console.WriteLine($"  Cards with fields (first 3 of {stack.Cards.Count(c => c.Parts.Any(p => p.IsField))}):");
+        foreach (var c in cardsWithFields)
+        {
+            Console.WriteLine($"    Card #{c.Header.Id} (bgId={c.BackgroundId}) parts:");
+            foreach (var p in c.Parts)
+                Console.WriteLine($"      Part {p.PartId,4} {(p.IsField?"field":"btn  ")} font={p.TextFontId,6} size={p.TextSize,3} style=0x{p.TextStyle:X2} name=\"{p.Name}\"");
+        }
+
         // Resource fork icons
         if (e.ResourceFork != null)
         {

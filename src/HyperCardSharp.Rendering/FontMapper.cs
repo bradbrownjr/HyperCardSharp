@@ -23,26 +23,40 @@ public static class FontMapper
             "HyperCardSharp.Rendering.Assets.ChicagoFLF.ttf");
         return stream != null ? SKTypeface.FromStream(stream) : null;
     }
+
+    // Noto Sans Regular/Bold — free (SIL OFL) Geneva substitute.
+    // Geneva was the primary UI font in System 7; we use Noto Sans as a visually
+    // faithful cross-platform stand-in for clean small-size Latin text.
+    private static readonly Lazy<SKTypeface?> s_notoRegular = new(() => LoadEmbeddedTypeface("NotoSans-Regular.ttf"));
+    private static readonly Lazy<SKTypeface?> s_notoBold    = new(() => LoadEmbeddedTypeface("NotoSans-Bold.ttf"));
+
+    private static SKTypeface? LoadEmbeddedTypeface(string fileName)
+    {
+        var asm = typeof(FontMapper).Assembly;
+        using var stream = asm.GetManifestResourceStream(
+            $"HyperCardSharp.Rendering.Assets.{fileName}");
+        return stream != null ? SKTypeface.FromStream(stream) : null;
+    }
     // Classic Mac font IDs → cross-platform font family names.
     // Font 0 (System/Chicago) uses the embedded ChicagoFLF (MIT licence).
-    // Font 1 (Application font = Geneva in System 7) uses Arial — Chicago is WRONG here.
+    // Fonts 1 and 3 (Application font / Geneva) use the embedded Noto Sans (SIL OFL).
     // Primary source: Inside Macintosh, Volume I, Font Manager chapter.
     private static readonly Dictionary<int, string> FontFamilyMap = new()
     {
         { 0,  "_chicago" },           // System (Chicago) → ChicagoFLF (embedded)
-        { 1,  "Arial" },              // Application font (Geneva in System 7) → Arial
+        { 1,  "_geneva" },            // Application font (Geneva in System 7) → Noto Sans (embedded)
         { 2,  "Times New Roman" },    // New York → Times
-        { 3,  "Arial" },              // Geneva → Arial
+        { 3,  "_geneva" },            // Geneva → Noto Sans (embedded)
         { 4,  "Courier New" },        // Monaco → Courier New (monospace)
-        { 5,  "Arial" },              // Cairo (pictographic, fall back)
-        { 6,  "Arial" },              // Los Angeles
-        { 13, "Arial" },              // Zapf Dingbats (fall back)
+        { 5,  "_geneva" },            // Cairo (pictographic, fall back to Noto)
+        { 6,  "_geneva" },            // Los Angeles
+        { 13, "_geneva" },            // Zapf Dingbats (fall back to Noto)
         { 14, "Georgia" },            // Bookman → Georgia
         { 16, "Palatino Linotype" },  // Palatino
         { 20, "Times New Roman" },    // Times
-        { 21, "Arial" },              // Helvetica → Arial
+        { 21, "_geneva" },            // Helvetica → Noto Sans (embedded)
         { 22, "Courier New" },        // Courier
-        { 23, "Arial" },              // Symbol (fall back)
+        { 23, "_geneva" },            // Symbol (fall back to Noto)
     };
 
     /// <summary>Returns the best available cross-platform font family for a Mac font ID.</summary>
@@ -72,12 +86,12 @@ public static class FontMapper
         {
             "chicago"   => "_chicago",    // embedded ChicagoFLF
             "charcoal"  => "_chicago",    // Charcoal is Chicago's System 8 successor
-            "geneva"    => "Arial",
+            "geneva"    => "_geneva",     // embedded Noto Sans Regular/Bold (SIL OFL)
+            "helvetica" => "_geneva",     // Helvetica → same substitute as Geneva
             "new york"  => "Times New Roman",
             "monaco"    => "Courier New",
             "courier"   => "Courier New",
             "times"     => "Times New Roman",
-            "helvetica" => "Arial",
             "palatino"  => "Palatino Linotype",
             "bookman"   => "Georgia",
             _           => macName, // Try the original name; SkiaSharp will fall back to default if unavailable
@@ -93,18 +107,19 @@ public static class FontMapper
     public static SKTypeface GetTypeface(int macFontId, byte textStyle, FontTableBlock? fontTable)
     {
         var family = GetFamilyName(macFontId, fontTable);
+        bool isBold   = (textStyle & 0x01) != 0;
+        bool isItalic = (textStyle & 0x02) != 0;
 
         // Chicago (sentinel "_chicago") uses the embedded ChicagoFLF typeface directly.
-        // ChicagoFLF has no true bold/italic variants; bold style is honoured by SkiaSharp
-        // synthesizing faux-bold, and italic falls back gracefully.
         if (family == "_chicago")
             return s_chicagoFlf.Value ?? SKTypeface.Default;
 
-        bool bold   = (textStyle & 0x01) != 0;
-        bool italic = (textStyle & 0x02) != 0;
+        // Geneva (sentinel "_geneva") uses embedded Noto Sans Regular or Bold.
+        if (family == "_geneva")
+            return (isBold ? s_notoBold.Value : s_notoRegular.Value) ?? SKTypeface.Default;
 
-        var weight = bold ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal;
-        var slant  = italic ? SKFontStyleSlant.Italic : SKFontStyleSlant.Upright;
+        var weight = isBold   ? SKFontStyleWeight.Bold   : SKFontStyleWeight.Normal;
+        var slant  = isItalic ? SKFontStyleSlant.Italic  : SKFontStyleSlant.Upright;
 
         return SKTypeface.FromFamilyName(family, weight, SKFontStyleWidth.Normal, slant)
                ?? SKTypeface.Default;
