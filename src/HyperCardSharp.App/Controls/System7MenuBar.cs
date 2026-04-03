@@ -22,6 +22,12 @@ public class System7MenuBar : Control
         public string? Shortcut { get; set; }
         public bool IsSeparator { get; set; }
         public EventHandler<RoutedEventArgs>? Click { get; set; }
+        /// <summary>
+        /// Optional predicate evaluated at render and click time.
+        /// When it returns false the item is drawn in gray and cannot be selected.
+        /// Null means always enabled.
+        /// </summary>
+        public Func<bool>? IsEnabled { get; set; }
     }
 
     public class MenuDef
@@ -373,19 +379,22 @@ internal class MenuDropdown : Control
     private void OnPointerMoved(object? sender, PointerEventArgs e)
     {
         int idx = HitItem(e.GetPosition(this).Y);
-        if (idx >= 0 && _menu.Items[idx].IsSeparator) idx = -1;
+        if (idx >= 0 && (_menu.Items[idx].IsSeparator || IsItemDisabled(idx))) idx = -1;
         if (idx != _hoverIndex) { _hoverIndex = idx; InvalidateVisual(); }
     }
 
     private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         int idx = HitItem(e.GetPosition(this).Y);
-        if (idx >= 0 && !_menu.Items[idx].IsSeparator)
+        if (idx >= 0 && !_menu.Items[idx].IsSeparator && !IsItemDisabled(idx))
         {
             ItemSelected?.Invoke(this, _menu.Items[idx]);
             e.Handled = true;
         }
     }
+
+    private bool IsItemDisabled(int idx)
+        => _menu.Items[idx].IsEnabled?.Invoke() == false;
 
     public void BeginFlash(System7MenuBar.MenuItem item, Action onDone)
     {
@@ -425,14 +434,17 @@ internal class MenuDropdown : Control
         {
             var item = _menu.Items[i];
             double y  = 4 + i * RowH;
-            bool hl   = !item.IsSeparator &&
+            bool disabled = IsItemDisabled(i);
+            bool hl   = !item.IsSeparator && !disabled &&
                         ((_flashIndex == i && _flashHighlit) ||
                          (_flashIndex < 0 && _hoverIndex == i));
 
             if (hl)
                 context.FillRectangle(Brushes.Black, new Rect(2, y, W - 4, RowH - 2));
 
-            IBrush fg = hl ? Brushes.White : Brushes.Black;
+            IBrush fg = hl ? Brushes.White
+                           : disabled ? new SolidColorBrush(Color.FromRgb(128, 128, 128))
+                           : Brushes.Black;
 
             if (item.IsSeparator)
             {

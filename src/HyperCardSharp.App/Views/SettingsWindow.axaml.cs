@@ -5,7 +5,6 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using HyperCardSharp.App.Controls;
-using HyperCardSharp.Rendering;
 
 namespace HyperCardSharp.App.Views;
 
@@ -39,24 +38,24 @@ public partial class SettingsWindow : Window
     {
         var fontDirBox    = this.FindControl<TextBox>("FontDirBox");
         var diskImageBox  = this.FindControl<TextBox>("DiskImageBox");
-        var colorModeCheck = this.FindControl<CheckBox>("ColorModeCheck");
+        var colorModeCombo = this.FindControl<ComboBox>("ColorModeCombo");
 
         if (fontDirBox    != null) fontDirBox.Text    = s.UserFontDirectory ?? string.Empty;
         if (diskImageBox  != null) diskImageBox.Text  = s.SystemDiskImagePath ?? string.Empty;
-        if (colorModeCheck != null) colorModeCheck.IsChecked = s.UseColorMode;
+        if (colorModeCombo != null) colorModeCombo.SelectedIndex = s.UseColorMode ? 1 : 0;
     }
 
     private AppSettings ReadFromDialog()
     {
         var fontDirBox    = this.FindControl<TextBox>("FontDirBox");
         var diskImageBox  = this.FindControl<TextBox>("DiskImageBox");
-        var colorModeCheck = this.FindControl<CheckBox>("ColorModeCheck");
+        var colorModeCombo = this.FindControl<ComboBox>("ColorModeCombo");
 
         return new AppSettings
         {
             UserFontDirectory   = string.IsNullOrWhiteSpace(fontDirBox?.Text)   ? null : fontDirBox!.Text.Trim(),
             SystemDiskImagePath = string.IsNullOrWhiteSpace(diskImageBox?.Text) ? null : diskImageBox!.Text.Trim(),
-            UseColorMode        = colorModeCheck?.IsChecked == true,
+            UseColorMode        = colorModeCombo?.SelectedIndex == 1,
         };
     }
 

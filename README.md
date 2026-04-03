@@ -16,6 +16,8 @@ HyperCard# brings those stacks back to life. Point it at a stack file and it jus
 
 HyperCard# understands all the common ways stacks were shared back in the day: raw stack files, StuffIt archives (.sit), BinHex (.hqx), MacBinary (.bin), and Mac disk images (.img). Just open the file — the app figures out the format automatically.
 
+> **Tip:** StuffIt archives (.sit) and Mac disk images (.img) preserve the HyperCard resource fork, which carries icons, embedded fonts, sounds, and color data. When looking for a stack online, prefer these formats over raw .stk files for the most complete experience.
+
 ## What Works
 
 - **Cards and graphics** — black-and-white and color rendering, just like the original

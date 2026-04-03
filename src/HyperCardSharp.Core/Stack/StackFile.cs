@@ -61,6 +61,12 @@ public class StackFile
     public Dictionary<short, byte[]> PictResources { get; init; } = new();
 
     /// <summary>
+    /// 'sfnt' TrueType font resources from the resource fork, keyed by resource ID.
+    /// Loaded by <see cref="HyperCardSharp.Rendering.FontMapper"/> as tier-0 stack-embedded fonts.
+    /// </summary>
+    public Dictionary<short, byte[]> SfntResources { get; init; } = new();
+
+    /// <summary>
     /// True when the stack was created by HyperCard 1.x (format version ≤ 7).
     /// Full 1.x format support is not yet implemented — the stack may render partially.
     /// </summary>

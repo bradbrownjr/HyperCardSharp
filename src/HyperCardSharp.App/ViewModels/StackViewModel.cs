@@ -718,6 +718,7 @@ public partial class StackViewModel : ObservableObject
         {
             var parser = new StackParser();
             _stack = parser.Parse(fileData, resourceFork);
+            HyperCardSharp.Rendering.FontMapper.SetStackFonts(_stack.SfntResources);
             _renderer?.ClearCache();
             _renderer = new CardRenderer(_stack);
 
@@ -804,6 +805,9 @@ public partial class StackViewModel : ObservableObject
         NavigateTo(prev, pushHistory: false);
     }
 
+    /// <summary>True when there is at least one card in the back-navigation history.</summary>
+    public bool HasBackHistory => _cardHistory.Count > 0;
+
     /// <summary>
     /// Rapidly navigates through all cards, pausing <paramref name="delayMs"/> milliseconds
     /// between each card. Called by <c>show cards</c> / <c>show all cards</c>.
@@ -881,6 +885,9 @@ public partial class StackViewModel : ObservableObject
         if (bgChanged)
             DispatchLifecycle("openBackground", newCardObj, newBgObj);
         DispatchLifecycle("openCard", newCardObj, newBgObj);
+
+        // Notify menu bar to re-evaluate IsEnabled on Go items that depend on history/position.
+        OnPropertyChanged(nameof(HasBackHistory));
     }
 
     /// <summary>

@@ -103,6 +103,22 @@ public static class ContainerPipeline
                 commonRsrcFork = volumeFork;
             else if (hfsForks.Count > 0)
                 namedRsrcForks = hfsForks;
+
+            // MacBinary: the file itself carries a resource fork alongside the data fork.
+            if (commonRsrcFork == null && namedRsrcForks == null)
+            {
+                var mbForks = new MacBinaryExtractor().ExtractForks(data);
+                if (mbForks?.ResourceFork?.Length > 0)
+                    commonRsrcFork = mbForks.Value.ResourceFork;
+            }
+
+            // AppleSingle/AppleDouble: same idea.
+            if (commonRsrcFork == null && namedRsrcForks == null)
+            {
+                var asForks = new AppleSingleExtractor().ExtractForks(data);
+                if (asForks?.ResourceFork?.Length > 0)
+                    commonRsrcFork = asForks.Value.ResourceFork;
+            }
         }
 
         var entries = new List<StackEntry>(tuples.Count);

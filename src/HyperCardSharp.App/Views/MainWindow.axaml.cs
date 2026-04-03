@@ -37,9 +37,6 @@ public partial class MainWindow : Window
     // Menu item whose submenu we rebuild when the recent-files list changes
     private HyperCardSharp.App.Controls.System7MenuBar.MenuItem? _recentFilesMenuItem;
 
-    // Held so its Title can be updated when the render mode toggles
-    private HyperCardSharp.App.Controls.System7MenuBar.MenuItem? _renderModeMenuItem;
-
     // Platform detection: on macOS, show ⌘ instead of Ctrl and accept Meta key
     private static bool IsMac => RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
     private static string Mod(string key) => IsMac ? $"\u2318{key}" : $"Ctrl+{key}";
@@ -106,19 +103,19 @@ public partial class MainWindow : Window
                 Title = "Go",
                 Items = new()
                 {
-                    new() { Title = "Back",        Shortcut = Mod("~"), Click = (s, e) => _viewModel.BackCard() },
+                    new() { Title = "Back",        Shortcut = Mod("~"), IsEnabled = () => _viewModel.IsLoaded && _viewModel.HasBackHistory, Click = (s, e) => _viewModel.BackCard() },
                     new() { Title = "Home",        Shortcut = Mod("H"), Click = (s, e) => _ = OpenFileAsync() },
                     new() { Title = "Help",        Shortcut = "F1",     Click = (s, e) => OnMenuHelp(s, e) },
                     new() { IsSeparator = true },
-                    new() { Title = "First",       Shortcut = Mod("1"), Click = (s, e) => _viewModel.FirstCard() },
-                    new() { Title = "Prev",        Shortcut = Mod("2"), Click = (s, e) => _viewModel.PreviousCard() },
-                    new() { Title = "Next",        Shortcut = Mod("3"), Click = (s, e) => _viewModel.NextCard() },
-                    new() { Title = "Last",        Shortcut = Mod("4"), Click = (s, e) => _viewModel.LastCard() },
+                    new() { Title = "First",       Shortcut = Mod("1"), IsEnabled = () => _viewModel.IsLoaded, Click = (s, e) => _viewModel.FirstCard() },
+                    new() { Title = "Prev",        Shortcut = Mod("2"), IsEnabled = () => _viewModel.IsLoaded, Click = (s, e) => _viewModel.PreviousCard() },
+                    new() { Title = "Next",        Shortcut = Mod("3"), IsEnabled = () => _viewModel.IsLoaded, Click = (s, e) => _viewModel.NextCard() },
+                    new() { Title = "Last",        Shortcut = Mod("4"), IsEnabled = () => _viewModel.IsLoaded, Click = (s, e) => _viewModel.LastCard() },
                     new() { IsSeparator = true },
                     new() { Title = "Find\u2026",  Shortcut = Mod("F"), Click = (s, e) => OnMenuFindStub(s, e) },
                     new() { Title = "Message",     Shortcut = Mod("M"), Click = (s, e) => OnMenuMessageStub(s, e) },
                     new() { Title = "Scroll",      Shortcut = Mod("E"), Click = (s, e) => OnMenuScrollStub(s, e) },
-                    new() { Title = "Next Window", Shortcut = Mod("L"), Click = null }
+                    new() { Title = "Next Window", Shortcut = Mod("L"), IsEnabled = () => false, Click = null }
                 }
             },
             // View menu
@@ -127,8 +124,6 @@ public partial class MainWindow : Window
                 Title = "View",
                 Items = new()
                 {
-                    (_renderModeMenuItem = new() { Title = _viewModel.RenderModeLabel, Click = (s, e) => OnMenuToggleRenderMode(s, e) }),
-                    new() { IsSeparator = true },
                     new() { Title = "Zoom 1\u00d7", Click = (s, e) => OnMenuZoom1(s, e) },
                     new() { Title = "Zoom 2\u00d7", Click = (s, e) => OnMenuZoom2(s, e) },
                     new() { Title = "Zoom 3\u00d7", Click = (s, e) => OnMenuZoom3(s, e) },
@@ -448,19 +443,6 @@ public partial class MainWindow : Window
     private void OnMenuSwitchStack(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => _ = SwitchStackAsync();
 
-    private void OnMenuToggleRenderMode(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        _viewModel.ToggleRenderMode();
-        bool isColor = _viewModel.RenderMode == HyperCardSharp.Rendering.RenderMode.Color;
-        // Update the menu item label to reflect the new mode
-        if (_renderModeMenuItem != null)
-            _renderModeMenuItem.Title = _viewModel.RenderModeLabel;
-        // Sync Apple logo: rainbow in color mode, black silhouette in B&W
-        var menuBar = this.FindControl<HyperCardSharp.App.Controls.System7MenuBar>("MenuBar");
-        if (menuBar != null)
-            menuBar.UseColorLogo = isColor;
-    }
-
     private void OnMenuZoom1(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     { _currentScaleIndex = 0; ResizeToScale(ZoomLevels[0]); }
 
@@ -501,8 +483,6 @@ public partial class MainWindow : Window
         {
             _viewModel.ToggleRenderMode();
             bool nowColor = _viewModel.RenderMode == HyperCardSharp.Rendering.RenderMode.Color;
-            if (_renderModeMenuItem != null)
-                _renderModeMenuItem.Title = _viewModel.RenderModeLabel;
             var menuBar = this.FindControl<HyperCardSharp.App.Controls.System7MenuBar>("MenuBar");
             if (menuBar != null)
                 menuBar.UseColorLogo = nowColor;

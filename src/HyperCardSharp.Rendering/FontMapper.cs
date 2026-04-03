@@ -2,6 +2,8 @@ using System.Reflection;
 using HyperCardSharp.Core.Parts;
 using HyperCardSharp.Core.Stack;
 using SkiaSharp;
+using System.Collections.Generic;
+using System.IO;
 
 namespace HyperCardSharp.Rendering;
 
@@ -19,6 +21,33 @@ namespace HyperCardSharp.Rendering;
 /// </summary>
 public static class FontMapper
 {
+    // ── Stack-embedded sfnt fonts (tier 0) ──────────────────────────────────
+
+    // Loaded from the current stack's resource fork. Keyed by family name (case-insensitive).
+    private static readonly Dictionary<string, SKTypeface> s_stackFonts = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Loads TrueType 'sfnt' resources from a stack's resource fork as tier-0 fonts.
+    /// Call this each time a new stack is loaded; previous stack fonts are released.
+    /// </summary>
+    public static void SetStackFonts(IReadOnlyDictionary<short, byte[]> sfntResources)
+    {
+        foreach (var tf in s_stackFonts.Values) tf.Dispose();
+        s_stackFonts.Clear();
+
+        foreach (var (_, data) in sfntResources)
+        {
+            try
+            {
+                using var ms = new MemoryStream(data);
+                var tf = SKTypeface.FromStream(ms);
+                if (tf != null && !string.IsNullOrEmpty(tf.FamilyName) && !s_stackFonts.ContainsKey(tf.FamilyName))
+                    s_stackFonts[tf.FamilyName] = tf;
+            }
+            catch { /* ignore malformed sfnt data */ }
+        }
+    }
+
     // ── Embedded typefaces (tier 3) ──────────────────────────────────────────
 
     // ChicagoFLF — loaded once from the embedded resource.
@@ -261,6 +290,10 @@ public static class FontMapper
                 macName = ftblName;
         }
         macName ??= MacFontNames.GetValueOrDefault(macFontId);
+
+        // Tier 0: Stack-embedded sfnt resources (most authentic — the stack's own fonts).
+        if (macName != null && s_stackFonts.TryGetValue(macName, out var stackTf))
+            return stackTf;
 
         // Tier 1: User font directory — try the original Mac name.
         if (macName != null)

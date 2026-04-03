@@ -96,4 +96,37 @@ public class MacBinaryExtractor : IContainerExtractor
             return null;
         }
     }
+
+    /// <summary>
+    /// Returns both the data fork and resource fork from a MacBinary file.
+    /// </summary>
+    public (byte[] DataFork, byte[]? ResourceFork)? ExtractForks(byte[] data)
+    {
+        if (!CanHandle(data))
+            return null;
+
+        try
+        {
+            var span = data.AsSpan();
+            int dataForkLen = BinaryPrimitives.ReadInt32BigEndian(span.Slice(84, 4));
+            int rsrcForkLen = BinaryPrimitives.ReadInt32BigEndian(span.Slice(88, 4));
+            int dataForkOffset = 128;
+            int paddedDataLen = dataForkLen == 0 ? 0 : ((dataForkLen + 127) / 128) * 128;
+            int rsrcForkOffset = dataForkOffset + paddedDataLen;
+
+            if (dataForkLen <= 0 || dataForkOffset + dataForkLen > data.Length)
+                return null;
+
+            byte[] df = data.AsSpan(dataForkOffset, dataForkLen).ToArray();
+            byte[]? rf = null;
+            if (rsrcForkLen > 0 && rsrcForkOffset + rsrcForkLen <= data.Length)
+                rf = data.AsSpan(rsrcForkOffset, rsrcForkLen).ToArray();
+
+            return (df, rf);
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }

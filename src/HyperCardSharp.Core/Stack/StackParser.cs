@@ -177,6 +177,10 @@ public class StackParser
         if (pictResources.Count > 0)
             _logger.LogInformation("Resource fork: {Count} PICT resource(s) loaded.", pictResources.Count);
 
+        var sfntResources = MacResourceForkReader.GetResources(resourceFork, "sfnt");
+        if (sfntResources.Count > 0)
+            _logger.LogInformation("Resource fork: {Count} sfnt font resource(s) loaded.", sfntResources.Count);
+
         return new StackFile
         {
             StackHeader = stackBlock,
@@ -196,6 +200,7 @@ public class StackParser
             CardColorData       = cardColorData,
             BackgroundColorData = bgColorData,
             PictResources       = pictResources,
+            SfntResources       = sfntResources,
         };
     }
 

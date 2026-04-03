@@ -92,4 +92,49 @@ public class AppleSingleExtractor : IContainerExtractor
             return null;
         }
     }
+
+    /// <summary>
+    /// Returns both the data fork and resource fork from an AppleSingle/AppleDouble file.
+    /// </summary>
+    public (byte[] DataFork, byte[]? ResourceFork)? ExtractForks(byte[] data)
+    {
+        if (!CanHandle(data))
+            return null;
+
+        try
+        {
+            var span = data.AsSpan();
+            ushort numEntries = BinaryPrimitives.ReadUInt16BigEndian(span.Slice(24, 2));
+            if (numEntries == 0 || numEntries > 1000)
+                return null;
+
+            int dataForkOffset = -1, dataForkLen = 0;
+            int rsrcForkOffset = -1, rsrcForkLen = 0;
+
+            for (int i = 0; i < numEntries; i++)
+            {
+                int descOffset = 26 + i * 12;
+                if (descOffset + 12 > span.Length) break;
+                uint entryId = BinaryPrimitives.ReadUInt32BigEndian(span.Slice(descOffset, 4));
+                int offset   = (int)BinaryPrimitives.ReadUInt32BigEndian(span.Slice(descOffset + 4, 4));
+                int length   = (int)BinaryPrimitives.ReadUInt32BigEndian(span.Slice(descOffset + 8, 4));
+                if (entryId == EntryDataFork)     { dataForkOffset = offset; dataForkLen = length; }
+                else if (entryId == EntryResourceFork) { rsrcForkOffset = offset; rsrcForkLen = length; }
+            }
+
+            if (dataForkOffset < 0 || dataForkLen <= 0 || dataForkOffset + dataForkLen > span.Length)
+                return null;
+
+            byte[] df = span.Slice(dataForkOffset, dataForkLen).ToArray();
+            byte[]? rf = null;
+            if (rsrcForkOffset >= 0 && rsrcForkLen > 0 && rsrcForkOffset + rsrcForkLen <= span.Length)
+                rf = span.Slice(rsrcForkOffset, rsrcForkLen).ToArray();
+
+            return (df, rf);
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }

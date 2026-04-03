@@ -122,6 +122,15 @@
                             <TextBlock Grid.Row="0" Grid.Column="1" Text="Keyboard shortcuts" Margin="0,2"/>
                         </Grid>
 
+                        <!-- ── File Format Tips ── -->
+                        <TextBlock Text="File Format Tips" FontWeight="Bold" FontSize="12" Foreground="#000000"/>
+                        <StackPanel Margin="10,0,0,0" Spacing="4">
+                            <TextBlock TextWrapping="Wrap" Foreground="#000000"
+                                       Text="StuffIt archives (.sit) and Mac disk images (.img) carry the stack&apos;s resource fork, which contains icons, fonts, sounds, and color data. When possible, use these formats for the best experience."/>
+                            <TextBlock TextWrapping="Wrap" Foreground="#000000"
+                                       Text="Raw .stk or .bin files may be missing the resource fork if downloaded from a PC or web server. If a stack looks bare, try finding the original .sit archive."/>
+                        </StackPanel>
+
                     </StackPanel>
                 </ScrollViewer>
 
