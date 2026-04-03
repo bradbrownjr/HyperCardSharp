@@ -186,32 +186,38 @@ public static class PartRenderer
         var dithRect = new SKRect(left, top + arrowH, right, bottom - arrowH);
         canvas.DrawRect(dithRect, grayFill);
 
-        // --- Up arrow box: solid black fill + white up-triangle ---
-        var upBox = new SKRect(left, top, right, top + arrowH);
-        canvas.DrawRect(upBox, blackFill);
-        canvas.DrawRect(upBox, blackBorder);
-        float ax = left + ScrollbarWidth / 2f;
-        float ay = top + arrowH * 0.65f;
-        float aw = 4f;
-        using var triPath = new SKPath();
-        triPath.MoveTo(ax,      ay - aw);
-        triPath.LineTo(ax - aw, ay + aw * 0.5f);
-        triPath.LineTo(ax + aw, ay + aw * 0.5f);
-        triPath.Close();
-        canvas.DrawPath(triPath, whiteFill);
+        // --- Arrow helper: centred filled black triangle in a white 15×15 box ---
+        // In System 7 B&W mode arrow buttons are white-fill + black border + small black arrow.
+        // Arrow triangle: centroid at box-centre, 8px wide base, ~6px tall (equilateral-ish).
+        // For up-arrow: tip points UP.
+        //   tip  = (cx, boxCentreY - 4)   base = (cx±4, boxCentreY + 2)
+        // For down-arrow: tip points DOWN.
+        //   tip  = (cx, boxCentreY + 4)   base = (cx±4, boxCentreY - 2)
 
-        // --- Down arrow box: solid black fill + white down-triangle ---
+        // Up arrow box
+        var upBox = new SKRect(left, top, right, top + arrowH);
+        canvas.DrawRect(upBox, whiteFill);
+        canvas.DrawRect(upBox, blackBorder);
+        float cx = left + ScrollbarWidth / 2f;
+        float upCy = top + arrowH / 2f;
+        using var upPath = new SKPath();
+        upPath.MoveTo(cx,     upCy - 4f);           // tip
+        upPath.LineTo(cx - 4f, upCy + 2f);           // bottom-left
+        upPath.LineTo(cx + 4f, upCy + 2f);           // bottom-right
+        upPath.Close();
+        canvas.DrawPath(upPath, blackFill);
+
+        // Down arrow box
         var downBox = new SKRect(left, bottom - arrowH, right, bottom);
-        canvas.DrawRect(downBox, blackFill);
+        canvas.DrawRect(downBox, whiteFill);
         canvas.DrawRect(downBox, blackBorder);
-        float bx = left + ScrollbarWidth / 2f;
-        float by = bottom - arrowH * 0.65f;
-        using var triPath2 = new SKPath();
-        triPath2.MoveTo(bx,      by + aw);
-        triPath2.LineTo(bx - aw, by - aw * 0.5f);
-        triPath2.LineTo(bx + aw, by - aw * 0.5f);
-        triPath2.Close();
-        canvas.DrawPath(triPath2, whiteFill);
+        float downCy = bottom - arrowH / 2f;
+        using var downPath = new SKPath();
+        downPath.MoveTo(cx,      downCy + 4f);       // tip
+        downPath.LineTo(cx - 4f, downCy - 2f);       // top-left
+        downPath.LineTo(cx + 4f, downCy - 2f);       // top-right
+        downPath.Close();
+        canvas.DrawPath(downPath, blackFill);
 
         // --- Thumb: white fill with 1px black border, positioned at scroll-to-top ---
         float thumbAreaTop = top + arrowH + 1;

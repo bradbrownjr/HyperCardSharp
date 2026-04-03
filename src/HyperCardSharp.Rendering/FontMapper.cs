@@ -1,3 +1,4 @@
+using System.Reflection;
 using HyperCardSharp.Core.Parts;
 using HyperCardSharp.Core.Stack;
 using SkiaSharp;
@@ -7,17 +8,31 @@ namespace HyperCardSharp.Rendering;
 /// <summary>
 /// Maps classic Macintosh font IDs to SkiaSharp typefaces.
 /// HyperCard used Mac system font IDs; we substitute with available cross-platform fonts.
+/// Chicago (font 0) is substituted with ChicagoFLF — a free Chicago lookalike (MIT licence,
+/// bundled from pfcode/system7css https://github.com/pfcode/system7css).
 /// </summary>
 public static class FontMapper
 {
+    // ChicagoFLF — loaded once from the embedded resource.
+    private static readonly Lazy<SKTypeface?> s_chicagoFlf = new(LoadChicagoFlf);
+
+    private static SKTypeface? LoadChicagoFlf()
+    {
+        var asm = typeof(FontMapper).Assembly;
+        using var stream = asm.GetManifestResourceStream(
+            "HyperCardSharp.Rendering.Assets.ChicagoFLF.ttf");
+        return stream != null ? SKTypeface.FromStream(stream) : null;
+    }
     // Classic Mac font IDs → cross-platform font family names.
+    // IDs 0 and 1 intentionally map to the sentinel "_chicago" which triggers the
+    // embedded ChicagoFLF typeface rather than a system font lookup.
     // Primary source: Inside Macintosh, Volume I, Font Manager chapter.
     private static readonly Dictionary<int, string> FontFamilyMap = new()
     {
-        { 0,  "Arial" },              // System (Chicago on Mac)
-        { 1,  "Arial" },              // Application font (Geneva equivalent)
-        { 2,  "Arial" },              // New York
-        { 3,  "Arial" },              // Geneva → Arial (closest sans-serif)
+        { 0,  "_chicago" },           // System (Chicago) → ChicagoFLF
+        { 1,  "_chicago" },           // Application font (Geneva) — use Chicago for now
+        { 2,  "Times New Roman" },    // New York → Times
+        { 3,  "Arial" },              // Geneva → Arial
         { 4,  "Courier New" },        // Monaco → Courier New (monospace)
         { 5,  "Arial" },              // Cairo (pictographic, fall back)
         { 6,  "Arial" },              // Los Angeles
@@ -55,7 +70,8 @@ public static class FontMapper
     private static string MapMacFontName(string macName) =>
         macName.ToLowerInvariant() switch
         {
-            "chicago"   => "Arial",
+            "chicago"   => "_chicago",    // embedded ChicagoFLF
+            "charcoal"  => "_chicago",    // Charcoal is Chicago's System 8 successor
             "geneva"    => "Arial",
             "new york"  => "Times New Roman",
             "monaco"    => "Courier New",
@@ -64,7 +80,6 @@ public static class FontMapper
             "helvetica" => "Arial",
             "palatino"  => "Palatino Linotype",
             "bookman"   => "Georgia",
-            "charcoal"  => "Arial",
             _           => macName, // Try the original name; SkiaSharp will fall back to default if unavailable
         };
 
@@ -78,6 +93,13 @@ public static class FontMapper
     public static SKTypeface GetTypeface(int macFontId, byte textStyle, FontTableBlock? fontTable)
     {
         var family = GetFamilyName(macFontId, fontTable);
+
+        // Chicago (sentinel "_chicago") uses the embedded ChicagoFLF typeface directly.
+        // ChicagoFLF has no true bold/italic variants; bold style is honoured by SkiaSharp
+        // synthesizing faux-bold, and italic falls back gracefully.
+        if (family == "_chicago")
+            return s_chicagoFlf.Value ?? SKTypeface.Default;
+
         bool bold   = (textStyle & 0x01) != 0;
         bool italic = (textStyle & 0x02) != 0;
 

@@ -29,8 +29,12 @@ public static class MacRomanEncoding
         '\u00A1', '\u00AC', '\u221A', '\u0192', '\u2248', '\u0394', '\u00AB', '\u00BB',
         '\u2026', '\u00A0', '\u00C0', '\u00C3', '\u00D5', '\u0152', '\u0153', '\u2013',
         // 0xD0–0xDF
-        '\u2014', '\u201C', '\u201D', '\u2018', '\u2019', '\u00F7', '\u25CA', '\u00FF',
-        '\u0178', '\u2044', '\u20AC', '\u2039', '\u203A', '\uFB01', '\uFB02', '\u2021',
+        // 0xD0=en dash, 0xD1=em dash, 0xD2–0xD3=typographic double quotes,
+        // 0xD4–0xD5=typographic single quotes (0xD5=RIGHT = apostrophe in HyperCard text).
+        // Previously this row was missing U+2013 at 0xD0, shifting every subsequent
+        // character one byte too early and mapping 0xD5 → ÷ instead of '.
+        '\u2013', '\u2014', '\u201C', '\u201D', '\u2018', '\u2019', '\u00F7', '\u25CA',
+        '\u00FF', '\u0178', '\u2044', '\u20AC', '\u2039', '\u203A', '\uFB01', '\uFB02',
         // 0xE0–0xEF
         '\u00B7', '\u201A', '\u201E', '\u2030', '\u00C2', '\u00CA', '\u00C1', '\u00CB',
         '\u00C8', '\u00CD', '\u00CE', '\u00CF', '\u00CC', '\u00D3', '\u00D4', '\uF8FF',
