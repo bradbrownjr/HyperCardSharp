@@ -82,7 +82,9 @@ public partial class MainWindow : Window
                 Title = "  ",
                 Items = new()
                 {
-                    new() { Title = "About HyperCard#…", Click = (s, e) => OnMenuAbout(s, e) }
+                    new() { Title = "About HyperCard#…", Click = (s, e) => OnMenuAbout(s, e) },
+                    new() { IsSeparator = true },
+                    new() { Title = "Settings\u2026", Click = (s, e) => OnMenuSettings(s, e) }
                 }
             },
             // File menu
@@ -92,10 +94,31 @@ public partial class MainWindow : Window
                 Items = new()
                 {
                     new() { Title = "Open\u2026", Shortcut = Mod("O"), Click = (s, e) => OnMenuOpen(s, e) },
-                    new() { Title = "Switch Stack\u2026", Shortcut = Mod("M"), Click = (s, e) => OnMenuSwitchStack(s, e) },
+                    new() { Title = "Switch Stack\u2026", Click = (s, e) => OnMenuSwitchStack(s, e) },
                     (_recentFilesMenuItem = new() { Title = "Open Recent", Click = null }),
                     new() { IsSeparator = true },
                     new() { Title = "Quit", Shortcut = Mod("Q"), Click = (s, e) => OnMenuQuit(s, e) }
+                }
+            },
+            // Go menu (authentic HyperCard layout)
+            new HyperCardSharp.App.Controls.System7MenuBar.MenuDef
+            {
+                Title = "Go",
+                Items = new()
+                {
+                    new() { Title = "Back",        Shortcut = Mod("~"), Click = (s, e) => _viewModel.BackCard() },
+                    new() { Title = "Home",        Shortcut = Mod("H"), Click = (s, e) => _ = OpenFileAsync() },
+                    new() { Title = "Help",        Shortcut = "F1",     Click = (s, e) => OnMenuHelp(s, e) },
+                    new() { IsSeparator = true },
+                    new() { Title = "First",       Shortcut = Mod("1"), Click = (s, e) => _viewModel.FirstCard() },
+                    new() { Title = "Prev",        Shortcut = Mod("2"), Click = (s, e) => _viewModel.PreviousCard() },
+                    new() { Title = "Next",        Shortcut = Mod("3"), Click = (s, e) => _viewModel.NextCard() },
+                    new() { Title = "Last",        Shortcut = Mod("4"), Click = (s, e) => _viewModel.LastCard() },
+                    new() { IsSeparator = true },
+                    new() { Title = "Find\u2026",  Shortcut = Mod("F"), Click = (s, e) => OnMenuFindStub(s, e) },
+                    new() { Title = "Message",     Shortcut = Mod("M"), Click = (s, e) => OnMenuMessageStub(s, e) },
+                    new() { Title = "Scroll",      Shortcut = Mod("E"), Click = (s, e) => OnMenuScrollStub(s, e) },
+                    new() { Title = "Next Window", Shortcut = Mod("L"), Click = null }
                 }
             },
             // View menu
@@ -106,10 +129,10 @@ public partial class MainWindow : Window
                 {
                     (_renderModeMenuItem = new() { Title = _viewModel.RenderModeLabel, Click = (s, e) => OnMenuToggleRenderMode(s, e) }),
                     new() { IsSeparator = true },
-                    new() { Title = "Zoom 1\u00d7", Shortcut = Mod("1"), Click = (s, e) => OnMenuZoom1(s, e) },
-                    new() { Title = "Zoom 2\u00d7", Shortcut = Mod("2"), Click = (s, e) => OnMenuZoom2(s, e) },
-                    new() { Title = "Zoom 3\u00d7", Shortcut = Mod("3"), Click = (s, e) => OnMenuZoom3(s, e) },
-                    new() { Title = "Zoom 4\u00d7", Shortcut = Mod("4"), Click = (s, e) => OnMenuZoom4(s, e) }
+                    new() { Title = "Zoom 1\u00d7", Click = (s, e) => OnMenuZoom1(s, e) },
+                    new() { Title = "Zoom 2\u00d7", Click = (s, e) => OnMenuZoom2(s, e) },
+                    new() { Title = "Zoom 3\u00d7", Click = (s, e) => OnMenuZoom3(s, e) },
+                    new() { Title = "Zoom 4\u00d7", Click = (s, e) => OnMenuZoom4(s, e) }
                 }
             },
             // Help menu
@@ -204,37 +227,42 @@ public partial class MainWindow : Window
                 _ = OpenFileAsync();
                 e.Handled = true;
                 break;
-            // Switch stack within the current multi-stack file
+            // Go > Home — open a new stack (same as File > Open)
+            case Key.H when HasCmdOrCtrl(e.KeyModifiers):
+                _ = OpenFileAsync();
+                e.Handled = true;
+                break;
+            // Go > Back — navigate to previous visited card
+            case Key.OemTilde when HasCmdOrCtrl(e.KeyModifiers):
+                _viewModel.BackCard();
+                e.Handled = true;
+                break;
+            // Go > First / Prev / Next / Last
+            case Key.D1 when HasCmdOrCtrl(e.KeyModifiers):
+                _viewModel.FirstCard();
+                e.Handled = true;
+                break;
+            case Key.D2 when HasCmdOrCtrl(e.KeyModifiers):
+                _viewModel.PreviousCard();
+                e.Handled = true;
+                break;
+            case Key.D3 when HasCmdOrCtrl(e.KeyModifiers):
+                _viewModel.NextCard();
+                e.Handled = true;
+                break;
+            case Key.D4 when HasCmdOrCtrl(e.KeyModifiers):
+                _viewModel.LastCard();
+                e.Handled = true;
+                break;
+            // Go > Message stub (Ctrl+M)
             case Key.M when HasCmdOrCtrl(e.KeyModifiers):
-                _ = SwitchStackAsync();
+                OnMenuMessageStub(null, null!);
                 e.Handled = true;
                 break;
             // Show help dialog — F1 is the cross-platform convention;
             // on classic Mac OS 7, HyperCard used Cmd+? for help.
             case Key.F1:
-            case Key.H when HasCmdOrCtrl(e.KeyModifiers):
                 _ = ShowHelpAsync();
-                e.Handled = true;
-                break;
-            // Zoom presets
-            case Key.D1 when HasCmdOrCtrl(e.KeyModifiers):
-                _currentScaleIndex = 0;
-                ResizeToScale(ZoomLevels[0]);
-                e.Handled = true;
-                break;
-            case Key.D2 when HasCmdOrCtrl(e.KeyModifiers):
-                _currentScaleIndex = 1;
-                ResizeToScale(ZoomLevels[1]);
-                e.Handled = true;
-                break;
-            case Key.D3 when HasCmdOrCtrl(e.KeyModifiers):
-                _currentScaleIndex = 2;
-                ResizeToScale(ZoomLevels[2]);
-                e.Handled = true;
-                break;
-            case Key.D4 when HasCmdOrCtrl(e.KeyModifiers):
-                _currentScaleIndex = 3;
-                ResizeToScale(ZoomLevels[3]);
                 e.Handled = true;
                 break;
             // Zoom in/out step (Ctrl+= and Ctrl+-)
@@ -450,6 +478,46 @@ public partial class MainWindow : Window
 
     private void OnMenuAbout(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => _ = ShowAboutAsync();
+
+    private void OnMenuSettings(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => _ = ShowSettingsAsync();
+
+    private async System.Threading.Tasks.Task ShowSettingsAsync()
+    {
+        var settings = new SettingsWindow();
+        settings.ColorMode = _viewModel.RenderMode == HyperCardSharp.Rendering.RenderMode.Color;
+        settings.SettingsApplied = ApplySettings;
+        await settings.ShowDialog(this);
+    }
+
+    private void ApplySettings(AppSettings s)
+    {
+        // Update font directory
+        FontMapper.UserFontDirectory = s.UserFontDirectory ?? string.Empty;
+
+        // Apply color mode if it changed
+        bool isColor = _viewModel.RenderMode == HyperCardSharp.Rendering.RenderMode.Color;
+        if (s.UseColorMode != isColor)
+        {
+            _viewModel.ToggleRenderMode();
+            bool nowColor = _viewModel.RenderMode == HyperCardSharp.Rendering.RenderMode.Color;
+            if (_renderModeMenuItem != null)
+                _renderModeMenuItem.Title = _viewModel.RenderModeLabel;
+            var menuBar = this.FindControl<HyperCardSharp.App.Controls.System7MenuBar>("MenuBar");
+            if (menuBar != null)
+                menuBar.UseColorLogo = nowColor;
+        }
+    }
+
+    // Go menu stubs — logged for now; full implementation in future phases.
+    private void OnMenuFindStub(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => _viewModel.StatusText = "[Go > Find] not yet implemented.";
+
+    private void OnMenuMessageStub(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => _viewModel.StatusText = "[Go > Message] not yet implemented.";
+
+    private void OnMenuScrollStub(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => _viewModel.StatusText = "[Go > Scroll] not yet implemented.";
 
     private async System.Threading.Tasks.Task ShowAboutAsync()
     {

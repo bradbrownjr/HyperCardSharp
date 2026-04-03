@@ -91,13 +91,12 @@ public static class TextRenderer
         float lineHeight = part.TextHeight > 0 ? part.TextHeight : textSize * 1.2f;
 
         using var font  = new SKFont(typeface, textSize);
-        using var paint = new SKPaint { Color = SKColors.Black, IsAntialias = false };
 
-        return DrawLines(canvas, font, paint, text, part.TextStyle, rect, align, lineHeight, textSize);
+        return DrawLines(canvas, font, text, part.TextStyle, rect, align, lineHeight, textSize);
     }
 
     private static float DrawLines(
-        SKCanvas canvas, SKFont font, SKPaint paint, string text, byte textStyle,
+        SKCanvas canvas, SKFont font, string text, byte textStyle,
         SKRect rect, HcTextAlign align, float lineHeight, float textSize)
     {
         var rawLines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
@@ -120,7 +119,7 @@ public static class TextRenderer
                     _                  => x0,
                 };
 
-                canvas.DrawText(wrappedLine, x, y, SKTextAlign.Left, font, paint);
+                        DrawTextWithStyle(canvas, wrappedLine, x, y, font, textStyle);
 
                 if ((textStyle & 0x04) != 0) // underline
                 {
@@ -335,7 +334,6 @@ public static class TextRenderer
             _                  => x0,
         };
 
-        using var paint = new SKPaint { Color = SKColors.Black, IsAntialias = false };
         float curX = startX;
 
         foreach (var token in tokens)
@@ -353,7 +351,7 @@ public static class TextRenderer
             using var fnt      = new SKFont(typeface ?? SKTypeface.Default, fontSize);
             float tw = fnt.MeasureText(token.Text);
 
-            canvas.DrawText(token.Text, curX, y, SKTextAlign.Left, fnt, paint);
+            DrawTextWithStyle(canvas, token.Text, curX, y, fnt, styleFlags);
 
             if ((styleFlags & 0x04) != 0) // underline
             {
@@ -362,6 +360,50 @@ public static class TextRenderer
             }
 
             curX += tw;
+        }
+    }
+
+    // ── Drawing helper: handles outline (0x08), shadow (0x10), plain fill ──────
+
+    /// <summary>
+    /// Draws text at (x, y) applying HyperCard style effects:
+    ///   0x08 Outline  — white fill, then 1px black stroke (hollow/bubble look)
+    ///   0x10 Shadow   — black shadow at (+1,+1), then normal black fill
+    ///   otherwise     — plain black fill
+    /// Bold/italic/underline are handled at the typeface/paint level elsewhere.
+    /// </summary>
+    private static void DrawTextWithStyle(
+        SKCanvas canvas, string text, float x, float y, SKFont font, byte styleFlags)
+    {
+        bool isOutline = (styleFlags & 0x08) != 0;
+        bool isShadow  = (styleFlags & 0x10) != 0;
+
+        if (isOutline)
+        {
+            // Hollow text: white interior + black outline stroke
+            using var whiteFill = new SKPaint { Color = SKColors.White, IsAntialias = false };
+            canvas.DrawText(text, x, y, SKTextAlign.Left, font, whiteFill);
+            using var strokePaint = new SKPaint
+            {
+                Color       = SKColors.Black,
+                IsAntialias = false,
+                Style       = SKPaintStyle.Stroke,
+                StrokeWidth = 1f,
+            };
+            canvas.DrawText(text, x, y, SKTextAlign.Left, font, strokePaint);
+        }
+        else if (isShadow)
+        {
+            // Shadow: draw a black copy offset by 1px, then draw normally
+            using var shadowPaint = new SKPaint { Color = new SKColor(128, 128, 128), IsAntialias = false };
+            canvas.DrawText(text, x + 1, y + 1, SKTextAlign.Left, font, shadowPaint);
+            using var normalPaint = new SKPaint { Color = SKColors.Black, IsAntialias = false };
+            canvas.DrawText(text, x, y, SKTextAlign.Left, font, normalPaint);
+        }
+        else
+        {
+            using var paint = new SKPaint { Color = SKColors.Black, IsAntialias = false };
+            canvas.DrawText(text, x, y, SKTextAlign.Left, font, paint);
         }
     }
 

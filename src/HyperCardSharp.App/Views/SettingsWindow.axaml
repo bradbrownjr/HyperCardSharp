@@ -1,0 +1,136 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:HyperCardSharp.App.Controls"
+        x:Class="HyperCardSharp.App.Views.SettingsWindow"
+        Title="Settings"
+        Width="430" Height="370"
+        CanResize="False"
+        SystemDecorations="None"
+        WindowStartupLocation="CenterOwner"
+        Background="#FFFFFF"
+        FontFamily="Geneva, Helvetica, Arial, sans-serif"
+        FontSize="12">
+
+    <!-- 1px black outer border — System 7 window outline -->
+    <Border BorderBrush="#000000" BorderThickness="1" Background="#FFFFFF">
+        <DockPanel>
+
+            <!-- System 7.5 striped title bar -->
+            <controls:System7TitleBar x:Name="TitleBar"
+                                      DockPanel.Dock="Top"
+                                      Title="Settings"
+                                      CloseRequested="OnTitleBarClose"/>
+
+            <!-- Hairline rule under title bar -->
+            <Border DockPanel.Dock="Top" Height="1" Background="#000000"/>
+
+            <!-- Button row at bottom -->
+            <StackPanel DockPanel.Dock="Bottom"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        Margin="0,10,0,12">
+                <Button x:Name="CancelButton" Content="Cancel"
+                        Classes="sys7"
+                        Width="84" Height="20"
+                        Click="OnCancelClick"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        FontSize="12"
+                        Margin="0,0,8,0"/>
+                <Border BorderBrush="#000000" BorderThickness="3" CornerRadius="4" Padding="0">
+                    <Button x:Name="OkButton" Content="OK"
+                            Classes="sys7"
+                            Width="84" Height="20"
+                            Click="OnOkClick" IsDefault="True"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            FontWeight="Bold" CornerRadius="3"
+                            FontSize="12"/>
+                </Border>
+            </StackPanel>
+
+            <!-- Content area -->
+            <StackPanel Margin="14,10,14,0" Spacing="12">
+
+                <!-- ── Fonts ─────────────────────────────────────────────── -->
+                <TextBlock Text="Fonts"
+                           FontWeight="Bold" FontSize="13"
+                           Foreground="#000000"/>
+                <Border Height="1" Background="#000000" Margin="0,-6,0,0"/>
+
+                <Grid ColumnDefinitions="*,6,Auto,6,Auto" Margin="0,0,0,0">
+                    <TextBox x:Name="FontDirBox"
+                             Grid.Column="0"
+                             Text=""
+                             IsReadOnly="True"
+                             BorderBrush="#000000" BorderThickness="1"
+                             Background="#FFFFFF"
+                             Height="22" FontSize="11"
+                             VerticalContentAlignment="Center"/>
+                    <Button Grid.Column="2" Content="Choose…"
+                            Classes="sys7"
+                            Width="70" Height="22"
+                            Click="OnChooseFontDir"
+                            HorizontalContentAlignment="Center"
+                            FontSize="11"/>
+                    <Button Grid.Column="4" Content="Reset"
+                            Classes="sys7"
+                            Width="54" Height="22"
+                            Click="OnResetFontDir"
+                            HorizontalContentAlignment="Center"
+                            FontSize="11"/>
+                </Grid>
+                <TextBlock Text="Drop original Mac system font files (.ttf/.otf) into this folder so HyperCard# can use the authentic Chicago, Geneva, and Monaco typefaces."
+                           FontSize="10" Foreground="#000000"
+                           TextWrapping="Wrap"
+                           Margin="0,-4,0,0"/>
+
+                <!-- ── System Disk Image ──────────────────────────────────── -->
+                <TextBlock Text="System Disk Image"
+                           FontWeight="Bold" FontSize="13"
+                           Foreground="#000000"/>
+                <Border Height="1" Background="#000000" Margin="0,-6,0,0"/>
+
+                <Grid ColumnDefinitions="*,6,Auto,6,Auto" Margin="0,0,0,0">
+                    <TextBox x:Name="DiskImageBox"
+                             Grid.Column="0"
+                             Text=""
+                             IsReadOnly="True"
+                             BorderBrush="#000000" BorderThickness="1"
+                             Background="#FFFFFF"
+                             Height="22" FontSize="11"
+                             VerticalContentAlignment="Center"/>
+                    <Button Grid.Column="2" Content="Choose…"
+                            Classes="sys7"
+                            Width="70" Height="22"
+                            Click="OnChooseDiskImage"
+                            HorizontalContentAlignment="Center"
+                            FontSize="11"/>
+                    <Button Grid.Column="4" Content="Clear"
+                            Classes="sys7"
+                            Width="54" Height="22"
+                            Click="OnClearDiskImage"
+                            HorizontalContentAlignment="Center"
+                            FontSize="11"/>
+                </Grid>
+                <TextBlock Text="Attach a Mac HFS disk image (.img) that contains system fonts. HyperCard# will extract fonts automatically on startup."
+                           FontSize="10" Foreground="#000000"
+                           TextWrapping="Wrap"
+                           Margin="0,-4,0,0"/>
+
+                <!-- ── Display ───────────────────────────────────────────── -->
+                <TextBlock Text="Display"
+                           FontWeight="Bold" FontSize="13"
+                           Foreground="#000000"/>
+                <Border Height="1" Background="#000000" Margin="0,-6,0,0"/>
+
+                <CheckBox x:Name="ColorModeCheck"
+                          Content="Color mode (render stacks using AddColor data when available)"
+                          IsChecked="False"
+                          FontSize="12"
+                          Foreground="#000000"/>
+
+            </StackPanel>
+        </DockPanel>
+    </Border>
+</Window>

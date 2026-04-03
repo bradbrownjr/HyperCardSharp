@@ -20,6 +20,7 @@ public partial class StackViewModel : ObservableObject
     private StackFile? _stack;
     private CardRenderer? _renderer;
     private List<int> _cardOrder = new();
+    private readonly Stack<int> _cardHistory = new();
     private readonly HyperTalkInterpreter _interpreter;
     private readonly MessageDispatcher _dispatcher;
     private readonly MediaService _media = new();
@@ -722,6 +723,7 @@ public partial class StackViewModel : ObservableObject
 
             // Get card order from PAGE blocks
             _cardOrder = _stack.GetCardOrder().ToList();
+            _cardHistory.Clear();
             if (_cardOrder.Count == 0)
             {
                 // Fallback: use block order
@@ -793,6 +795,15 @@ public partial class StackViewModel : ObservableObject
         NavigateTo(_cardOrder.Count - 1);
     }
 
+    [RelayCommand]
+    public void BackCard()
+    {
+        if (_cardHistory.Count == 0) return;
+        // Navigate back without pushing the current card onto history again.
+        int prev = _cardHistory.Pop();
+        NavigateTo(prev, pushHistory: false);
+    }
+
     /// <summary>
     /// Rapidly navigates through all cards, pausing <paramref name="delayMs"/> milliseconds
     /// between each card. Called by <c>show cards</c> / <c>show all cards</c>.
@@ -815,10 +826,13 @@ public partial class StackViewModel : ObservableObject
     /// Core navigation primitive.  Fires lifecycle events (closeCard / openCard / openBackground)
     /// then captures any pending visual effect and raises <see cref="TransitionRequested"/>.
     /// </summary>
-    private void NavigateTo(int newIndex)
+    private void NavigateTo(int newIndex, bool pushHistory = true)
     {
         if (_stack == null || _cardOrder.Count == 0) return;
         newIndex = Math.Clamp(newIndex, 0, _cardOrder.Count - 1);
+
+        if (pushHistory && newIndex != CurrentCardIndex && _cardHistory.Count < 50)
+            _cardHistory.Push(CurrentCardIndex);
 
         // Determine old/new backgrounds before we change anything
         var oldCard = CurrentCard();

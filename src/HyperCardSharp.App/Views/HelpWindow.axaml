@@ -67,7 +67,25 @@
                               VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="10" Margin="0,0,0,4">
 
-                        <!-- ── Navigation ── -->
+                        <!-- ── Go (HyperCard navigation) ── -->
+                        <TextBlock Text="Go" FontWeight="Bold" FontSize="12" Foreground="#000000"/>
+                        <Grid Margin="10,0,0,0" ColumnDefinitions="155,*"
+                              RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl+1"        Margin="0,2"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="First card"    Margin="0,2"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Ctrl+2"        Margin="0,2"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Prev card"     Margin="0,2"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Ctrl+3"        Margin="0,2"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="Next card"     Margin="0,2"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Ctrl+4"        Margin="0,2"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="Last card"     Margin="0,2"/>
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl+~"        Margin="0,2"/>
+                            <TextBlock Grid.Row="4" Grid.Column="1" Text="Back (recent)" Margin="0,2"/>
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Ctrl+H"        Margin="0,2"/>
+                            <TextBlock Grid.Row="5" Grid.Column="1" Text="Home (open stack)" Margin="0,2"/>
+                        </Grid>
+
+                        <!-- ── Navigation (arrow keys) ── -->
                         <TextBlock Text="Navigation" FontWeight="Bold" FontSize="12" Foreground="#000000"/>
                         <Grid Margin="10,0,0,0" ColumnDefinitions="155,*"
                               RowDefinitions="Auto,Auto,Auto,Auto">
@@ -80,43 +98,28 @@
                             <TextBlock Grid.Row="3" Grid.Column="0" Text="End"          Margin="0,2"/>
                             <TextBlock Grid.Row="3" Grid.Column="1" Text="Last card"    Margin="0,2"/>
                         </Grid>
-
-                        <!-- ── Zoom ── -->
-                        <TextBlock Text="Zoom" FontWeight="Bold" FontSize="12" Foreground="#000000"/>
-                        <Grid Margin="10,0,0,0" ColumnDefinitions="155,*"
-                              RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl+1"  Margin="0,2"/>
-                            <TextBlock Grid.Row="0" Grid.Column="1" Text="100%  (512 × 342)" Margin="0,2"/>
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Ctrl+2"  Margin="0,2"/>
-                            <TextBlock Grid.Row="1" Grid.Column="1" Text="150%"    Margin="0,2"/>
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Ctrl+3"  Margin="0,2"/>
-                            <TextBlock Grid.Row="2" Grid.Column="1" Text="200%"    Margin="0,2"/>
-                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Ctrl+4"  Margin="0,2"/>
-                            <TextBlock Grid.Row="3" Grid.Column="1" Text="400%"    Margin="0,2"/>
-                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl+="  Margin="0,2"/>
-                            <TextBlock Grid.Row="4" Grid.Column="1" Text="Zoom in one step"  Margin="0,2"/>
-                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Ctrl+−"  Margin="0,2"/>
-                            <TextBlock Grid.Row="5" Grid.Column="1" Text="Zoom out one step" Margin="0,2"/>
-                        </Grid>
-
-                        <!-- ── File &amp; Stacks ── -->
-                        <TextBlock Text="File &amp; Stacks" FontWeight="Bold" FontSize="12" Foreground="#000000"/>
                         <Grid Margin="10,0,0,0" ColumnDefinitions="155,*"
                               RowDefinitions="Auto,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl+="  Margin="0,2"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Zoom in one step"  Margin="0,2"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Ctrl+−"  Margin="0,2"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Zoom out one step" Margin="0,2"/>
+                        </Grid>
+
+                        <!-- ── File ── -->
+                        <TextBlock Text="File" FontWeight="Bold" FontSize="12" Foreground="#000000"/>
+                        <Grid Margin="10,0,0,0" ColumnDefinitions="155,*"
+                              RowDefinitions="Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl+O" Margin="0,2"/>
                             <TextBlock Grid.Row="0" Grid.Column="1" Text="Open file…"   Margin="0,2"/>
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Ctrl+M" Margin="0,2"/>
-                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Stack list…"  Margin="0,2"/>
                         </Grid>
 
                         <!-- ── Help ── -->
                         <TextBlock Text="Help" FontWeight="Bold" FontSize="12" Foreground="#000000"/>
                         <Grid Margin="10,0,0,0" ColumnDefinitions="155,*"
-                              RowDefinitions="Auto,Auto">
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="F1  / Ctrl+H" Margin="0,2"/>
-                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Show this window" Margin="0,2"/>
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="⌘? (classic Mac)" Margin="0,2" FontSize="11" Foreground="#000000"/>
-                            <TextBlock Grid.Row="1" Grid.Column="1" Text="HyperCard help (historical)" Margin="0,2" FontSize="11" Foreground="#000000"/>
+                              RowDefinitions="Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="F1" Margin="0,2"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Keyboard shortcuts" Margin="0,2"/>
                         </Grid>
 
                     </StackPanel>
