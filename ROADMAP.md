@@ -40,16 +40,17 @@ Diagnosis method: headless render harness (see task A0) run against all six
 sample files, plus targeted source inspection. Statuses: `open`, `partial`,
 `fixed`.
 
-- **F1 [partial] Part chrome rendering.** Originally buttons/fields were
+- **F1 [fixed, B2] Part chrome rendering.** Originally buttons/fields were
   never drawn (the old `PartRenderer` assumed chrome was baked into the WOBA
-  bitmap, which is false; HyperCard drew all part chrome live). As of
-  `0669b6b`, `PartRenderer` draws field fills/borders/shadows, scrollbar
-  chrome, button chrome with icons from the stack's resource fork, and
-  styled text. Verified visually: NEUROBLAST card 1 renders its "Go Back"
-  roundRect button with icon and its opaque field correctly. Remaining work:
-  audit every `PartStyle` value, hilite/autoHilite states, checkBox/
-  radioButton glyphs, popup style, `showName`/`ShowLines`/`WideMargins`
-  flags, and lock it all in with golden tests (tasks B2, B7).
+  bitmap, which is false; HyperCard drew all part chrome live). By `0669b6b`
+  most styles drew; B2 (`fa0c9ca`) completed the audit: every `PartStyle`
+  now renders in both normal and hilited states (checkBox X-mark,
+  radioButton filled dot, popup dropdown arrow, and SKBlendMode.Difference
+  hilite inversion for push buttons, none of which existed before), fixed a
+  bug where Opaque buttons never drew their label, added verified flag
+  accessors with 21 fixture-byte tests, and corrected the Part Record byte
+  table in `docs/stack-format.md`. Golden-image lock-in is task B7. Two
+  small gaps deferred: see the B2 follow-ups below.
 - **F2 [fixed] Message-passing hierarchy.** `StackViewModel.HandleCardClick`
   now walks part -> card -> background -> stack with Handled/Passed
   semantics, and `openCard` lifecycle messages fire on navigation. Verify
@@ -380,10 +381,35 @@ never translate GPL code line by line into this MIT project.
   in the corpus exercises this scenario; covered by the fixture tests
   instead — worth sourcing such a sample for the B7 golden-image suite).
 
-### B2. Part-style audit and completion  [model: sonnet] [status: pending]
+### B2. Part-style audit and completion  [model: sonnet] [status: done, commit fa0c9ca]
 
-- **Goal:** Take F1 from partial to done: every `PartStyle` renders
-  correctly in both normal and hilited states.
+- **Outcome:** All 12 styles render in normal + hilited states (checkBox,
+  radioButton, popup, and push-button hilite inversion were newly added;
+  Opaque-label bug fixed). Added Part flag accessors (`LockText`,
+  `SharedText`, `FileHilite`, `AutoHilite`, `SharedHilite`, `ShowLines`,
+  `WideMargins`, `Family`) with 21 fixture-byte tests; corrected the Part
+  Record byte table and added flag/enum tables to `docs/stack-format.md`;
+  built the reusable `PartShowcaseFixture` (in
+  `tests/HyperCardSharp.Rendering.Tests/Fixtures/`, consumed by B7). Suite
+  86/86. Flag bit positions were derived from HyperCardPreview's
+  `FilePart.swift` as a spec only (GPL, no code copied) and independently
+  reimplemented. Notable correction: button `hilite` and field `lockText`
+  do NOT share a bit (the shared `Flags` bit 0 is `enabled`/`lockText`;
+  `hilite` is `MoreFlags` bit 6).
+- **Follow-ups found during B2 (deferred, tagged):**
+  - **B8. Field ruled lines (`showLines`)** [model: haiku]: the `ShowLines`
+    accessor and doc entry exist, but neither `PartRenderer` nor
+    `TextRenderer` draws the ruled underline per text row. Needed for
+    faithful ruled-line fields. Small, self-contained.
+  - **Button `enabled` bit not wired to runtime** [model: haiku]: `Flags`
+    bit 0 (inverted) is the button `enabled` flag, documented but not
+    connected to the existing `Part.Enabled`/`EnabledOverride` runtime
+    properties, and disabled buttons are not drawn dimmed. Fold into C2
+    (autoHilite/click feedback) or do standalone. Popup "pressed" hilite
+    feedback is likewise inert and also belongs with C2.
+
+- **Goal (original):** Take F1 from partial to done: every `PartStyle`
+  renders correctly in both normal and hilited states.
 - **Files:** `Rendering/PartRenderer.cs`, `Core/Parts/PartStyle.cs`,
   `docs/stack-format.md`.
 - **Spec:** Verify the style enum against the format doc (0 transparent,
