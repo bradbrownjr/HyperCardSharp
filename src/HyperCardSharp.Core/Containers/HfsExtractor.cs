@@ -8,7 +8,7 @@ namespace HyperCardSharp.Core.Containers;
 /// </summary>
 public class HfsExtractor : IContainerExtractor
 {
-    private const ushort HfsMdbSignature = 0xD2D7;
+    private const ushort HfsMdbSignature = 0x4244;  // ASCII "BD" = HFS MDB signature (0xD2D7 is MFS, not HFS)
     private const ushort HfsPlusSignature = 0x482B; // "H+"
     private const int MdbOffset = 1024; // Block 2 * 512 bytes
     private const uint HfsMdbTimestampMin = 0xA8000000u;

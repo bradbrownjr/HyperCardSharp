@@ -15,7 +15,7 @@ public class HfsReader
 {
     // HFS volume constants
     private const int SectorSize = 512;
-    private const ushort HfsMdbSignature = 0xD2D7;
+    private const ushort HfsMdbSignature = 0x4244;  // ASCII "BD" = HFS MDB signature (0xD2D7 is MFS, not HFS)
     private const int MdbOffset = SectorSize * 2; // block 2
 
     // Some disk-image tools produce an MDB with a non-standard signature word while
@@ -63,20 +63,24 @@ public class HfsReader
 
     /// <summary>
     /// Returns true if this looks like an HFS volume.
-    /// Accepts the canonical D2D7 signature and also tries a heuristic check
-    /// (plausible creation-date timestamp) for disk images produced by tools
-    /// that write non-standard signature words.
+    /// Primary check: the canonical 0x4244 signature at MDB+0.
+    /// Fallback (for non-standard disk-imaging tools): if the creation-date
+    /// field at MDB+2 looks like a plausible Mac timestamp, treat it as HFS
+    /// even if the signature word is non-standard.
     /// </summary>
     public bool IsHfs()
     {
         if (_disk.Length < MdbOffset + 10)
             return false;
+
+        // Primary check: canonical HFS signature at MDB offset 0
         ushort sig = BinaryPrimitives.ReadUInt16BigEndian(_disk.AsSpan(MdbOffset, 2));
         if (sig == HfsMdbSignature)
             return true;
-        // Heuristic: the standard D2D7 sigword is sometimes replaced by imaging
-        // tools.  If the creation-date field at MDB+2 contains a plausible Mac
-        // timestamp, treat the volume as HFS anyway.
+
+        // Fallback for non-standard imaging tools that replace the signature word
+        // but keep other MDB fields intact: check if the creation-date field
+        // (at MDB+2) contains a plausible Mac timestamp.
         uint crDate = BinaryPrimitives.ReadUInt32BigEndian(_disk.AsSpan(MdbOffset + 2, 4));
         return crDate >= HfsMdbTimestampMin && crDate <= HfsMdbTimestampMax;
     }
