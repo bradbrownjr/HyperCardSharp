@@ -1,5 +1,9 @@
 # HyperCard# — Full Implementation Plan
 
+> **Superseded (2026-07-11):** This document is the original build plan, kept
+> for history. The living plan, including the fidelity diagnosis, task specs,
+> and per-task model recommendations, is [`/ROADMAP.md`](../ROADMAP.md).
+
 ## Context
 
 We are building a native, cross-platform HyperCard stack viewer in C# / .NET 8 that opens classic Mac HyperCard files directly — no Mac emulation. The project must handle stacks arriving as raw files, StuffIt archives, or disk images. It must support B&W and color display modes, embedded QuickTime MOV playback via LibVLC, and a HyperTalk script interpreter. The goal is to create a usable foundation that attracts community contributors interested in retro computing preservation.
