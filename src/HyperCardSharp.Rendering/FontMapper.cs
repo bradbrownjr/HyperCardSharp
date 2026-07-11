@@ -350,4 +350,17 @@ public static class FontMapper
     /// <summary>Returns the resolved style-flag byte for a styled run.</summary>
     public static byte GetStyleFlagsForRun(StyleEntry entry, Part fallbackPart)
         => entry.InheritStyle ? fallbackPart.TextStyle : (byte)(entry.TextStyle < 0 ? 0 : entry.TextStyle);
+
+    /// <summary>
+    /// Creates an SKFont configured for authentic 1-bit HyperCard text: aliased edges,
+    /// no subpixel positioning, no hinting. In the SkiaSharp 3.x API these SKFont
+    /// properties (not SKPaint.IsAntialias) control text edging, so every font used for
+    /// drawing or measuring text must go through here to stay crisp and pure black/white.
+    /// </summary>
+    public static SKFont CreateAliasedFont(SKTypeface typeface, float size) => new(typeface, size)
+    {
+        Edging = SKFontEdging.Alias,
+        Subpixel = false,
+        Hinting = SKFontHinting.None
+    };
 }

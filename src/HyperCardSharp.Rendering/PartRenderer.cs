@@ -15,6 +15,7 @@ namespace HyperCardSharp.Rendering;
 /// </summary>
 public static class PartRenderer
 {
+
     /// <summary>
     /// Renders background-field text and non-Transparent button chrome for the current card.
     /// Background part content that differs per card lives in card.PartContents (negative IDs);
@@ -358,7 +359,7 @@ public static class PartRenderer
             float labelMaxWidth = rect.Width - 6f;
             float effectiveSize = ShrinkFontToFit(typeface, part.Name, textSize, labelMaxWidth);
 
-            using var labelFont = new SKFont(typeface, effectiveSize);
+            using var labelFont = FontMapper.CreateAliasedFont(typeface, effectiveSize);
             using var textPaint = new SKPaint { Color = SKColors.Black, IsAntialias = false };
 
             float tw = labelFont.MeasureText(part.Name);
@@ -390,7 +391,7 @@ public static class PartRenderer
         float size = baseSize;
         while (size > 9f)
         {
-            using var probe = new SKFont(typeface, size);
+            using var probe = FontMapper.CreateAliasedFont(typeface, size);
             if (probe.MeasureText(text) <= maxWidth)
                 break;
             size -= 1f;
@@ -465,7 +466,7 @@ public static class PartRenderer
         if (part.HiliteState)
         {
             using var markPaint = new SKPaint
-                { Style = SKPaintStyle.Stroke, Color = SKColors.Black, StrokeWidth = 1.5f, IsAntialias = true };
+                { Style = SKPaintStyle.Stroke, Color = SKColors.Black, StrokeWidth = 1.5f, IsAntialias = false };
             const float pad = 2.5f;
             canvas.DrawLine(boxRect.Left + pad, boxRect.Top + pad, boxRect.Right - pad, boxRect.Bottom - pad, markPaint);
             canvas.DrawLine(boxRect.Left + pad, boxRect.Bottom - pad, boxRect.Right - pad, boxRect.Top + pad, markPaint);
@@ -487,13 +488,13 @@ public static class PartRenderer
 
         using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = SKColors.White };
         using var borderPaint = new SKPaint
-            { Style = SKPaintStyle.Stroke, Color = ButtonBorderColor, StrokeWidth = 1, IsAntialias = true };
+            { Style = SKPaintStyle.Stroke, Color = ButtonBorderColor, StrokeWidth = 1, IsAntialias = false };
         canvas.DrawOval(circleRect, fillPaint);
         canvas.DrawOval(circleRect, borderPaint);
 
         if (part.HiliteState)
         {
-            using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = SKColors.Black, IsAntialias = true };
+            using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = SKColors.Black, IsAntialias = false };
             float inset = CheckGlyphSize * 0.28f;
             var dotRect = new SKRect(circleRect.Left + inset, circleRect.Top + inset,
                 circleRect.Right - inset, circleRect.Bottom - inset);
@@ -536,7 +537,7 @@ public static class PartRenderer
             float textSize = part.TextSize > 0 ? part.TextSize : 12f;
             float maxWidth = Math.Max(0f, titleWidth - 6f);
             float effectiveSize = ShrinkFontToFit(typeface, part.Name, textSize, maxWidth);
-            using var labelFont = new SKFont(typeface, effectiveSize);
+            using var labelFont = FontMapper.CreateAliasedFont(typeface, effectiveSize);
             using var textPaint = new SKPaint { Color = SKColors.Black, IsAntialias = false };
             float ty = rect.MidY + effectiveSize / 2f - 1f;
             canvas.DrawText(part.Name, rect.Left + 3f, ty, labelFont, textPaint);
@@ -568,7 +569,7 @@ public static class PartRenderer
         float maxWidth = Math.Max(0f, rect.Right - 3f - textLeft);
         float effectiveSize = ShrinkFontToFit(typeface, part.Name, textSize, maxWidth);
 
-        using var labelFont = new SKFont(typeface, effectiveSize);
+        using var labelFont = FontMapper.CreateAliasedFont(typeface, effectiveSize);
         using var textPaint = new SKPaint { Color = SKColors.Black, IsAntialias = false };
         float ty = rect.MidY + effectiveSize / 2f - 1f;
         canvas.DrawText(part.Name, textLeft, ty, labelFont, textPaint);

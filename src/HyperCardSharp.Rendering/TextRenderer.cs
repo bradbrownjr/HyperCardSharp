@@ -13,6 +13,8 @@ public static class TextRenderer
 {
     private const int FieldPadding = 2; // left/right inset inside field rect (points)
 
+    // ── SKFont creation helper (1-bit purity: alias edge, no subpixel, no hinting) ──
+
     // ── Public entrypoints ────────────────────────────────────────────────────
 
     /// <summary>
@@ -90,7 +92,7 @@ public static class TextRenderer
         float textSize   = part.TextSize > 0 ? part.TextSize : 12f;
         float lineHeight = part.TextHeight > 0 ? part.TextHeight : textSize * 1.2f;
 
-        using var font  = new SKFont(typeface, textSize);
+        using var font  = FontMapper.CreateAliasedFont(typeface, textSize);
 
         return DrawLines(canvas, font, text, part.TextStyle, rect, align, lineHeight, textSize);
     }
@@ -260,7 +262,7 @@ public static class TextRenderer
             : FontMapper.GetTypeface(part.TextFontId, part.TextStyle, fontTable);
         using var tf  = typeface;
         float sz = entry != null ? FontMapper.GetSizeForRun(entry, part) : (part.TextSize > 0 ? part.TextSize : 12f);
-        using var f  = new SKFont(tf, sz);
+        using var f  = FontMapper.CreateAliasedFont(tf, sz);
         return f.MeasureText(tokenText);
     }
 
@@ -348,7 +350,7 @@ public static class TextRenderer
             byte styleFlags = entry != null ? FontMapper.GetStyleFlagsForRun(entry, part)  : part.TextStyle;
 
             using var typeface = tf;
-            using var fnt      = new SKFont(typeface ?? SKTypeface.Default, fontSize);
+            using var fnt      = FontMapper.CreateAliasedFont(typeface ?? SKTypeface.Default, fontSize);
             float tw = fnt.MeasureText(token.Text);
 
             DrawTextWithStyle(canvas, token.Text, curX, y, fnt, styleFlags);
@@ -394,8 +396,8 @@ public static class TextRenderer
         }
         else if (isShadow)
         {
-            // Shadow: draw a black copy offset by 1px, then draw normally
-            using var shadowPaint = new SKPaint { Color = new SKColor(128, 128, 128), IsAntialias = false };
+            // Shadow: draw a black copy offset by 1px down-right, then draw main text on top
+            using var shadowPaint = new SKPaint { Color = SKColors.Black, IsAntialias = false };
             canvas.DrawText(text, x + 1, y + 1, SKTextAlign.Left, font, shadowPaint);
             using var normalPaint = new SKPaint { Color = SKColors.Black, IsAntialias = false };
             canvas.DrawText(text, x, y, SKTextAlign.Left, font, normalPaint);
