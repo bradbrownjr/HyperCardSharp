@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Headless SkiaSharp on Linux needs the native asset package explicitly;
+      the umbrella SkiaSharp package alone throws a SKObject/SKImageInfo
+      type-initializer exception at runtime on Linux dev machines and CI.
+      Harmless no-op on Windows/macOS builds (Microsoft.NETCore.App already
+      supplies natives there via SkiaSharp's own RID graph).
+    -->
+    <PackageReference Include="SkiaSharp" Version="3.119.2" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\HyperCardSharp.Core\HyperCardSharp.Core.csproj" />
+    <ProjectReference Include="..\..\src\HyperCardSharp.Rendering\HyperCardSharp.Rendering.csproj" />
+  </ItemGroup>
+
+</Project>

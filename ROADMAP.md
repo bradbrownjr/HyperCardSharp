@@ -61,13 +61,18 @@ sample files, plus targeted source inspection. Statuses: `open`, `partial`,
   every StuffIt extraction silently returned nothing. Fixed by the custom
   table in `Core/Text/MacRomanEncoding.cs` (no external package, better).
   Verified: `NEUROBLAST_Cyberdelia.sit` extracts by name and renders.
-- **F4 [open] Wrong HFS signature constant.** `HfsReader.cs` and
-  `HfsExtractor.cs` still define `HfsMdbSignature = 0xD2D7`. That is the MFS
-  (400K floppy) signature; classic HFS is `0x4244` (ASCII "BD"), confirmed
-  present at offset 1024 in both sample .img files. The HFS B-tree reader
-  therefore never executes; .img files open only via the raw-sector
-  fallback, which cannot enumerate multiple files or recover resource forks
-  from the volume. Task A2.
+- **F4 [worked around, not root-cause fixed] Wrong HFS signature constant.**
+  `HfsReader.cs` and `HfsExtractor.cs` still define
+  `HfsMdbSignature = 0xD2D7`. That is the MFS (400K floppy) signature;
+  classic HFS is `0x4244` (ASCII "BD"), confirmed present at offset 1024 in
+  both sample .img files. The primary signature check therefore still
+  fails on real HFS volumes. Both .img samples open correctly today only
+  because `HfsReader.IsHfs()` (verified 2026-07-11 via the new render
+  harness) falls back to a heuristic: if the MDB+2 field looks like a
+  plausible Mac timestamp, it accepts the volume regardless of the
+  signature word. That masks the bug rather than fixing it, and risks a
+  false positive on non-HFS data with a coincidentally plausible
+  timestamp. Task A2.
 - **F5 [open] WOBA mask layer discarded.** `WobaDecoder.cs` decodes the mask
   then outputs only the image layer ("Full composition will be handled at
   render time", which never happens); `CardRenderer` draws the card layer
@@ -187,38 +192,69 @@ new human contributor without holding the whole system in their head.
 
 ## 4. Phase A: Every sample opens, nothing crashes
 
-### A0. Commit the render-dump harness as a tool  [model: sonnet] [status: pending]
+### A0. Commit the render-dump harness as a tool  [model: sonnet] [status: done, commit TBD]
 
 - **Goal:** A repeatable CLI rendering any stack's cards to PNGs, so
   rendering tasks show before/after evidence and CI can diff golden images.
-  (The diagnosis harness lives only in a session scratchpad today;
-  `tests/QuickTest` lists stacks but does not render.)
-- **Files:** new `tools/RenderDump/`; solution file; tool README.
-- **Spec:** Console app referencing Core + Rendering. Args:
-  `<input-file> <out-dir> [max-cards]`, plus `--info` mode printing block
-  inventory and per-card part tables (id, type, style, rect, name, icon id,
-  script length) without rendering. Pipeline: read file,
-  `ContainerPipeline.UnwrapMultiple`, `new StackParser().Parse`, iterate
-  `GetCardOrder()`, `CardRenderer.RenderCard`, PNG via `SKImage.Encode`.
-  Print all pipeline log lines. Non-Windows dev/CI needs package
-  `SkiaSharp.NativeAssets.Linux.NoDependencies` version-matched to
-  SkiaSharp.
-- **Accept:** `dotnet run --project tools/RenderDump -- samples/NEUROBLAST_HyperCard out 6`
-  writes 6 PNGs on Linux, macOS, and Windows.
+- **Files:** `tools/RenderDump/RenderDump.csproj`, `Program.cs`, `README.md`;
+  added to `HyperCardSharp.sln` under a `tools` solution folder. Also fixed
+  `tests/HyperCardSharp.Core.Tests/HyperCardSharp.Core.Tests.csproj`, which
+  was missing the same Linux native-asset package and made
+  `Phase24CorpusTests.AllSamples_FirstCardRendersWithoutException` fail on
+  this dev machine with a `SKObject` type-initializer exception (not a
+  product bug; confirmed identical failure on a clean stash before this
+  task touched anything).
+- **Spec (as built):** Console app referencing Core + Rendering. Args:
+  `<input-file> <out-dir> [max-cards]` renders; `--info <input-file>
+  [max-cards]` prints the block inventory (`StackParser.GetBlockInventory`)
+  and a per-card part table without rendering. Uses
+  `ContainerPipeline.UnwrapEntries` (the fork-carrying API, not the older
+  `UnwrapMultiple` tuple form) so resource-fork size is visible in the log.
+  All pipeline log lines are echoed. `SkiaSharp.NativeAssets.Linux.NoDependencies`
+  pinned to the same version as `SkiaSharp` (3.119.2).
+- **Verified:** Ran against all six samples. Five render cleanly
+  (`NEUROBLAST_HyperCard`, `.img`, `NEUROBLAST_Cyberdelia.sit`, `.img`,
+  and — confirming F10(a) is still open — `BeavisEmulatorV2.sit` fails
+  its `StackParser.Parse` call with the expected `ArgumentOutOfRangeException`,
+  caught and reported by the tool rather than crashing it).
+  `ContextualMenus.sit` correctly reports zero stacks found (F10(b), SIT5
+  still unsupported). `dotnet build` and `dotnet test`: 0 errors, 0
+  warnings, 39/39 tests green.
+- **Finding surfaced by this task (updates F4 below):** `HfsExtractor`
+  logged `"HFS volume found with 1 stack(s)"` for both `.img` samples,
+  which looked like F4 was already fixed. It is not: `HfsMdbSignature` is
+  still the wrong constant (`0xD2D7`, the MFS signature) in both
+  `HfsReader.cs` and `HfsExtractor.cs`. What actually makes it work is a
+  heuristic added to `HfsReader.IsHfs()` that accepts any volume whose
+  MDB+2 field looks like a plausible Mac timestamp, bypassing the
+  signature check entirely when it fails. This is a symptom patch, not
+  the root-cause fix `AGENTS.md`'s Root-Cause Policy calls for: the
+  constant is still mislabeled, and the heuristic could accept
+  non-HFS data that happens to have a plausible-looking timestamp field.
+  A2 is revised below to fix the constant itself and tighten the
+  heuristic to a documented fallback rather than the primary path.
 
-### A2. Fix the HFS signature constant and classic-HFS enumeration  [model: haiku] [status: pending]
+### A2. Fix the HFS signature constant; demote the timestamp heuristic to a fallback  [model: haiku] [status: pending]
 
-- **Goal:** Close F4 so the HFS B-tree reader actually runs.
-- **Files:** `Core/Containers/HfsReader.cs`, `HfsExtractor.cs`,
-  `ContainerPipeline.cs`.
+- **Goal:** Close F4 for real. `.img` samples already extract via HFS today
+  (A0 confirmed this), but only because a heuristic masks a wrong constant.
+  This task fixes the constant so the primary, well-defined check is the
+  one that actually matches real HFS volumes, and keeps the heuristic only
+  as a documented last resort for non-standard imaging tools.
+- **Files:** `Core/Containers/HfsReader.cs`, `HfsExtractor.cs`.
 - **Spec:** Change `HfsMdbSignature` from `0xD2D7` to `0x4244` in both
-  files. In `ContainerPipeline.UnwrapMultiple`, before the raw-scan
-  fallback, probe classic HFS the same way HFS+ is probed: construct
-  `HfsReader`, if `IsHfs()` then `EnumerateStacks()` and return named
-  results when non-empty. Keep raw scan as last resort.
-- **Accept:** Render harness against both sample .img files logs an HFS
-  extraction path (not RawStackScanner) and real HFS file names; multi-file
-  volumes list every stack. Both .img samples still render identically.
+  files (add a one-line comment noting `0xD2D7` is the *MFS* signature, to
+  stop the next reader making the same mistake). Leave `IsHfs()`'s
+  timestamp-plausibility fallback in place for the non-standard-tool case
+  it was added for, but reorder/comment it so it reads as an explicit
+  fallback path after the corrected primary check, not as the thing
+  silently doing all the work.
+- **Accept:** `HfsReader.IsHfs()` returns true for both sample .img files
+  via the primary signature check alone (add a unit test asserting this
+  directly, bypassing the heuristic, e.g. by truncating the MDB+2 bytes to
+  an implausible value and confirming the signature check alone still
+  passes). Render harness output for both samples is unchanged. Existing
+  `dotnet test` suite (39 tests) stays green.
 
 ### A4. Never crash on unrecognized or corrupt input  [model: sonnet] [status: pending]
 

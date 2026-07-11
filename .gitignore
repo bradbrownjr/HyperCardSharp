@@ -39,9 +39,6 @@ bld/
 # Sample stacks (local testing only)
 samples/
 
-# Third-party tools (unar, lsar binaries)
-tools/
-
 # Debug output
 dbg.txt
 
