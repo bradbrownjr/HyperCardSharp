@@ -236,7 +236,7 @@ new human contributor without holding the whole system in their head.
   A2 is revised below to fix the constant itself and tighten the
   heuristic to a documented fallback rather than the primary path.
 
-### A2. Fix the HFS signature constant; demote the timestamp heuristic to a fallback  [model: haiku] [status: pending]
+### A2. Fix the HFS signature constant; demote the timestamp heuristic to a fallback  [model: haiku] [status: done, commit 3c2ba0f]
 
 - **Goal:** Close F4 for real. `.img` samples already extract via HFS today
   (A0 confirmed this), but only because a heuristic masks a wrong constant.
