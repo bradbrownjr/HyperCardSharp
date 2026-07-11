@@ -91,8 +91,9 @@ sample files, plus targeted source inspection. Statuses: `open`, `partial`,
 - **F7 [fixed] Latin1 instead of MacRoman.** No `Encoding.Latin1` remains in
   `src/` text decoding; all call sites use `MacRomanEncoding`.
 - **F8 [fixed] Styled text runs unused.** `TextRenderer.DrawStyledText`
-  resolves `StyleRun`s against `StyleTableBlock`/`FontTableBlock`. Golden
-  coverage still needed (B7).
+  resolves `StyleRun`s against `StyleTableBlock`/`FontTableBlock`. B7
+  (`75b6901`) added pixel-level golden coverage via a synthetic
+  styled-text fixture (plain/bold/italic/bold-italic/large/underline runs).
 - **F9 [fixed, B3] Font fidelity.** Multi-tier `FontMapper` (user `fonts/`
   directory, system fonts, embedded ChicagoFLF + Noto Sans, generic
   fallbacks) was already implemented per the Font Policy in `AGENTS.md`.
@@ -454,25 +455,45 @@ never translate GPL code line by line into this MIT project.
 - **Accept:** Purity test green; a 2x zoom screenshot shows blocky
   doubled pixels, not smoothed edges.
 
-### B7. Golden-image regression suite  [model: sonnet] [status: pending]
+### B7. Golden-image regression suite  [model: sonnet] [status: done, commit 75b6901]
 
-- **Goal:** Lock fidelity so later work cannot silently regress it
-  (styled text F8 and font tiers F9 currently have no pixel-level tests).
-- **Files:** `tests/HyperCardSharp.Rendering.Tests/Golden/`, CI workflow.
-- **Spec:** Helper renders named fixture cards and byte-compares PNGs to
-  committed goldens (tolerance 0 in B&W mode). `UPDATE_GOLDENS=1`
-  regenerates. Fixtures: the B2 part showcase, a styled-text card, one
-  NEUROBLAST card and one Cyberdelia card (samples are gitignored; gate on
-  file presence locally, download via `docs/samples.md` script in CI).
-  Font-dependent goldens must render from the *embedded* fonts only, with
-  the user/system tiers disabled in test config, so results are
-  machine-independent.
-- **Accept:** CI fails when a rendering change alters goldens without
-  regeneration.
+- **Outcome:** `tests/.../Golden/GoldenImageAssert` decodes committed
+  golden PNGs and the fresh render to raw BGRA pixels and compares
+  tolerance-0; `UPDATE_GOLDENS=1 dotnet test` regenerates. Two goldens,
+  both CI-enforced on Linux: the B2 `PartShowcaseFixture` (every style,
+  normal + hilited) and a new `StyledTextFixture` (mixed STBL runs, F8
+  coverage). Determinism: `FontMapper.UseEmbeddedFontsOnly` skips the
+  user/system tiers AND (fix added during orchestration) routes tier-4
+  generic families to the embedded Noto substitute, so no host fontconfig
+  lookup can leak in; tests gated to Linux via `SkippableFact` since
+  Skia's rasterizer differs by OS backend (windows/macos CI skip these,
+  run everything else). A non-trivial guard prevents a golden passing
+  against a blank canvas. Goldens verified idempotent (identical md5) and
+  visually inspected. Suite 89/89. No `build.yml` change needed
+  (ubuntu-latest already runs `dotnet test`).
+- **Follow-ups found during B7 (deferred, tagged):**
+  - **Sample-based goldens** [model: sonnet]: intentionally skipped.
+    `samples/` is gitignored to avoid redistributing that stack content,
+    and committing a PNG rendered from it raises the same concern; it also
+    adds an un-guarded determinism surface (stack-embedded sfnt fonts,
+    AddColor, resource forks). If local-only NEUROBLAST/Cyberdelia
+    coverage is wanted, add it gated on Linux AND file-presence so it
+    stays a no-op in CI.
+  - **Static font-flag parallelism** [model: haiku]: `GoldenImageTests`
+    toggles the process-wide static `FontMapper.UseEmbeddedFontsOnly`.
+    xunit parallelizes across test classes, so in principle this could
+    leak into another font-sensitive test running concurrently. Harmless
+    today (the only other showcase renderer, the B&W purity test, asserts
+    black/white regardless of font), but a future font-sensitive parallel
+    test could flake. Fix by putting all font-dependent test classes in
+    one non-parallel xunit collection.
 
-**Phase B exit criteria:** A stack with standard buttons and fields is
-visually indistinguishable from a period screenshot at 1x except for
-resources the file does not contain; golden suite green in CI.
+**Phase B exit criteria: met, 2026-07-11.** All part styles render
+faithfully in both states (B2), text is pixel-crisp 1-bit (B3), and the
+golden suite (B7) locks it in on Linux CI. A stack with standard buttons
+and fields renders indistinguishably from period screenshots at 1x except
+for resources the file does not contain. Findings F1, F5, F8, F9 all
+fixed. Full suite 89/89 green.
 
 ---
 
