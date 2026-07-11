@@ -93,11 +93,15 @@ sample files, plus targeted source inspection. Statuses: `open`, `partial`,
 - **F8 [fixed] Styled text runs unused.** `TextRenderer.DrawStyledText`
   resolves `StyleRun`s against `StyleTableBlock`/`FontTableBlock`. Golden
   coverage still needed (B7).
-- **F9 [partial] Font fidelity.** Multi-tier `FontMapper` (user `fonts/`
+- **F9 [fixed, B3] Font fidelity.** Multi-tier `FontMapper` (user `fonts/`
   directory, system fonts, embedded ChicagoFLF + Noto Sans, generic
-  fallbacks) is implemented per the Font Policy in `AGENTS.md`. Remaining:
-  verify text draws with antialiasing off and integer-scale
-  nearest-neighbor zoom so pixels stay crisp (task B3).
+  fallbacks) was already implemented per the Font Policy in `AGENTS.md`.
+  B3 (`c91544b`) closed the remainder: all `SKFont`s now use
+  `Edging=Alias`/no-subpixel/no-hinting (in SkiaSharp 3.x the paint's
+  `IsAntialias` no longer controls text edging, so glyphs were being
+  smoothed), the gray "shadow" text style was made pure black, and a B&W
+  pixel-purity regression test was added. Nearest-neighbor display scaling
+  was already present (`BitmapInterpolationMode.None`).
 - **F10 [crash fixed by A4; underlying formats still unsupported] Unsupported
   container variants degrade, no longer crash.**
   (a) `BeavisEmulatorV2.sit` uses StuffIt compression method 5, which is
@@ -428,9 +432,18 @@ never translate GPL code line by line into this MIT project.
   in `docs/samples.md`) renders every style; each style has a golden image
   in both states.
 
-### B3. Pixel-crisp text and integer zoom  [model: haiku] [status: pending]
+### B3. Pixel-crisp text and integer zoom  [model: haiku] [status: done, commit c91544b]
 
-- **Goal:** Close the remainder of F9: authentic 1-bit text rendering.
+- **Outcome:** All seven `SKFont` sites in `TextRenderer`/`PartRenderer`
+  routed through a single `FontMapper.CreateAliasedFont`
+  (Alias/no-subpixel/no-hinting). Fixed the gray shadow-text style to pure
+  black and de-antialiased the checkbox/radio glyphs B2 had introduced.
+  Added a B&W pixel-purity regression test on `PartShowcaseFixture`.
+  Nearest-neighbor scaling (`BitmapInterpolationMode.None`) was already
+  present in `SkiaBitmapControl` and left as-is. Suite 87/87.
+
+- **Goal (original):** Close the remainder of F9: authentic 1-bit text
+  rendering.
 - **Files:** `Rendering/TextRenderer.cs`, `App/Controls/SkiaBitmapControl.cs`.
 - **Spec:** All `SKFont` instances: `Edging = SKFontEdging.Alias`,
   `Subpixel = false`, `Hinting = SKFontHinting.None`. The display control
