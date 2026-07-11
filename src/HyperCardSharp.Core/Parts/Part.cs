@@ -79,6 +79,59 @@ public class Part
     public bool ShowName => IsButton && (MoreFlags & 0x80) != 0;
     /// <summary>For buttons: the icon resource ID (0 = no icon).</summary>
     public short IconId => IsButton ? IconIdOrFirstSelectedLine : (short)0;
+
+    // ── Additional part flag accessors (Flags / MoreFlags bit layout) ──────────
+    //
+    // Verified against HyperCardPreview's FilePart.swift (Pierre Lorenzi, GPL) as a
+    // format SPECIFICATION only -- no code from that project was copied, only the
+    // documented bit offsets/meanings, which are also written up in
+    // docs/stack-format.md under "Part Record flag bits".
+    //
+    // Flags (offset 0x05) bit 0 is a SHARED bit whose meaning depends on part type:
+    // for fields it is "lockText"; for buttons the same bit (inverted) is "enabled".
+    // This codebase does not currently wire the button side into the runtime
+    // Enabled/EnabledOverride properties (those remain purely a HyperTalk runtime
+    // concept) -- only the field-side LockText accessor is exposed here since it is
+    // the one requested by the B2 part-style audit.
+
+    /// <summary>For fields: bit 0 (0x01) of <see cref="Flags"/> = lockText (the field's
+    /// text cannot be edited directly by the user, though scripts may still change it).
+    /// This bit is shared with the button "enabled" flag (inverted) at the same position.</summary>
+    public bool LockText => IsField && (Flags & 0x01) != 0;
+
+    /// <summary>For fields: bit 3 (0x08) of <see cref="Flags"/> = sharedText (the field's
+    /// text content is shared across every card that uses this background, rather than
+    /// each card having its own copy).</summary>
+    public bool SharedText => IsField && (Flags & 0x08) != 0;
+
+    /// <summary>For buttons: bit 6 (0x40) of <see cref="MoreFlags"/> = the persisted
+    /// initial hilite state as authored in the stack file. Used only to seed
+    /// <see cref="HiliteState"/> at parse time; runtime hilite changes are tracked by
+    /// <see cref="HiliteState"/> itself, not this property.</summary>
+    public bool FileHilite => IsButton && (MoreFlags & 0x40) != 0;
+
+    /// <summary>For buttons: bit 5 (0x20) of <see cref="MoreFlags"/> = autoHilite
+    /// (the button automatically inverts/hilites itself while the mouse is down over it,
+    /// without needing an explicit "set the hilite" script command).</summary>
+    public bool AutoHilite => IsButton && (MoreFlags & 0x20) != 0;
+
+    /// <summary>For buttons: bit 4 (0x10) of <see cref="MoreFlags"/>, STORED INVERTED =
+    /// sharedHilite (whether the hilite state is shared across every card that uses this
+    /// background part, vs. each card tracking its own hilite independently).</summary>
+    public bool SharedHilite => IsButton && (MoreFlags & 0x10) == 0;
+
+    /// <summary>For fields: bit 6 (0x40) of <see cref="MoreFlags"/> = showLines
+    /// (draw a ruled line under each row of text).</summary>
+    public bool ShowLines => IsField && (MoreFlags & 0x40) != 0;
+
+    /// <summary>For fields: bit 5 (0x20) of <see cref="MoreFlags"/> = wideMargins
+    /// (extra left/right text inset).</summary>
+    public bool WideMargins => IsField && (MoreFlags & 0x20) != 0;
+
+    /// <summary>For buttons: low nibble (0x0F) of <see cref="MoreFlags"/> = the button
+    /// "family" number (0-15). Radio buttons sharing a non-zero family number act as a
+    /// mutually-exclusive group (hiliting one un-hilites the others in the same family).</summary>
+    public int Family => IsButton ? (MoreFlags & 0x0F) : 0;
     public int Width => Right - Left;
     public int Height => Bottom - Top;
 
@@ -120,7 +173,7 @@ public class Part
                 script = ReadNullTerminatedString(data, scriptOffset);
         }
 
-        return new Part
+        var part = new Part
         {
             EntrySize = entrySize,
             PartId = partId,
@@ -142,6 +195,13 @@ public class Part
             Name = name,
             Script = script
         };
+
+        // Seed the runtime hilite state from the persisted file bit (MoreFlags bit 6 for
+        // buttons) so checkboxes/radio buttons authored as initially-checked render that
+        // way on first load. HyperTalk scripts remain free to change HiliteState afterward.
+        part.HiliteState = part.FileHilite;
+
+        return part;
     }
 
     /// <summary>

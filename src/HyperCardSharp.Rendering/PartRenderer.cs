@@ -259,9 +259,11 @@ public static class PartRenderer
         switch (part.Style)
         {
             case PartStyle.Opaque:
-                // White fill, no border
+                // White fill, no border. (Still gets icon/label/hilite below --
+                // previously this returned immediately and never drew a label, which
+                // was a bug: HyperCard opaque buttons do show their name.)
                 canvas.DrawRect(rect, fillPaint);
-                return;
+                break;
 
             case PartStyle.RoundRect:
             case PartStyle.Standard:
@@ -293,7 +295,19 @@ public static class PartRenderer
                 }
                 break;
 
-            default:  // Rectangle, CheckBox, RadioButton
+            case PartStyle.CheckBox:
+                RenderCheckBoxChrome(canvas, part, rect);
+                return;
+
+            case PartStyle.RadioButton:
+                RenderRadioButtonChrome(canvas, part, rect);
+                return;
+
+            case PartStyle.Popup:
+                RenderPopupChrome(canvas, part, rect);
+                return;
+
+            default:  // Rectangle, and any unexpected style (e.g. Scrolling on a button)
                 canvas.DrawRect(rect, fillPaint);
                 canvas.DrawRect(rect, borderPaint);
                 break;
@@ -335,33 +349,229 @@ public static class PartRenderer
         }
 
         // ─ Label ────────────────────────────────────────────────────────────────
+        if (part.ShowName && !string.IsNullOrEmpty(part.Name))
+        {
+            using var typeface = FontMapper.GetTypeface(part.TextFontId, part.TextStyle);
+
+            // Auto-shrink font size if label is wider than the button (minimum 9pt).
+            // 6px total horizontal margin (3px each side) matches HyperCard's Chicago font metrics.
+            float labelMaxWidth = rect.Width - 6f;
+            float effectiveSize = ShrinkFontToFit(typeface, part.Name, textSize, labelMaxWidth);
+
+            using var labelFont = new SKFont(typeface, effectiveSize);
+            using var textPaint = new SKPaint { Color = SKColors.Black, IsAntialias = false };
+
+            float tw = labelFont.MeasureText(part.Name);
+            float tx = rect.MidX - tw / 2f;
+
+            // Vertical position: centre in remaining text area
+            float remainH = rect.Bottom - textAreaTop;
+            float ty = textAreaTop + remainH / 2f + effectiveSize / 2f - 1f;
+
+            canvas.DrawText(part.Name, tx, ty, labelFont, textPaint);
+        }
+
+        // ─ Hilite (push-button styles only) ─────────────────────────────────────
+        // Authentic 1-bit "pressed" look: invert every pixel drawn so far (fill,
+        // border, icon, and label) within the button's shape. CheckBox/RadioButton/
+        // Popup return earlier above and never reach here -- they show their
+        // check/dot mark instead of inverting (see their own methods below).
+        if (part.HiliteState)
+            ApplyHiliteInversion(canvas, rect, part.Style);
+    }
+
+    /// <summary>
+    /// Shrinks a font size (down to a 9pt floor) until <paramref name="text"/> fits within
+    /// <paramref name="maxWidth"/>. Shared by the centered push-button label and the
+    /// left-aligned checkbox/radio-button/popup labels.
+    /// </summary>
+    private static float ShrinkFontToFit(SKTypeface typeface, string text, float baseSize, float maxWidth)
+    {
+        float size = baseSize;
+        while (size > 9f)
+        {
+            using var probe = new SKFont(typeface, size);
+            if (probe.MeasureText(text) <= maxWidth)
+                break;
+            size -= 1f;
+        }
+        return size;
+    }
+
+    /// <summary>
+    /// Inverts every pixel within the button's shape using SKBlendMode.Difference against
+    /// a solid white fill -- this maps black&lt;-&gt;white exactly with no intermediate
+    /// gray, matching the project's authentic 1-bit rendering requirement.
+    /// </summary>
+    private static void ApplyHiliteInversion(SKCanvas canvas, SKRect rect, PartStyle style)
+    {
+        canvas.Save();
+        switch (style)
+        {
+            case PartStyle.Oval:
+                using (var ovalPath = new SKPath())
+                {
+                    ovalPath.AddOval(rect);
+                    canvas.ClipPath(ovalPath);
+                }
+                break;
+
+            case PartStyle.RoundRect:
+            case PartStyle.Standard:
+            case PartStyle.Default:
+                using (var roundPath = new SKPath())
+                {
+                    roundPath.AddRoundRect(rect, ButtonCornerRadius, ButtonCornerRadius);
+                    canvas.ClipPath(roundPath);
+                }
+                break;
+
+            default:
+                canvas.ClipRect(rect);
+                break;
+        }
+
+        using var invertPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = SKColors.White,
+            BlendMode = SKBlendMode.Difference
+        };
+        canvas.DrawRect(rect, invertPaint);
+        canvas.Restore();
+    }
+
+    private const float CheckGlyphSize = 12f;
+
+    /// <summary>
+    /// CheckBox chrome: a small square at the left edge (white fill, black border),
+    /// an "X" mark drawn inside when hilited (classic Mac System 6/7 checkbox style --
+    /// not a modern checkmark tick), and the label left-aligned to its right.
+    /// Hilite here does NOT invert the whole part (unlike push-button styles) --
+    /// only the mark inside the box changes.
+    /// </summary>
+    private static void RenderCheckBoxChrome(SKCanvas canvas, Part part, SKRect rect)
+    {
+        float boxTop = rect.Top + (rect.Height - CheckGlyphSize) / 2f;
+        float boxLeft = rect.Left + 2f;
+        var boxRect = new SKRect(boxLeft, boxTop, boxLeft + CheckGlyphSize, boxTop + CheckGlyphSize);
+
+        using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = SKColors.White };
+        using var borderPaint = new SKPaint
+            { Style = SKPaintStyle.Stroke, Color = ButtonBorderColor, StrokeWidth = 1, IsAntialias = false };
+        canvas.DrawRect(boxRect, fillPaint);
+        canvas.DrawRect(boxRect, borderPaint);
+
+        if (part.HiliteState)
+        {
+            using var markPaint = new SKPaint
+                { Style = SKPaintStyle.Stroke, Color = SKColors.Black, StrokeWidth = 1.5f, IsAntialias = true };
+            const float pad = 2.5f;
+            canvas.DrawLine(boxRect.Left + pad, boxRect.Top + pad, boxRect.Right - pad, boxRect.Bottom - pad, markPaint);
+            canvas.DrawLine(boxRect.Left + pad, boxRect.Bottom - pad, boxRect.Right - pad, boxRect.Top + pad, markPaint);
+        }
+
+        DrawLeftAlignedLabel(canvas, part, boxRect.Right + 4f, rect);
+    }
+
+    /// <summary>
+    /// RadioButton chrome: a small circle at the left edge (white fill, black border),
+    /// a filled center dot drawn when hilited, and the label left-aligned to its right.
+    /// Like CheckBox, hilite does not invert the whole part.
+    /// </summary>
+    private static void RenderRadioButtonChrome(SKCanvas canvas, Part part, SKRect rect)
+    {
+        float circleTop = rect.Top + (rect.Height - CheckGlyphSize) / 2f;
+        float circleLeft = rect.Left + 2f;
+        var circleRect = new SKRect(circleLeft, circleTop, circleLeft + CheckGlyphSize, circleTop + CheckGlyphSize);
+
+        using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = SKColors.White };
+        using var borderPaint = new SKPaint
+            { Style = SKPaintStyle.Stroke, Color = ButtonBorderColor, StrokeWidth = 1, IsAntialias = true };
+        canvas.DrawOval(circleRect, fillPaint);
+        canvas.DrawOval(circleRect, borderPaint);
+
+        if (part.HiliteState)
+        {
+            using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = SKColors.Black, IsAntialias = true };
+            float inset = CheckGlyphSize * 0.28f;
+            var dotRect = new SKRect(circleRect.Left + inset, circleRect.Top + inset,
+                circleRect.Right - inset, circleRect.Bottom - inset);
+            canvas.DrawOval(dotRect, dotPaint);
+        }
+
+        DrawLeftAlignedLabel(canvas, part, circleRect.Right + 4f, rect);
+    }
+
+    /// <summary>
+    /// Popup chrome: a plain rectangular frame, the button's name drawn left-aligned
+    /// within the "title width" region (<see cref="Part.TitleWidthOrLastSelectedLine"/>,
+    /// with a vertical divider line at its edge when set), and a solid downward-pointing
+    /// triangle near the right edge indicating a drop-down menu.
+    /// </summary>
+    private static void RenderPopupChrome(SKCanvas canvas, Part part, SKRect rect)
+    {
+        using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = SKColors.White };
+        using var borderPaint = new SKPaint
+            { Style = SKPaintStyle.Stroke, Color = ButtonBorderColor, StrokeWidth = 1, IsAntialias = false };
+        canvas.DrawRect(rect, fillPaint);
+        canvas.DrawRect(rect, borderPaint);
+
+        const float arrowAreaWidth = 16f;
+        float maxTitleWidth = Math.Max(0f, rect.Width - arrowAreaWidth);
+        bool hasTitleWidth = part.TitleWidthOrLastSelectedLine > 0;
+        float titleWidth = hasTitleWidth
+            ? Math.Min(part.TitleWidthOrLastSelectedLine, maxTitleWidth)
+            : maxTitleWidth;
+
+        if (hasTitleWidth && titleWidth < maxTitleWidth)
+        {
+            float dividerX = rect.Left + titleWidth;
+            canvas.DrawLine(dividerX, rect.Top, dividerX, rect.Bottom, borderPaint);
+        }
+
+        if (part.ShowName && !string.IsNullOrEmpty(part.Name))
+        {
+            using var typeface = FontMapper.GetTypeface(part.TextFontId, part.TextStyle);
+            float textSize = part.TextSize > 0 ? part.TextSize : 12f;
+            float maxWidth = Math.Max(0f, titleWidth - 6f);
+            float effectiveSize = ShrinkFontToFit(typeface, part.Name, textSize, maxWidth);
+            using var labelFont = new SKFont(typeface, effectiveSize);
+            using var textPaint = new SKPaint { Color = SKColors.Black, IsAntialias = false };
+            float ty = rect.MidY + effectiveSize / 2f - 1f;
+            canvas.DrawText(part.Name, rect.Left + 3f, ty, labelFont, textPaint);
+        }
+
+        float arrowCx = rect.Right - arrowAreaWidth / 2f;
+        float arrowCy = rect.MidY;
+        using var arrowFill = new SKPaint { Style = SKPaintStyle.Fill, Color = SKColors.Black, IsAntialias = false };
+        using var arrowPath = new SKPath();
+        arrowPath.MoveTo(arrowCx - 4f, arrowCy - 2f);
+        arrowPath.LineTo(arrowCx + 4f, arrowCy - 2f);
+        arrowPath.LineTo(arrowCx, arrowCy + 3f);
+        arrowPath.Close();
+        canvas.DrawPath(arrowPath, arrowFill);
+    }
+
+    /// <summary>
+    /// Draws a button's name left-aligned starting at <paramref name="textLeft"/>,
+    /// vertically centred within <paramref name="rect"/>. Used by CheckBox and
+    /// RadioButton, whose labels sit to the right of a small glyph rather than
+    /// centered like push buttons.
+    /// </summary>
+    private static void DrawLeftAlignedLabel(SKCanvas canvas, Part part, float textLeft, SKRect rect)
+    {
         if (!part.ShowName || string.IsNullOrEmpty(part.Name)) return;
 
-        using var typeface  = FontMapper.GetTypeface(part.TextFontId, part.TextStyle);
-
-        // Auto-shrink font size if label is wider than the button (minimum 9pt).
-        // 6px total horizontal margin (3px each side) matches HyperCard's Chicago font metrics.
-        float labelMaxWidth = rect.Width - 6f;
-        float effectiveSize = textSize;
-        while (effectiveSize > 9f)
-        {
-            using var probe = new SKFont(typeface, effectiveSize);
-            if (probe.MeasureText(part.Name) <= labelMaxWidth)
-                break;
-            effectiveSize -= 1f;
-        }
+        using var typeface = FontMapper.GetTypeface(part.TextFontId, part.TextStyle);
+        float textSize = part.TextSize > 0 ? part.TextSize : 12f;
+        float maxWidth = Math.Max(0f, rect.Right - 3f - textLeft);
+        float effectiveSize = ShrinkFontToFit(typeface, part.Name, textSize, maxWidth);
 
         using var labelFont = new SKFont(typeface, effectiveSize);
         using var textPaint = new SKPaint { Color = SKColors.Black, IsAntialias = false };
-
-        float tw = labelFont.MeasureText(part.Name);
-        float tx = rect.MidX - tw / 2f;
-
-        // Vertical position: centre in remaining text area
-        float remainH = rect.Bottom - textAreaTop;
-        float ty = textAreaTop + remainH / 2f + effectiveSize / 2f - 1f;
-
-        canvas.DrawText(part.Name, tx, ty, labelFont, textPaint);
+        float ty = rect.MidY + effectiveSize / 2f - 1f;
+        canvas.DrawText(part.Name, textLeft, ty, labelFont, textPaint);
     }
 
     /// <summary>

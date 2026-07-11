@@ -214,23 +214,89 @@ Mac 128K/Plus/SE display.
 
 ## Part Record (in CARD / BKGD)
 
+Verified field-by-field against `Part.cs`'s working parser (already exercised against the
+NEUROBLAST corpus) and cross-referenced with HyperCardPreview's `FilePart.swift` byte
+offsets. This replaces an earlier, less precise version of this table that misplaced the
+title-width/icon-id fields and had Name starting 8 bytes too early.
+
 ```
-Offset  Size  Field
-0x00    2     Part size           Total bytes including variable-length fields
-0x02    2     Part ID             1-based within card/background
-0x04    1     Part style flags    bit 7 = button (0) or field (1); other bits = style
-0x05    1     Visibility + other flags   bit 7 = visible
+Offset  Size  Field                       Notes
+0x00    2     Part size                   Total bytes including variable-length fields
+0x02    2     Part ID                     1-based within card/background
+0x04    1     Part type                   low nibble: 1 = button, 2 = field
+0x05    1     Flags                       see "Part Record flag bits" below
 0x06    2     Top
 0x08    2     Left
 0x0A    2     Bottom
 0x0C    2     Right
-0x0E    2     Feature flags       (font ID for fields; button style flags for buttons)
-0x10    2     Text style flags    bold=0x01, italic=0x02, underline=0x04, outline=0x08, shadow=0x10, condense=0x20, extend=0x40
-0x12    2     Text size           In points (e.g. 12)
-0x14    2     Text align          0=left, 1=center, -1=right
-0x16    ?     Name                Null-terminated Mac Roman string
-...           Script              Null-terminated Mac Roman string (follows name + null)
+0x0E    1     MoreFlags                   see "Part Record flag bits" below
+0x0F    1     Style                       PartStyle enum (0-11), see below
+0x10    2     Title width / last sel. line   popup title width (button) / lastSelectedLine (field)
+0x12    2     Icon ID / first sel. line   ICON resource ID (button) / firstSelectedLine (field)
+0x14    2     Text align                  0=left, 1=center, -1=right
+0x16    2     Text font ID                Mac font ID
+0x18    2     Text size                   In points (e.g. 12)
+0x1A    1     Text style flags            bold=0x01, italic=0x02, underline=0x04, outline=0x08, shadow=0x10, condense=0x20, extend=0x40
+0x1B    1     (padding)
+0x1C    2     Text height                 Line height in pixels
+0x1E    ?     Name                        Null-terminated Mac Roman string
+...           Script                      Null-terminated Mac Roman string (follows name + null + 1 separator byte)
 ```
+
+**PartStyle enum (offset 0x0F), verified:**
+
+| Value | Name | Value | Name |
+|-------|------|-------|------|
+| 0 | Transparent | 6 | RadioButton |
+| 1 | Opaque | 7 | Scrolling |
+| 2 | Rectangle | 8 | Standard |
+| 3 | RoundRect | 9 | Default |
+| 4 | Shadow | 10 | Oval |
+| 5 | CheckBox | 11 | Popup |
+
+---
+
+### Part Record flag bits (verified)
+
+The two flag bytes in a part record are shared between buttons and fields: the SAME bit
+position means something different depending on `Type`. Verified by cross-referencing
+against HyperCardPreview's `FilePart.swift` (Pierre Lorenzi, GPL) as a format
+**specification only** — no code from that project is reused here, only the documented
+byte/bit offsets, which are independently implemented in `Part.cs`.
+
+**`Flags` byte (offset 0x05):**
+
+| Bit | Mask | Button meaning | Field meaning |
+|-----|------|-----------------|---------------|
+| 7 | 0x80 | Hidden (part not visible) | Hidden (part not visible) — shared, same meaning both types |
+| 3 | 0x08 | (unused by current accessors) | `sharedText` — text content shared across every card using this background field |
+| 0 | 0x01 | `enabled`, **stored inverted** (bit set = disabled) — not currently wired into `Part.Enabled`/`EnabledOverride`, which remain a pure HyperTalk runtime concept | `lockText` — field text cannot be edited directly by the user |
+
+Bits 1, 2, 4, 5 of this byte are documented upstream as field-only flags (`autoTab`,
+`fixedLineHeight` inverted, `dontSearch`, `dontWrap` respectively) but are not exposed as
+`Part` accessors because nothing in HyperCard# currently consumes them — added here only
+for completeness of the specification, not as implemented behavior.
+
+**`MoreFlags` byte (offset 0x0E):**
+
+| Bit | Mask | Button meaning | Field meaning |
+|-----|------|-----------------|---------------|
+| 7 | 0x80 | `showName` — draw the button's label | (unused; field name is never drawn) |
+| 6 | 0x40 | `hilite` — the persisted/initial hilite (checked) state, seeded into `Part.HiliteState` at parse time | `showLines` — draw a ruled line under each row of text |
+| 5 | 0x20 | `autoHilite` — button inverts itself automatically while the mouse is down over it | `wideMargins` — extra left/right text inset |
+| 4 | 0x10 | `sharedHilite`, **stored inverted** (bit set = NOT shared) — hilite state shared across every card using this background button | (documented upstream as `multipleLines`; not exposed as a `Part` accessor — unused) |
+| 0-3 | 0x0F | `family` — button family number (0-15); non-zero families group radio buttons so hiliting one un-hilites the rest in the same family | (documented upstream as `autoSelect` at bit 7 instead; low nibble unused for fields) |
+
+`Part.cs` accessors implementing the table above: `Visible`, `LockText`, `SharedText`,
+`ShowName`, `FileHilite`, `AutoHilite`, `SharedHilite`, `ShowLines`, `WideMargins`,
+`Family`. Each accessor gates on `IsButton`/`IsField` so reading it against the wrong
+part type returns a safe default (`false`/`0`) rather than a misleading value.
+
+**Note on shared bits:** the B2 task brief anticipated "hilite (button) / lockText
+(field)" sharing one bit — the verified layout instead shows `enabled` (button) /
+`lockText` (field) sharing `Flags` bit 0, while `hilite` (button) actually lives at
+`MoreFlags` bit 6 with no field equivalent at that position (fields use that bit for
+`showLines` instead). Documented here as the correction.
 
 ---
 
