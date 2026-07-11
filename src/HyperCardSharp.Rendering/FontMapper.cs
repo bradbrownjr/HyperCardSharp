@@ -82,6 +82,19 @@ public static class FontMapper
     /// </summary>
     public static string? UserFontDirectory { get; set; }
 
+    /// <summary>
+    /// When true, tiers 1 (user font directory) and 2 (system-installed fonts) are
+    /// skipped entirely, so resolution goes straight to the embedded substitutes
+    /// (ChicagoFLF, Noto Sans) or the generic cross-platform fallback.
+    ///
+    /// Rendering output otherwise depends on whichever fonts happen to be installed
+    /// on the host machine (e.g. a box with a real "Chicago" or "Geneva" font installed
+    /// renders differently than one without). This switch exists so golden-image
+    /// regression tests (roadmap task B7) can force byte-deterministic output across
+    /// machines. Defaults to false; production rendering leaves the full tier chain enabled.
+    /// </summary>
+    public static bool UseEmbeddedFontsOnly { get; set; } = false;
+
     // Cache of typefaces loaded from the user font directory, keyed by lowercase family name.
     private static readonly Dictionary<string, SKTypeface> s_userFonts = new(StringComparer.OrdinalIgnoreCase);
     private static bool s_userFontsScanned;
@@ -132,6 +145,7 @@ public static class FontMapper
     /// <summary>Try to resolve a typeface from the user font directory.</summary>
     private static SKTypeface? TryUserFont(string familyName)
     {
+        if (UseEmbeddedFontsOnly) return null;
         EnsureUserFontsScanned();
         return s_userFonts.TryGetValue(familyName, out var tf) ? tf : null;
     }
@@ -149,6 +163,8 @@ public static class FontMapper
     /// </summary>
     private static SKTypeface? TrySystemFont(string familyName, SKFontStyleWeight weight, SKFontStyleSlant slant)
     {
+        if (UseEmbeddedFontsOnly) return null;
+
         // Quick reject sentinels.
         if (familyName.StartsWith('_')) return null;
 
@@ -317,6 +333,13 @@ public static class FontMapper
             return s_chicagoFlf.Value ?? SKTypeface.Default;
 
         if (family == "_geneva")
+            return (isBold ? s_notoBold.Value : s_notoRegular.Value) ?? SKTypeface.Default;
+
+        // In embedded-only mode we must never fall through to a host-resolved family
+        // (tier 4 below uses fontconfig, which differs across machines and breaks
+        // golden-image determinism). Route every remaining family to the embedded
+        // Noto substitute so output depends only on fonts shipped in the assembly.
+        if (UseEmbeddedFontsOnly)
             return (isBold ? s_notoBold.Value : s_notoRegular.Value) ?? SKTypeface.Default;
 
         // Tier 4: Common cross-platform font.
