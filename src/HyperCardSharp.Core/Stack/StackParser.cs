@@ -31,10 +31,23 @@ public class StackParser
         {
             var header = BlockHeader.Parse(data.Slice(offset), offset);
 
-            if (header.Size <= 0)
+            // A valid block must be at least as large as its own 16-byte header,
+            // and must not claim to extend past the end of the file. Both are
+            // symptoms of corrupt or mis-decompressed data (e.g. a StuffIt archive
+            // decompressed with the wrong algorithm) — stop enumeration rather than
+            // let a later unguarded Slice() throw ArgumentOutOfRangeException.
+            if (header.Size < 16)
             {
                 _logger.LogWarning("Invalid block size {Size} at offset 0x{Offset:X}. Stopping enumeration.",
                     header.Size, offset);
+                break;
+            }
+
+            if (header.FileOffset + header.Size > data.Length)
+            {
+                _logger.LogWarning(
+                    "Block '{Type}' at offset 0x{Offset:X} claims size {Size}, which extends {Overrun} bytes past end of file (length {Length}). Stopping enumeration.",
+                    header.Type, offset, header.Size, header.FileOffset + header.Size - data.Length, data.Length);
                 break;
             }
 
@@ -80,76 +93,90 @@ public class StackParser
 
         foreach (var header in blocks)
         {
+            // EnumerateBlocks already bounds-checked header.FileOffset/header.Size
+            // against data.Length, so this slice cannot throw for outer bounds.
+            // The try/catch below guards against malformed *content* inside an
+            // otherwise well-bounded block (e.g. a corrupt part list within a
+            // CARD block), converting any parse failure into a StackFormatException
+            // with offset context instead of leaking a raw BCL exception.
             var blockData = data.Slice((int)header.FileOffset, header.Size);
 
-            switch (header.Type)
+            try
             {
-                case "STAK":
-                    stackBlock = StackBlock.Parse(blockData, header);
-                    _logger.LogInformation(
-                        "STAK: version={Version}, cards={Cards}, backgrounds={Backgrounds}, size={Width}x{Height}",
-                        stackBlock.FormatVersion, stackBlock.CardCount, stackBlock.BackgroundCount,
-                        stackBlock.CardWidth, stackBlock.CardHeight);
-                    if (stackBlock.FormatVersion is >= 1 and <= 7)
-                        _logger.LogWarning(
-                            "HyperCard 1.x stack detected (format version {V}). Full 1.x support is not yet implemented.",
-                            stackBlock.FormatVersion);
-                    if (stackBlock.PasswordHash != 0)
-                        _logger.LogWarning("Stack is password-protected (hash={Hash:X8}). Password cannot be verified or removed.", stackBlock.PasswordHash);
-                    break;
+                switch (header.Type)
+                {
+                    case "STAK":
+                        stackBlock = StackBlock.Parse(blockData, header);
+                        _logger.LogInformation(
+                            "STAK: version={Version}, cards={Cards}, backgrounds={Backgrounds}, size={Width}x{Height}",
+                            stackBlock.FormatVersion, stackBlock.CardCount, stackBlock.BackgroundCount,
+                            stackBlock.CardWidth, stackBlock.CardHeight);
+                        if (stackBlock.FormatVersion is >= 1 and <= 7)
+                            _logger.LogWarning(
+                                "HyperCard 1.x stack detected (format version {V}). Full 1.x support is not yet implemented.",
+                                stackBlock.FormatVersion);
+                        if (stackBlock.PasswordHash != 0)
+                            _logger.LogWarning("Stack is password-protected (hash={Hash:X8}). Password cannot be verified or removed.", stackBlock.PasswordHash);
+                        break;
 
-                case "MAST":
-                    masterBlock = MasterBlock.Parse(blockData, header);
-                    var nonZeroOffsets = masterBlock.Offsets.Count(o => o != 0);
-                    _logger.LogInformation("MAST: {Count} non-zero offset entries", nonZeroOffsets);
-                    break;
+                    case "MAST":
+                        masterBlock = MasterBlock.Parse(blockData, header);
+                        var nonZeroOffsets = masterBlock.Offsets.Count(o => o != 0);
+                        _logger.LogInformation("MAST: {Count} non-zero offset entries", nonZeroOffsets);
+                        break;
 
-                case "LIST":
-                    listBlock = ListBlock.Parse(blockData, header);
-                    _logger.LogInformation("LIST: {PageCount} pages, {CardCount} total cards, cardRefSize={RefSize}",
-                        listBlock.PageCount, listBlock.TotalCardCount, listBlock.CardReferenceSize);
-                    break;
+                    case "LIST":
+                        listBlock = ListBlock.Parse(blockData, header);
+                        _logger.LogInformation("LIST: {PageCount} pages, {CardCount} total cards, cardRefSize={RefSize}",
+                            listBlock.PageCount, listBlock.TotalCardCount, listBlock.CardReferenceSize);
+                        break;
 
-                case "PAGE":
-                    // Defer PAGE parsing until we have the LIST block's cardReferenceSize
-                    pageHeaders.Add(header);
-                    break;
+                    case "PAGE":
+                        // Defer PAGE parsing until we have the LIST block's cardReferenceSize
+                        pageHeaders.Add(header);
+                        break;
 
-                case "CARD":
-                    var card = CardBlock.Parse(blockData, header);
-                    cards.Add(card);
-                    _logger.LogDebug("CARD {Id}: bg={BgId}, parts={Parts}, bitmap={Bitmap}",
-                        header.Id, card.BackgroundId, card.Parts.Count, card.BitmapId);
-                    break;
+                    case "CARD":
+                        var card = CardBlock.Parse(blockData, header);
+                        cards.Add(card);
+                        _logger.LogDebug("CARD {Id}: bg={BgId}, parts={Parts}, bitmap={Bitmap}",
+                            header.Id, card.BackgroundId, card.Parts.Count, card.BitmapId);
+                        break;
 
-                case "BKGD":
-                    var bg = BackgroundBlock.Parse(blockData, header);
-                    backgrounds.Add(bg);
-                    _logger.LogInformation("BKGD {Id}: {Cards} cards, {Parts} parts",
-                        header.Id, bg.CardCount, bg.Parts.Count);
-                    break;
+                    case "BKGD":
+                        var bg = BackgroundBlock.Parse(blockData, header);
+                        backgrounds.Add(bg);
+                        _logger.LogInformation("BKGD {Id}: {Cards} cards, {Parts} parts",
+                            header.Id, bg.CardCount, bg.Parts.Count);
+                        break;
 
-                case "FTBL":
-                    fontTable = FontTableBlock.Parse(blockData, header);
-                    _logger.LogInformation("FTBL: {Count} fonts", fontTable.FontCount);
-                    break;
+                    case "FTBL":
+                        fontTable = FontTableBlock.Parse(blockData, header);
+                        _logger.LogInformation("FTBL: {Count} fonts", fontTable.FontCount);
+                        break;
 
-                case "STBL":
-                    styleTable = StyleTableBlock.Parse(blockData, header);
-                    _logger.LogInformation("STBL: {Count} styles", styleTable.StyleCount);
-                    break;
+                    case "STBL":
+                        styleTable = StyleTableBlock.Parse(blockData, header);
+                        _logger.LogInformation("STBL: {Count} styles", styleTable.StyleCount);
+                        break;
 
-                case "BMAP":
-                    var bmap = BitmapBlock.Parse(blockData, header);
-                    bitmaps[header.Id] = bmap;
-                    _logger.LogDebug("BMAP {Id}: card={CardRect}, mask={MaskRect}, image={ImageRect}",
-                        header.Id, bmap.CardRect, bmap.MaskRect, bmap.ImageRect);
-                    break;
+                    case "BMAP":
+                        var bmap = BitmapBlock.Parse(blockData, header);
+                        bitmaps[header.Id] = bmap;
+                        _logger.LogDebug("BMAP {Id}: card={CardRect}, mask={MaskRect}, image={ImageRect}",
+                            header.Id, bmap.CardRect, bmap.MaskRect, bmap.ImageRect);
+                        break;
+                }
+            }
+            catch (Exception ex) when (ex is not StackFormatException)
+            {
+                throw new StackFormatException(
+                    $"Failed to parse '{header.Type}' block content", header.FileOffset, ex);
             }
         }
 
         if (stackBlock == null)
-            throw new InvalidDataException("No STAK block found in file");
+            throw new StackFormatException("No STAK block found in file", 0);
 
         // Now parse PAGE blocks with the LIST's cardReferenceSize
         var pages = new List<PageBlock>();
@@ -163,11 +190,22 @@ public class StackParser
 
             foreach (var pageHeader in pageHeaders)
             {
+                // pageHeader came from the bounds-validated blocks list, so this
+                // slice cannot throw for outer bounds; guard only against malformed
+                // inner content (e.g. a corrupt card-reference table).
                 var pageData = data.Slice((int)pageHeader.FileOffset, pageHeader.Size);
                 var expectedCards = pageCardCounts.GetValueOrDefault(pageHeader.Id, 0);
-                var page = PageBlock.Parse(pageData, pageHeader, listBlock.CardReferenceSize, expectedCards);
-                pages.Add(page);
-                _logger.LogInformation("PAGE {Id}: {Count} card references", pageHeader.Id, page.CardReferences.Count);
+                try
+                {
+                    var page = PageBlock.Parse(pageData, pageHeader, listBlock.CardReferenceSize, expectedCards);
+                    pages.Add(page);
+                    _logger.LogInformation("PAGE {Id}: {Count} card references", pageHeader.Id, page.CardReferences.Count);
+                }
+                catch (Exception ex) when (ex is not StackFormatException)
+                {
+                    throw new StackFormatException(
+                        "Failed to parse 'PAGE' block content", pageHeader.FileOffset, ex);
+                }
             }
         }
 
@@ -195,12 +233,12 @@ public class StackParser
             Blocks = blocks,
             RawData = fileData,
             Icons = ParseIconResources(resourceFork),
-            SoundsById          = soundsById,
-            SoundsByName        = soundsByName,
-            CardColorData       = cardColorData,
+            SoundsById = soundsById,
+            SoundsByName = soundsByName,
+            CardColorData = cardColorData,
             BackgroundColorData = bgColorData,
-            PictResources       = pictResources,
-            SfntResources       = sfntResources,
+            PictResources = pictResources,
+            SfntResources = sfntResources,
         };
     }
 
@@ -214,7 +252,7 @@ public class StackParser
 
     private (Dictionary<short, byte[]> ById, Dictionary<string, byte[]> ByName) ParseSoundResources(byte[]? resourceFork)
     {
-        var byId   = new Dictionary<short, byte[]>();
+        var byId = new Dictionary<short, byte[]>();
         var byName = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
 
         var sndResources = MacResourceForkReader.GetResourcesWithNames(resourceFork, "snd ");
@@ -236,7 +274,7 @@ public class StackParser
         ParseAddColorResources(byte[]? resourceFork)
     {
         var cardData = new Dictionary<int, IReadOnlyList<AddColorDecoder.ColorRegion>>();
-        var bgData   = new Dictionary<int, IReadOnlyList<AddColorDecoder.ColorRegion>>();
+        var bgData = new Dictionary<int, IReadOnlyList<AddColorDecoder.ColorRegion>>();
 
         var hccd = MacResourceForkReader.GetResources(resourceFork, "HCcd");
         foreach (var (id, raw) in hccd)

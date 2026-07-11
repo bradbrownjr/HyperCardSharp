@@ -43,6 +43,65 @@ public class StackParserTests
         Assert.Equal("TAIL", blocks[1].Type);
     }
 
+    [Fact]
+    public void EnumerateBlocks_RejectsSizeSmallerThanHeader()
+    {
+        // A block claiming size=8 (less than the 16-byte header it must at least contain)
+        var data = new byte[32];
+        data[0] = 0x00; data[1] = 0x00; data[2] = 0x00; data[3] = 0x08; // size = 8 (invalid, < 16)
+        data[4] = (byte)'S'; data[5] = (byte)'T'; data[6] = (byte)'A'; data[7] = (byte)'K';
+
+        var parser = new StackParser();
+        var blocks = parser.EnumerateBlocks(data).ToList();
+
+        Assert.Empty(blocks); // enumeration stops immediately, no exception
+    }
+
+    [Fact]
+    public void EnumerateBlocks_RejectsSizeExtendingPastEndOfFile()
+    {
+        // A block claiming size=2048 in a buffer that's only 64 bytes long —
+        // this is the exact failure mode that used to reach an unguarded
+        // Slice() in StackParser.Parse() and throw ArgumentOutOfRangeException
+        // (reproduced by BeavisEmulatorV2.sit's mis-decompressed data).
+        var data = new byte[64];
+        data[0] = 0x00; data[1] = 0x00; data[2] = 0x08; data[3] = 0x00; // size = 2048
+        data[4] = (byte)'S'; data[5] = (byte)'T'; data[6] = (byte)'A'; data[7] = (byte)'K';
+
+        var parser = new StackParser();
+        var blocks = parser.EnumerateBlocks(data).ToList();
+
+        Assert.Empty(blocks); // enumeration stops before accepting the overrunning header
+    }
+
+    [Fact]
+    public void Parse_ThrowsStackFormatException_NotBclException_OnCorruptData()
+    {
+        // Same overrun scenario as above, but exercised through Parse() end-to-end:
+        // must surface a typed StackFormatException with offset context, never a
+        // raw ArgumentOutOfRangeException.
+        var data = new byte[64];
+        data[0] = 0x00; data[1] = 0x00; data[2] = 0x08; data[3] = 0x00; // size = 2048
+        data[4] = (byte)'S'; data[5] = (byte)'T'; data[6] = (byte)'A'; data[7] = (byte)'K';
+
+        var parser = new StackParser();
+        var ex = Assert.Throws<StackFormatException>(() => parser.Parse(data));
+        Assert.Contains("No STAK block found", ex.Message);
+    }
+
+    [Fact]
+    public void Parse_ThrowsStackFormatException_OnRandomGarbageData()
+    {
+        // Arbitrary non-stack data must fail gracefully with a typed exception,
+        // not crash with an unhandled BCL exception (never-crash UX requirement).
+        var random = new Random(42);
+        var data = new byte[256];
+        random.NextBytes(data);
+
+        var parser = new StackParser();
+        Assert.Throws<StackFormatException>(() => parser.Parse(data));
+    }
+
     [SkippableFact]
     public void Parse_NeuroblastSample_ReadsStackHeader()
     {

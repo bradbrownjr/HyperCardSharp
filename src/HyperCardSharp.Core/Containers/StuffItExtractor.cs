@@ -53,8 +53,12 @@ public class StuffItExtractor : IContainerExtractor
         return false;
     }
 
-    /// <summary>Returns true when the data is a StuffIt 5.x archive (not StuffIt Classic).</summary>
-    private static bool IsStuffIt5(ReadOnlySpan<byte> data)
+    /// <summary>
+    /// Returns true when the data is a StuffIt 5.x / Aladdin archive (not StuffIt Classic).
+    /// Public so callers (e.g. ContainerPipeline) can surface a specific
+    /// "not yet supported" message rather than a generic extraction failure.
+    /// </summary>
+    public static bool IsStuffIt5(ReadOnlySpan<byte> data)
         => data.Length >= 7 &&
            data[0] == 'S' && data[1] == 't' && data[2] == 'u' && data[3] == 'f' &&
            data[4] == 'f' && data[5] == 'I' && data[6] == 't';

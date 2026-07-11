@@ -51,7 +51,9 @@ public static class ContainerPipeline
 
             if (extracted == null)
             {
-                log?.Invoke($"{extractor.GetType().Name} recognized container but could not extract a stack.");
+                log?.Invoke(extractor is StuffItExtractor && StuffItExtractor.IsStuffIt5(data)
+                    ? "StuffIt 5.x/Aladdin archives are not yet supported. Unpack with an external tool (e.g. The Unarchiver) and open the extracted stack directly."
+                    : $"{extractor.GetType().Name} recognized container but could not extract a stack.");
                 return null;
             }
 
@@ -265,7 +267,9 @@ public static class ContainerPipeline
                 var sitStacks = sit.ExtractAll(data);
                 if (sitStacks.Count == 0)
                 {
-                    log?.Invoke("StuffItExtractor found no STAK entries.");
+                    log?.Invoke(StuffItExtractor.IsStuffIt5(data)
+                        ? "StuffIt 5.x/Aladdin archives are not yet supported. Unpack with an external tool (e.g. The Unarchiver) and open the extracted stack directly."
+                        : "StuffItExtractor found no STAK entries.");
                     return [];
                 }
                 log?.Invoke($"StuffItExtractor found {sitStacks.Count} stack(s).");
