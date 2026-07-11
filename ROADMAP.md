@@ -93,14 +93,19 @@ sample files, plus targeted source inspection. Statuses: `open`, `partial`,
   fallbacks) is implemented per the Font Policy in `AGENTS.md`. Remaining:
   verify text draws with antialiasing off and integer-scale
   nearest-neighbor zoom so pixels stay crisp (task B3).
-- **F10 [open] Unsupported container variants crash or garble.**
+- **F10 [crash fixed by A4; underlying formats still unsupported] Unsupported
+  container variants degrade, no longer crash.**
   (a) `BeavisEmulatorV2.sit` uses StuffIt compression method 5, which is
   LZAH (LZSS *plus adaptive Huffman*). The current `DecompressLzss` is plain
-  LZSS, so it emits 43,040 bytes of garbage that then crashes
-  `StackParser.Parse` (`ArgumentOutOfRangeException`, verified at HEAD).
-  Needs the Huffman stage (D5) and, independently, a graceful parser failure
-  (A4). (b) `ContextualMenus.sit` is StuffIt 5 format (`StuffIt (c)1997-`
-  magic); detection recognizes it but no SIT5 extractor exists (D6).
+  LZSS, so it still emits 43,040 bytes of garbage — but as of A4,
+  `StackParser.Parse` now rejects that garbage with a typed
+  `StackFormatException` instead of crashing with
+  `ArgumentOutOfRangeException`. Actually decoding this archive still needs
+  the Huffman stage (D5). (b) `ContextualMenus.sit` is StuffIt 5 format
+  (`StuffIt (c)1997-` magic); `StuffItExtractor.IsStuffIt5` already
+  detected it, and A4 made `ContainerPipeline` report that fact with a
+  specific message instead of a generic one. Actually extracting it still
+  needs a SIT5 implementation (D6).
 
 **Commit-history lesson.** Earlier development spent ~15 consecutive commits
 on window chrome while the card canvas had the defects above. Chrome
@@ -258,27 +263,57 @@ new human contributor without holding the whole system in their head.
   passes). Render harness output for both samples is unchanged. Existing
   `dotnet test` suite (39 tests) stays green.
 
-### A4. Never crash on unrecognized or corrupt input  [model: sonnet] [status: pending]
+### A4. Never crash on unrecognized or corrupt input  [model: sonnet] [status: done, commit ae7818f]
 
 - **Goal:** Close the F10 crash path; enforce the graceful-degradation UX
   rule ("never a crash").
-- **Files:** `Core/Stack/StackParser.cs`, `Core/Binary/MagicDetector.cs`,
-  `App/ViewModels/StackViewModel.cs`.
-- **Spec:** `Parse`/`EnumerateBlocks` validate block sizes and offsets
-  before slicing (reject size < 16, size beyond EOF, offset overflow) and
-  throw one typed `StackFormatException` carrying offset context, instead
-  of leaking `ArgumentOutOfRangeException` (currently reproducible with
-  `BeavisEmulatorV2.sit`, whose mis-decompressed fork reaches the parser).
-  SIT5 files (`StuffIt (c)1997-` magic) must surface "StuffIt 5 archives
-  are not supported yet" rather than reaching the parser. App catches
-  `StackFormatException` into a readable status message.
-- **Accept:** Opening `BeavisEmulatorV2.sit` and `ContextualMenus.sit`
-  shows friendly messages; a random binary shows "not a HyperCard stack";
-  no exception escapes in any of the three cases (unit tests included).
+- **Files (as built):** `Core/Stack/StackParser.cs`,
+  `Core/Stack/StackFormatException.cs` (new),
+  `Core/Containers/ContainerPipeline.cs`,
+  `Core/Containers/StuffItExtractor.cs`. `Core/Binary/MagicDetector.cs`
+  and `App/ViewModels/StackViewModel.cs` were **not** touched: `MagicDetector`
+  turned out to be dead code (zero call sites outside its own file/test —
+  detection actually happens per-extractor via `CanHandle()` inside
+  `ContainerPipeline`), and `StackViewModel.LoadStack`/`MainWindow.OpenFileAsync`
+  already forward exception/log messages verbatim into `StatusText`, so
+  fixing the message at the source was sufficient without App changes.
+- **Spec (as built):** `EnumerateBlocks` rejects headers with `Size < 16`
+  or `FileOffset + Size > data.Length`, logging the specific reason and
+  stopping enumeration (same graceful-stop pattern as the pre-existing
+  `size <= 0` check) — this is the actual fix, since it prevents the bad
+  header from ever reaching `Parse()`'s slicing. `StackFormatException`
+  (carries a byte offset) replaces `InvalidDataException`/raw BCL
+  exceptions; `Parse()` wraps both the per-block dispatch loop and the
+  PAGE-parsing loop so inner-content failures also get offset context.
+  `StuffItExtractor.IsStuffIt5` (already existed privately, detecting the
+  `"StuffIt "` banner) promoted to public; `ContainerPipeline.Unwrap` and
+  `UnwrapMultiple` both check it to log "StuffIt 5.x/Aladdin archives are
+  not yet supported..." instead of the generic "found no STAK entries."
+- **Verified:** `dotnet test` 50/50 (8 new: 4 StackParser bounds/exception
+  tests incl. a random-garbage fuzz case, 4 SIT5-message tests). RenderDump
+  swept all six samples: the four healthy ones render identically to
+  before A4 (unchanged card counts/IDs); `BeavisEmulatorV2.sit` now fails
+  with `StackFormatException: No STAK block found in file (at offset 0x0)`
+  instead of a raw `ArgumentOutOfRangeException`; `ContextualMenus.sit`
+  reports the specific SIT5-unsupported message instead of a generic one.
+  Random 256-byte garbage also fails gracefully with the same typed
+  exception, confirming the fix generalizes beyond the one sample that
+  exposed it. (A third occurrence of A2's `0xD2D7` bug was noticed while
+  reading nearby code during this task — see the Phase A exit-criteria
+  note below; left unfixed here as out of A4's scope.)
 
-**Phase A exit criteria:** All six samples either open with correct names
-via their intended container path or fail with a specific, readable
-message. `dotnet test` green.
+**Phase A exit criteria: met, 2026-07-11.** All six samples either open
+with correct names via their intended container path (4/6) or fail with a
+specific, readable message (`BeavisEmulatorV2.sit`, `ContextualMenus.sit`
+— both still unsupported *formats*, per D5/D6, but no longer crash and no
+longer show a misleading message). `dotnet test`: 50/50 green.
+
+**Known follow-up left for a later session (not blocking Phase A):**
+`ContainerPipeline.TryExtractHfsResourceForks` has its own inline
+`hfsSig = 0xD2D7` constant — a third occurrence of the bug A2 fixed in
+`HfsReader.cs`/`HfsExtractor.cs`, masked by the same timestamp heuristic
+inline in that method so it isn't currently user-visible. One-line fix,
+same pattern as A2's commit (`3c2ba0f`).
 
 ---
 
