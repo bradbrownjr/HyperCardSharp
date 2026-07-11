@@ -15,9 +15,10 @@ files involved, an explicit spec, acceptance criteria, and a model
 recommendation. When a task is finished, change its status line, note the
 commit hash, and keep the spec text so later readers understand what was done
 and why. Never mark a phase complete while any task in it is `pending` (see
-the Phase Completion Guardrail in `AGENTS.md`). Re-verify a finding's status
-before working it: parallel sessions have fixed findings before, and this
-file may lag the code.
+the Phase Completion Guardrail in `AGENTS.md`). Start every session with
+`git pull` and re-verify a finding's status before working it: the original
+diagnosis was made on a stale clone that was several large commits behind
+origin, and half its findings were already fixed upstream.
 
 **Model routing guide.**
 
@@ -527,5 +528,6 @@ outranks chrome, a lesson paid for in commit history.
 5. Update `docs/stack-format.md` / `docs/hypertalk-coverage.md` when
    format or language knowledge changed.
 6. Commit per Commit Policy (imperative message, Copilot co-author
-   trailer); pull --rebase before push, parallel sessions are active in
-   this repo.
+   trailer). Pull at session start and before push: work happens from
+   more than one machine, and a stale clone once produced a diagnosis of
+   already-fixed bugs.
