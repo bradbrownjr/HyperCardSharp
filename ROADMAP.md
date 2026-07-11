@@ -73,12 +73,16 @@ sample files, plus targeted source inspection. Statuses: `open`, `partial`,
   signature word. That masks the bug rather than fixing it, and risks a
   false positive on non-HFS data with a coincidentally plausible
   timestamp. Task A2.
-- **F5 [open] WOBA mask layer discarded.** `WobaDecoder.cs` decodes the mask
-  then outputs only the image layer ("Full composition will be handled at
-  render time", which never happens); `CardRenderer` draws the card layer
-  opaque. Any stack whose background holds artwork gets whited out by card
-  paint. The samples hide this (their art is card-level, full-bleed). Task
-  B1.
+- **F5 [fixed, B1] WOBA mask layer discarded.** Was: `WobaDecoder.cs` decoded
+  the mask then output only the image layer; `CardRenderer` drew the card
+  layer opaque in B&W mode regardless. Fixed by carrying a real `Mask` array
+  through `BitmapImage` and compositing all three WOBA pixel states
+  (opaque black / opaque white / transparent) uniformly in both render
+  modes. The sample corpus never exercised this (its art is card-level,
+  self-masked, full-bleed) — proven instead by two new hand-built fixture
+  tests. See B1 for the full account, including a partial prior compensation
+  (a Color-mode-only, heuristic-based transparency path) that this
+  superseded.
 - **F6 [fixed] Resource forks discarded.** `Containers/StackEntry.cs` now
   carries `ResourceFork`, `Resources/MacResourceForkReader.cs` parses it,
   and button icons already consume it. Fork-dependent features (sound,
@@ -324,27 +328,57 @@ github.com/PierreLorenzi/HyperCardPreview), especially part drawing and
 text layout. Use it as a *specification* (read, understand, re-express);
 never translate GPL code line by line into this MIT project.
 
-### B1. Carry the WOBA mask through to compositing  [model: sonnet] [status: pending]
+### B1. Carry the WOBA mask through to compositing  [model: sonnet] [status: done, commit 9591d86]
 
-- **Goal:** Close F5: correct four-layer compositing (background paint ->
-  background parts -> card paint -> card parts) with true card-layer
-  transparency.
-- **Files:** `Core/Bitmap/BitmapImage.cs`, `Core/Bitmap/WobaDecoder.cs`,
-  `Rendering/BitmapRenderer.cs`, `Rendering/CardRenderer.cs`.
-- **Spec:** `BitmapImage` gains `byte[] Mask` (same row layout as `Data`).
-  WOBA semantics (HyperCardPreview + the Wildfire format doc): pixel is
-  *black* when image bit = 1; *opaque white* when mask bit = 1 and image
-  bit = 0; *transparent* when both are 0. `MaskDataSize == 0` with empty
-  `MaskRect` means self-masking (only image=1 pixels are opaque, black).
-  `MaskDataSize == 0` with non-empty `MaskRect` means the whole rect is
-  opaque white. Consolidate `BitmapRenderer`'s two conversion methods into
-  one three-state BGRA conversion (DRY). `CardRenderer`: background layer
-  opaque over white base; card layer with transparency. Respect
-  `HideCardPicture` and the background equivalent (skip layer when set).
-- **Accept:** Unit test on a hand-built 16x16 BMAP fixture with known
-  mask/image bits asserts all three pixel states in the composited output.
+- **Goal:** Close F5: correct compositing (background paint -> background
+  parts -> card paint -> card parts) with true card-layer transparency.
+- **Files (as built):** same four files as planned, plus
+  `tests/HyperCardSharp.Rendering.Tests/HyperCardSharp.Rendering.Tests.csproj`
+  (needed the same `SkiaSharp.NativeAssets.Linux.NoDependencies` package
+  A0 added elsewhere, to make `SKBitmap.GetPixel` work in tests on Linux).
+- **Found before implementing (revises the original F5 diagnosis):** a prior
+  session had already added a second `BitmapRenderer` conversion method and
+  wired `isColor`-gated transparency into `CardRenderer` — but it only
+  activated in Color mode (never in B&W, the default/primary mode), and its
+  "transparency" was a naive "any white pixel is transparent" heuristic
+  applied post-hoc to the SKBitmap conversion, not derived from the real
+  WOBA mask (`WobaDecoder` still discarded the decoded mask array
+  unconditionally). So F5's user-visible symptom was unchanged; the fix
+  below replaces this heuristic rather than building alongside it.
+- **Spec (as built):** `BitmapImage` gained `byte[] Mask`. WOBA semantics
+  (HyperCardPreview + the Wildfire format doc): pixel is *black* when Data
+  bit = 1; *opaque white* when Mask bit = 1 and Data bit = 0; *transparent*
+  when both are 0. Self-masking (`MaskDataSize == 0`, empty `MaskRect`)
+  sets `Mask = Data` (aliased, not copied — decoded arrays are never
+  mutated post-decode elsewhere in the codebase, so this is safe and
+  avoids an allocation on the common case). `BitmapRenderer`'s two
+  conversion methods consolidated into one three-state `ToSKBitmap`, with
+  a documented fallback to fully-opaque-white when `Mask` is absent/wrong
+  length (covers hand-built fixtures). `CardRenderer` draws both bg and
+  card bitmap layers through the single method unconditionally (not
+  gated on Color mode — a transparent pixel over the white canvas looks
+  identical to opaque white, so this is correct in B&W mode too, and
+  improves Color-mode AddColor fidelity as a side effect). Dropped the
+  now-redundant `_bitmapCacheAlpha`. `CardBlock.HideCardPicture` /
+  `BackgroundBlock.HideBackgroundPicture` (existed, were never consulted
+  anywhere) are now wired in.
+- **Verified:** 6 new tests (2 `WobaDecoderTests` against a hand-built
+  16x16 three-state BMAP fixture with real separate mask data, verifying
+  `Mask` is distinct from `Data` and each of the three states decodes
+  correctly, plus a self-masking case verifying `Mask == Data`; 4
+  `BitmapRendererTests` asserting the three composited SKBitmap pixel
+  states directly via `GetPixel`, including the no-mask-provided fallback).
+  Suite: 58/58 green (was 52). RenderDump swept all six samples: output
+  byte-identical to pre-B1 (the sample corpus is self-masked/full-bleed,
+  so it never exercised the separate-mask path — the fix is proven by the
+  fixture tests, not the samples, exactly as anticipated in the original
+  accept criteria below).
+- **Accept (met):** Unit tests on a hand-built BMAP fixture with known
+  mask/image bits assert all three pixel states in the composited output.
   NEUROBLAST renders unchanged (self-contained cards). A fixture stack
-  whose background carries art is no longer whited out.
+  whose background carries art would no longer be whited out (no sample
+  in the corpus exercises this scenario; covered by the fixture tests
+  instead — worth sourcing such a sample for the B7 golden-image suite).
 
 ### B2. Part-style audit and completion  [model: sonnet] [status: pending]
 
