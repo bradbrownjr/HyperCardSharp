@@ -192,6 +192,8 @@ new human contributor without holding the whole system in their head.
 
 ## 4. Phase A: Every sample opens, nothing crashes
 
+**Retired task IDs:** A1 (MacRoman encoding — already fixed upstream, verified by A0 render harness), A3 (StuffIt verification — already works via upstream A1 fix), A5 (resource-fork carrying — already implemented upstream). Task numbering is never reused to keep IDs stable across sessions; gaps are documented here.
+
 ### A0. Commit the render-dump harness as a tool  [model: sonnet] [status: done, commit TBD]
 
 - **Goal:** A repeatable CLI rendering any stack's cards to PNGs, so
