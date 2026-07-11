@@ -11,9 +11,8 @@ namespace HyperCardSharp.Rendering;
 public class CardRenderer
 {
     private readonly StackFile _stack;
-    private readonly Dictionary<int, SKBitmap> _bitmapCache      = new();
-    private readonly Dictionary<int, SKBitmap> _bitmapCacheAlpha = new();
-    private readonly Dictionary<short, SKBitmap> _iconCache       = new();
+    private readonly Dictionary<int, SKBitmap> _bitmapCache = new();
+    private readonly Dictionary<short, SKBitmap> _iconCache = new();
 
     public CardRenderer(StackFile stack)
     {
@@ -46,7 +45,11 @@ public class CardRenderer
 
         bool isColor = mode == RenderMode.Color;
 
-        // Draw background bitmap (if any)
+        // Draw background bitmap (if any). Compositing is always transparency-aware
+        // (see BitmapRenderer.ToSKBitmap) regardless of B&W/Color mode: a transparent
+        // pixel over the white canvas below looks identical to an opaque white one,
+        // so this is correct in B&W mode too, and lets AddColor fills show through
+        // in Color mode.
         var bg = _stack.Backgrounds.FirstOrDefault(b => b.Header.Id == card.BackgroundId);
         if (bg != null)
         {
@@ -55,23 +58,25 @@ public class CardRenderer
             if (isColor && _stack.BackgroundColorData.TryGetValue(bg.Header.Id, out var bgRegions))
                 ColorRenderer.DrawColorRegions(canvas, bgRegions, bg.Parts);
 
-            if (bg.BitmapId != 0)
+            if (bg.BitmapId != 0 && !bg.HideBackgroundPicture)
             {
-                var bgBmp = GetOrDecodeBitmap(bg.BitmapId, isColor, out _);
+                var bgBmp = GetOrDecodeBitmap(bg.BitmapId, out _);
                 if (bgBmp != null)
                     canvas.DrawBitmap(bgBmp, 0, 0);
             }
         }
 
-        // Draw card bitmap on top
+        // Draw card bitmap on top, transparent where the WOBA mask says so —
+        // this is what lets background art show through instead of being
+        // whited out by the card layer.
         (int Left, int Top, int Right, int Bottom)? cardImgRect = null;
-        if (card.BitmapId != 0)
+        if (card.BitmapId != 0 && !card.HideCardPicture)
         {
             // In Color mode: draw AddColor card fills before the card bitmap
             if (isColor && _stack.CardColorData.TryGetValue(card.Header.Id, out var cardRegions))
                 ColorRenderer.DrawColorRegions(canvas, cardRegions, card.Parts);
 
-            var cardBitmap = GetOrDecodeBitmap(card.BitmapId, isColor, out var cardBmap);
+            var cardBitmap = GetOrDecodeBitmap(card.BitmapId, out var cardBmap);
             if (cardBitmap != null)
                 canvas.DrawBitmap(cardBitmap, 0, 0);
             if (cardBmap != null)
@@ -94,12 +99,11 @@ public class CardRenderer
         return result;
     }
 
-    private SKBitmap? GetOrDecodeBitmap(int bmapId, bool transparent, out BitmapBlock? bmap)
+    private SKBitmap? GetOrDecodeBitmap(int bmapId, out BitmapBlock? bmap)
     {
         bmap = null;
-        var cache = transparent ? _bitmapCacheAlpha : _bitmapCache;
 
-        if (cache.TryGetValue(bmapId, out var cached))
+        if (_bitmapCache.TryGetValue(bmapId, out var cached))
         {
             _stack.Bitmaps.TryGetValue(bmapId, out bmap);
             return cached;
@@ -114,11 +118,9 @@ public class CardRenderer
 
         var blockData = _stack.GetBlockData(blockHeader);
         var decoded   = WobaDecoder.Decode(blockData, bmap);
-        var skBitmap  = transparent
-            ? BitmapRenderer.ToSKBitmapWithTransparency(decoded)
-            : BitmapRenderer.ToSKBitmap(decoded);
+        var skBitmap  = BitmapRenderer.ToSKBitmap(decoded);
 
-        cache[bmapId] = skBitmap;
+        _bitmapCache[bmapId] = skBitmap;
         return skBitmap;
     }
 
@@ -151,9 +153,6 @@ public class CardRenderer
         foreach (var bmp in _bitmapCache.Values)
             bmp.Dispose();
         _bitmapCache.Clear();
-        foreach (var bmp in _bitmapCacheAlpha.Values)
-            bmp.Dispose();
-        _bitmapCacheAlpha.Clear();
         foreach (var bmp in _iconCache.Values)
             bmp.Dispose();
         _iconCache.Clear();

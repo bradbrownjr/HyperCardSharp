@@ -14,6 +14,13 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="xunit" Version="2.5.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+    <!--
+      Needed for SKBitmap pixel access on Linux; the umbrella SkiaSharp
+      package has no native binaries here without this explicit package
+      (throws a SKObject/SKImageInfo type initializer exception otherwise).
+      No-op on Windows/macOS. Same fix as Core.Tests.csproj (roadmap task A0).
+    -->
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.2" />
   </ItemGroup>
 
   <ItemGroup>

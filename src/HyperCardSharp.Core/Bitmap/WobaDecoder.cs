@@ -43,28 +43,19 @@ public static class WobaDecoder
             DecompressLayer(imageData, image, bmap.ImageRect, bmap.CardRect, fullRowBytes);
         }
 
-        // Compose: if no mask data and mask rect is empty, use image as mask
+        // WOBA compositing semantics: an image bit of 1 is always opaque black ink.
+        // Where the image bit is 0, the mask decides opaque-white vs. transparent.
+        // Self-masking (no mask data and an empty mask rect) means only inked
+        // pixels are opaque, so the mask is identical to the image itself.
         bool useSelfMask = bmap.MaskDataSize == 0 && bmap.MaskRect.IsEmpty;
-
-        var result = new byte[fullRowBytes * cardHeight];
-        for (int i = 0; i < result.Length; i++)
-        {
-            byte imgBit = image[i];
-            byte mskBit = useSelfMask ? imgBit : mask[i];
-            // Mask=1 → white, Image=1 → black (image overrides mask)
-            // Result: image bits OR (mask bits that aren't image bits) as white background
-            result[i] = imgBit; // For rendering: 1=black
-            // For areas within the mask but not in image, we need to differentiate
-            // from transparent areas. For now, just output the image layer.
-            // Full composition will be handled at render time.
-        }
 
         return new BitmapImage
         {
             Width = cardWidth,
             Height = cardHeight,
             RowBytes = fullRowBytes,
-            Data = result
+            Data = image,
+            Mask = useSelfMask ? image : mask
         };
     }
 

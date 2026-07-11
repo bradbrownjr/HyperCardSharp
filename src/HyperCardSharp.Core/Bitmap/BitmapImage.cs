@@ -12,6 +12,14 @@ public class BitmapImage
     public byte[] Data { get; init; } = Array.Empty<byte>();
 
     /// <summary>
+    /// Opacity mask: same row layout as <see cref="Data"/>. Bit 1 = opaque,
+    /// bit 0 = transparent (lets whatever is drawn underneath show through).
+    /// A Data bit of 1 (black ink) is always opaque regardless of Mask; the
+    /// mask only distinguishes opaque white from transparent where Data is 0.
+    /// </summary>
+    public byte[] Mask { get; init; } = Array.Empty<byte>();
+
+    /// <summary>
     /// Get pixel value at (x, y). Returns true if black, false if white.
     /// </summary>
     public bool GetPixel(int x, int y)
